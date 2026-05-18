@@ -40,20 +40,17 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
       clave: string | null;
       clave_hash: string | null;
       id_funcionario: number | null;
-      nombres_fun: string | null;
-      ap_pat_fun: string | null;
-      ap_mat_fun: string | null;
-      email_fun: string | null;
+      nombres: string | null;
+      apellidos: string | null;
       id_dependencia: number | null;
       desc_dependencia: string | null;
-      activo: boolean | null;
     }>(`
       SELECT
-        u.id_usuario, u.usuario, u.clave, u.clave_hash,
+        u.id_usuario, u.usuario, u.clave,
+        NULL AS clave_hash,
         u.id_funcionario,
-        f.nombres_fun, f.ap_pat_fun, f.ap_mat_fun, f.email_fun, f.id_dependencia,
-        d.desc_dependencia,
-        ISNULL(u.activo, 1) AS activo
+        f.nombres, f.apellidos, f.id_dependencia,
+        d.desc_dependencia
       FROM usuario u
       LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
       LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
@@ -63,12 +60,11 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
   const row = result.recordset[0];
 
   if (!row) throw createAuthError('Credenciales inválidas');
-  if (row.activo === false) throw createAuthError('Usuario deshabilitado');
 
   const isValid = await verifyPassword(dto.clave, row.clave, row.clave_hash);
   if (!isValid) throw createAuthError('Credenciales inválidas');
 
-  // Migración gradual: si no tiene hash, generarlo y guardarlo
+  // Intento de migración gradual a bcrypt (silencioso si la columna no existe)
   if (!row.clave_hash) {
     const hash = await bcrypt.hash(dto.clave, BCRYPT_ROUNDS);
     await saveClavHash(pool, row.id_usuario, hash);
@@ -80,10 +76,10 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
     idUsuario: row.id_usuario,
     usuario: row.usuario,
     idFuncionario: row.id_funcionario,
-    nombres: row.nombres_fun,
-    apPat: row.ap_pat_fun,
-    apMat: row.ap_mat_fun,
-    email: row.email_fun,
+    nombres: row.nombres ?? null,
+    apPat: row.apellidos ?? null,
+    apMat: null,
+    email: null,
     idDependencia: row.id_dependencia,
     descDependencia: row.desc_dependencia,
     roles,
@@ -152,15 +148,13 @@ export async function getMe(idUsuario: number): Promise<UserSession> {
       id_usuario: number;
       usuario: string;
       id_funcionario: number | null;
-      nombres_fun: string | null;
-      ap_pat_fun: string | null;
-      ap_mat_fun: string | null;
-      email_fun: string | null;
+      nombres: string | null;
+      apellidos: string | null;
       id_dependencia: number | null;
       desc_dependencia: string | null;
     }>(`
       SELECT u.id_usuario, u.usuario, u.id_funcionario,
-             f.nombres_fun, f.ap_pat_fun, f.ap_mat_fun, f.email_fun, f.id_dependencia,
+             f.nombres, f.apellidos, f.id_dependencia,
              d.desc_dependencia
       FROM usuario u
       LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
@@ -177,10 +171,10 @@ export async function getMe(idUsuario: number): Promise<UserSession> {
     idUsuario: row.id_usuario,
     usuario: row.usuario,
     idFuncionario: row.id_funcionario,
-    nombres: row.nombres_fun,
-    apPat: row.ap_pat_fun,
-    apMat: row.ap_mat_fun,
-    email: row.email_fun,
+    nombres: row.nombres ?? null,
+    apPat: row.apellidos ?? null,
+    apMat: null,
+    email: null,
     idDependencia: row.id_dependencia,
     descDependencia: row.desc_dependencia,
     roles,

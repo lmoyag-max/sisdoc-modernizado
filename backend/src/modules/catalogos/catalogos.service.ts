@@ -3,8 +3,8 @@ import { getPool, sql } from '../../config/database';
 export async function getTiposDocumento() {
   const pool = await getPool();
   const r = await pool.request().query(`
-    SELECT id_tipo_documento AS id, desc_tipo_documento AS descripcion, activo
-    FROM tipo_documento WHERE activo = 1 ORDER BY desc_tipo_documento
+    SELECT id_tipo_documento AS id, desc_tipo_documento AS descripcion
+    FROM tipo_documento ORDER BY desc_tipo_documento
   `);
   return r.recordset;
 }
@@ -19,21 +19,20 @@ export async function getEstadosDocumento() {
 }
 
 export async function getPrioridades() {
-  const pool = await getPool();
-  const r = await pool.request().query(`
-    SELECT id_prioridad AS id, desc_prioridad AS descripcion, color
-    FROM prioridad ORDER BY id_prioridad
-  `);
-  return r.recordset;
+  // La tabla prioridad puede no existir en SISDOC legacy
+  return [
+    { id: 1, descripcion: 'Normal', color: '#6b7280' },
+    { id: 2, descripcion: 'Urgente', color: '#f59e0b' },
+    { id: 3, descripcion: 'Muy Urgente', color: '#ef4444' },
+  ];
 }
 
-export async function getDependencias(soloActivas = true) {
+export async function getDependencias(_soloActivas = true) {
   const pool = await getPool();
-  const request = pool.request();
-  const where = soloActivas ? 'WHERE activa = 1' : '';
-  const r = await request.query(`
-    SELECT id_dependencia AS id, desc_dependencia AS descripcion, sigla_dependencia AS sigla
-    FROM dependencia ${where} ORDER BY desc_dependencia
+  const r = await pool.request().query(`
+    SELECT id_dependencia AS id, desc_dependencia AS descripcion,
+           cod_dependencia AS sigla
+    FROM dependencia ORDER BY desc_dependencia
   `);
   return r.recordset;
 }
@@ -42,7 +41,7 @@ export async function getDescriptores() {
   const pool = await getPool();
   const r = await pool.request().query(`
     SELECT id_descriptor AS id, desc_descriptor AS descripcion
-    FROM descriptor WHERE activo = 1 ORDER BY desc_descriptor
+    FROM descriptor ORDER BY desc_descriptor
   `);
   return r.recordset;
 }
@@ -54,20 +53,23 @@ export async function getFuncionariosPorDependencia(idDependencia: number) {
     .input('idDep', sql.Int, idDependencia)
     .query(`
       SELECT f.id_funcionario AS id,
-             f.nombres_fun + ' ' + f.ap_pat_fun AS nombre,
-             f.email_fun AS email
+             f.nombres + ' ' + f.apellidos AS nombre
       FROM funcionario f
       WHERE f.id_dependencia = @idDep
-      ORDER BY f.ap_pat_fun, f.nombres_fun
+      ORDER BY f.apellidos, f.nombres
     `);
   return r.recordset;
 }
 
 export async function getDependenciasExternas() {
-  const pool = await getPool();
-  const r = await pool.request().query(`
-    SELECT id_dependencia_externa AS id, desc_dependencia_externa AS descripcion, tipo
-    FROM dependencia_externa ORDER BY desc_dependencia_externa
-  `);
-  return r.recordset;
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT id_dependencia_externa AS id, desc_dependencia_externa AS descripcion, tipo
+      FROM dependencia_externa ORDER BY desc_dependencia_externa
+    `);
+    return r.recordset;
+  } catch {
+    return [];
+  }
 }

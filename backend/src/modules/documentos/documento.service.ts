@@ -24,24 +24,13 @@ export async function obtenerHistorial(idDocumento: number) {
 export async function crearDocumento(dto: CrearDocumentoDto, idUsuario: number) {
   const idDocumento = await repo.insert({
     idTipoDocumento: dto.idTipoDocumento,
-    numDocumento: dto.numDocumento,
-    asunto: dto.asunto,
+    numInterno: dto.numDocumento,
+    materia: dto.asunto,
     idEstadoDocumento: 1,
-    idProcedencia: dto.idProcedencia,
-    idProcedenciaExterna: dto.idProcedenciaExterna,
-    idDestino: dto.idDestino,
     idUsuario,
-    idPrioridad: dto.idPrioridad,
-    idExpediente: dto.idExpediente,
     fechaDocumento: dto.fechaDocumento ? new Date(dto.fechaDocumento) : undefined,
-    observacion: dto.observacion,
   });
 
-  if (dto.descriptores?.length) {
-    await insertDescriptores(idDocumento, dto.descriptores);
-  }
-
-  await repo.insertHistorial({ idDocumento, idUsuario, accion: 'INGRESADO' });
   return obtenerDocumento(idDocumento);
 }
 
@@ -57,25 +46,16 @@ export async function derivarDocumento(
   await pool
     .request()
     .input('idDocumento', sql.Int, idDocumento)
-    .input('idUsuarioOrigen', sql.Int, idUsuario)
-    .input('idDependenciaDestino', sql.Int, dto.idDependenciaDestino)
-    .input('idFuncionarioDestino', sql.Int, dto.idFuncionarioDestino ?? null)
+    .input('idUsuario', sql.Int, idUsuario)
+    .input('idDestino', sql.Int, dto.idDependenciaDestino)
     .input('observacion', sql.VarChar(500), dto.observacion ?? null)
     .query(`
-      INSERT INTO tramite (id_documento, id_usuario_origen, id_dependencia_destino,
-                           id_funcionario_destino, id_estado_tramite, fecha_derivacion, observacion)
-      VALUES (@idDocumento, @idUsuarioOrigen, @idDependenciaDestino,
-              @idFuncionarioDestino, 1, GETDATE(), @observacion)
+      INSERT INTO tramite (id_documento, id_usuario, id_destino,
+                           id_estado_tramite, fecha_sistema, observaciones)
+      VALUES (@idDocumento, @idUsuario, @idDestino, 1, GETDATE(), @observacion)
     `);
 
   await repo.updateEstado(idDocumento, 3);
-  await repo.insertHistorial({
-    idDocumento,
-    idUsuario,
-    accion: 'DERIVADO',
-    observacion: dto.observacion,
-  });
-
   return obtenerDocumento(idDocumento);
 }
 
@@ -98,8 +78,8 @@ async function insertDescriptores(idDocumento: number, descriptores: number[]): 
 function mapDocumento(row: repo.DocumentoRow) {
   return {
     idDocumento: row.id_documento,
-    numDocumento: row.num_documento,
-    asunto: row.asunto,
+    numDocumento: row.num_oficial ?? row.num_interno,
+    asunto: row.materia,
     tipoDocumento: {
       id: row.id_tipo_documento,
       descripcion: row.desc_tipo_documento,
@@ -108,27 +88,17 @@ function mapDocumento(row: repo.DocumentoRow) {
       id: row.id_estado_documento,
       descripcion: row.desc_estado_documento,
     },
-    prioridad: {
-      id: row.id_prioridad,
-      descripcion: row.desc_prioridad,
-      color: row.color_prioridad,
-    },
-    procedencia: {
-      id: row.id_procedencia,
-      descripcion: row.desc_procedencia,
-    },
-    destino: {
-      id: row.id_destino,
-      descripcion: row.desc_destino,
-    },
+    prioridad: { id: null, descripcion: null, color: null },
+    procedencia: { id: null, descripcion: null },
+    destino: { id: null, descripcion: null },
     ingresadoPor: {
       id: row.id_usuario,
       usuario: row.usuario,
-      nombre: [row.nombres_fun, row.ap_pat_fun].filter(Boolean).join(' '),
+      nombre: [row.nombres, row.apellidos].filter(Boolean).join(' '),
     },
     fechaDocumento: row.fecha_documento,
-    fechaIngreso: row.fecha_ingreso,
-    fechaCierre: row.fecha_cierre,
-    observacion: row.observacion,
+    fechaIngreso: row.fecha_sistema,
+    fechaCierre: null,
+    observacion: null,
   };
 }

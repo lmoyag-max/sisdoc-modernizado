@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth.middleware';
-import { getPool, sql } from '../../config/database';
+import { getPool } from '../../config/database';
 import { sendSuccess } from '../../shared/utils/response';
 
 const router = Router();
@@ -14,8 +14,8 @@ router.get('/dashboard', async (_req, res, next) => {
         SELECT
           COUNT(*) AS total,
           SUM(CASE WHEN id_estado_documento IN (1,2,3,4) THEN 1 ELSE 0 END) AS pendientes,
-          SUM(CASE WHEN CAST(fecha_cierre AS DATE) = CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS cerradosHoy,
-          SUM(CASE WHEN id_prioridad = (SELECT MAX(id_prioridad) FROM prioridad) THEN 1 ELSE 0 END) AS urgentes
+          SUM(CASE WHEN CAST(fecha_sistema AS DATE) = CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS cerradosHoy,
+          0 AS urgentes
         FROM documento
       `),
       pool.request().query<{ id_estado_documento: number; desc_estado_documento: string; cantidad: number }>(`
@@ -27,10 +27,10 @@ router.get('/dashboard', async (_req, res, next) => {
         ORDER BY d.id_estado_documento
       `),
       pool.request().query<{ mes: string; cantidad: number }>(`
-        SELECT FORMAT(fecha_ingreso, 'yyyy-MM') AS mes, COUNT(*) AS cantidad
+        SELECT FORMAT(fecha_sistema, 'yyyy-MM') AS mes, COUNT(*) AS cantidad
         FROM documento
-        WHERE fecha_ingreso >= DATEADD(MONTH, -6, GETDATE())
-        GROUP BY FORMAT(fecha_ingreso, 'yyyy-MM')
+        WHERE fecha_sistema >= DATEADD(MONTH, -6, GETDATE())
+        GROUP BY FORMAT(fecha_sistema, 'yyyy-MM')
         ORDER BY mes
       `),
     ]);
@@ -47,21 +47,37 @@ router.get('/actividad-reciente', async (_req, res, next) => {
   try {
     const pool = await getPool();
     const result = await pool.request().query<{
-      id_historial: number; accion: string | null; fecha: Date;
-      asunto: string | null; num_documento: string | null;
-      usuario: string | null; nombres_fun: string | null;
+      id_seguimiento: number;
+      id_estado_tramite: number | null;
+      fecha_sistema: Date | null;
+      materia: string | null;
+      num_interno: string | null;
+      usuario: string | null;
+      nombres: string | null;
     }>(`
       SELECT TOP 10
-        h.id_historial, h.accion, h.fecha,
-        d.asunto, d.num_documento,
-        u.usuario, f.nombres_fun
-      FROM historial_documento h
-      JOIN documento d ON h.id_documento = d.id_documento
-      LEFT JOIN usuario u ON h.id_usuario = u.id_usuario
+        t.id_seguimiento, t.id_estado_tramite, t.fecha_sistema,
+        d.materia, d.num_interno,
+        u.usuario, f.nombres
+      FROM tramite t
+      JOIN documento d ON t.id_documento = d.id_documento
+      LEFT JOIN usuario u ON t.id_usuario = u.id_usuario
       LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
-      ORDER BY h.fecha DESC
+      ORDER BY t.fecha_sistema DESC
     `);
-    sendSuccess(res, result.recordset);
+
+    // Mapear al formato que espera el frontend
+    const mapped = result.recordset.map(r => ({
+      id_historial: r.id_seguimiento,
+      accion: r.id_estado_tramite === 1 ? 'DERIVADO' : 'RECEPCIONADO',
+      fecha: r.fecha_sistema,
+      asunto: r.materia,
+      num_documento: r.num_interno,
+      usuario: r.usuario,
+      nombres_fun: r.nombres,
+    }));
+
+    sendSuccess(res, mapped);
   } catch (e) { next(e); }
 });
 

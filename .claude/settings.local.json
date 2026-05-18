@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\sisdoc-modernizado\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(xargs ls -la)",
+      "Bash(mkdir -p \"c:\\\\sisdoc-modernizado\\\\docs\\\\analisis-claude\")",
+      "Bash(Get-ChildItem \"c:\\\\sisdoc-modernizado\\\\docs\\\\analisis-claude\")",
+      "Bash(Select-Object Name, Length, LastWriteTime)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\sisdoc-modernizado\\\\backend\" -Exclude \"node_modules\" -Recurse -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | ForEach-Object { $_.FullName } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\sisdoc-modernizado\\\\frontend\\\\src\" -Recurse -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | ForEach-Object { $_.FullName } | Sort-Object)"
+    ],
+    "additionalDirectories": [
+      "c:\\sisdoc-modernizado\\docs"
+    ]
+  }
+}

@@ -1,0 +1,73 @@
+BODY
+{
+    FONT-FAMILY: "Trebuchet MS", Verdana, Arial, sans-serif;
+	font-size: 12px;
+  	scrollbar-face-color: #D6DFF5; 
+    scrollbar-track-color: #F0F3E5; 
+    scrollbar-arrow-color: #082EA2;
+    scrollbar-highlight-color: #FFFFFF; 
+    scrollbar-3dlight-color: #8EB6D9; 
+    scrollbar-shadow-color: #663366;
+    scrollbar-darkshadow-color: #000000; 
+}
+
+TEXTAREA {
+	font-family: Geneva, Arial, Helvetica, sans-serif;
+	font-size: 10px;
+	font-style: normal;
+	border: 1px solid;
+}
+
+
+TR {
+	FONT-SIZE: 12px; COLOR: #000000; FONT-FAMILY: arial, helvetica, sans-serif; TEXT-DECORATION: none
+}
+TD {
+	FONT-SIZE: 12px; COLOR: #000000; FONT-FAMILY: arial, helvetica, sans-serif; TEXT-DECORATION: none
+}
+.unnamed1 {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: xx-small;
+	font-style: normal;
+	border: 1px dotted;
+}
+.botones {
+
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: xx-small;
+	font-style: normal;
+	border: 1px solid;
+}
+
+SELECT {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: xx-small;
+	font-weight: lighter;
+	font-variant: normal;
+	cursor: auto;
+	margin: 5px;
+	padding: 4px;
+	height: auto;
+	width: auto;
+	list-style-position: outside;
+	list-style-image: none;
+	list-style-type: disc;
+	border: doble #CCCCCC;
+	word-spacing: normal;
+	display: list-item;
+
+}
+
+.texto {
+	font-family: "Trebuchet MS", Verdana, Arial, sans-serif;
+	font-size: 12px;
+	font-style: normal;
+	font-weight: normal;
+}
+
+.entradas {
+	font-family: Geneva, Arial, Helvetica, sans-serif;
+	font-size: 10px;
+	font-style: normal;
+	border: 1px solid;
+}

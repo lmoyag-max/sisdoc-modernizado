@@ -1,0 +1,225 @@
+	
+	
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>< Edicion></title>
+</head>
+
+<body bgcolor="#FFFFFF" text="#000000" link="#CCCCCC"  onLoad="carga()">
+<form name="form1" method="post" >
+  <table width="727" border="2" cellpadding="1" cellspacing="1" bordercolor="#990066" bgcolor="#FFFFCC" height="870">
+    <tr>
+      <td width="717" height="30" align="center"> 
+        <table width="639" border="0" align="center" cellpadding="2" cellspacing="2" height="40">
+        </table>
+        <table width="629" border="0" align="center" cellpadding="0" cellspacing="0" height="30">
+          <tr>
+            <td width="629" height="30" align="center">&nbsp; </td>
+          </tr>
+        </table>
+        <table width="630" height="245" border="1" align="center" cellpadding="2" cellspacing="2">
+          <tr> </tr>
+          <tr> 
+            <td width="602" valign="top" height="212"> 
+              <div align="center"> 
+                <table width="604" border="0" cellspacing="2" cellpadding="2">
+                  <tr> 
+                    <td width="128" height="18"><font ><b>Tipo de Docto</b></font> 
+                    </td>
+                    <td width="183" height="18" > 
+                      Memorandum                    </td>
+                <td width="88" height="18"><b>Fecha Docto<font face="Arial, Helvetica, sans-serif">&nbsp;</font></b></td>
+                 <td height="18" colspan="3"> 
+                      08/05/2003                 </td>
+                  </tr>
+                  <tr> 
+                    <td width="128" height="18"><b>Estado del Tr&aacute;mite</b></td>
+                    <td width="183" height="18"> 
+                      Recepcionado                    </td>
+                    <td width="88" height="18"><b>Medio</b></td>
+                    <td width="64" bgcolor="#FFFFCC" height="18"> 
+                      Papel                    </td>
+                    <td width="62" bgcolor="#FFFFCC" height="18"><b>Original</b></td>
+                    <td width="41" bgcolor="#FFFFCC" height="18"> 
+                      S                    </td>
+                  </tr>
+                </table>
+                <div align="left"><strong> N&uacute;meros</strong> </div>
+                <table width="600" align="center"  height="31" border="1" cellspacing="1" cellpadding="1">
+                  <tr valign="middle"> 
+                    <td width="92" height="30"><b><i>Interno<font size="4" face="Arial"> 
+                      </font></i></b></td>
+                    <td width="99" height="30"> 
+                      555                    </td>
+                    <td width="95" height="30"><b><i>Oficial</i></b><font size="4" face="Arial">&nbsp; 
+                      </font></td>
+                    <td width="95" height="30"> 
+                      0                    </td>
+                    <td width="96" height="30"><b><i>Externo<font size="4" face="Arial"> 
+                      </font></i></b></td>
+                    <td width="96" height="30"> 
+                      0                    </td>
+                  </tr>
+                </table>
+                <table width="600" border="0" cellspacing="2" cellpadding="2" height="55">
+                  <tr> 
+                    <td width="97" height="20"><b>Procedencia</b></td>
+                    <td width="187" height="20">
+                      Informática                    </td>
+                    <td width="123" height="20"><b>Funcionario</b></td>
+                    <td width="167" height="20"> 
+                      ximena moreno                    </td>
+                  </tr>
+                  <tr> 
+                    <td height="27" colspan="4"><b>Materia</b></td>
+                  </tr>
+                  <tr bordercolor="#FFFFFF"> 
+                    <td   height="40" colspan="4" > 
+                      <textarea name ="textfield6" cols="70" onFocus="this.blur();">pruebq x xc c cbc</textarea>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+          </tr>
+        </table>
+        <table width="626" border="0" cellspacing="1" cellpadding="1">
+          <tr> 
+            <td width="304"><font color="#0080C0"><strong><em>Trámite Del Documento</em></strong></font></td>
+          </tr>
+        </table>
+        <table width="626" border="1" cellspacing="1" cellpadding="1">
+          <tr> 
+            <td width="304"><font color="#800040"><strong>ORIGEN</strong></font></td>
+            <td width="309"><font color="#800040"><strong>DESTINO</strong></font></td>
+          </tr>
+        </table>
+        <table width="626" border="1" cellspacing="2" cellpadding="1">
+          <tr> 
+            <td width="305" height="89"> 
+              <table width="305" border="0" cellspacing="1" cellpadding="1">
+                <tr> 
+                  <td width="128">
+                    <b>Interno</b>                  </td>
+                </tr>
+                <tr> 
+                  <td>Procedencia</td>
+                  <td>Administración Interna</td>
+                </tr>
+                <tr> 
+                  <td>Funcionario</td>
+                  <td>mario m</td>
+                </tr>
+              </table>
+            </td>
+            <td width="308" height="89"> <table width="305" border="0" cellspacing="1" cellpadding="1">
+                <tr> 
+                  <td width="115"> <div align="center"><strong>Interno 
+                      <input name="radiodestino" type="radio"  value ="1" checked onClick="javascript:destino_interno();">
+                      </strong></div></td>
+                  <td width="183"><strong>Externo 
+                    <input name="radiodestino" type="radio"  value="2" onClick="javascript:destino_externo();">
+                    </strong> </td>
+                </tr>
+                <tr> 
+                  <td height="20">Destinatario </td>
+                  <td height="20"><font face="Arial"> 
+                    <select name="Cbo_Destinatario" id="Cbo_Destinatario" onChange="javascript:cambio1();">
+                      <option value="0"> </option>
+                                            <option value=5 > 
+                      Administración Interna </option>
+                                            <option value=1 > 
+                      Gabinete </option>
+                                            <option value=3 > 
+                      Informática </option>
+                                            <option value=6 > 
+                      Oficina de Partes </option>
+                                            <option value=4 > 
+                      Relaciones Públicas </option>
+                                            <option value=2 > 
+                      Subsecretaria </option>
+                                          </select>
+                    </font></td>
+                </tr>
+                <tr> 
+                  <td>Funcionario</td>
+                  <td><font face="Arial"> 
+                    <select name="Cbo_Func_Destino" id="select" onChange="javascript:cambio3();">
+                    </select>
+                    </font> </td>
+                </tr>
+              </table></td>
+          </tr>
+        </table>
+        <table width="626" border="1" cellspacing="2" cellpadding="1">
+          <tr> 
+            <td>Tipo Distribuci&oacute;n</td>
+            <td> <font face="Arial">
+              <select name="Cbo_Tipo_Distribucion" id="select9">
+                                <option value=1 >
+                Dar respuesta                </option>
+                                <option value=2 >
+                Para firma                </option>
+                                <option value=3 >
+                Para conocimiento                </option>
+                              </select>
+              </font></td>
+            <td>Tipo Compromiso</td>
+            <td> <font face="Arial">
+              <select name="Cbo_Tipo_Compromiso" id="select14">
+                                <option value=1 >
+                No tiene                </option>
+                                <option value=2 >
+                Normal                </option>
+                                <option value=3 >
+                Urgente                </option>
+                              </select>
+              </font></td>
+          </tr>
+          <tr> 
+            <td>Estado Compromiso</td>
+            <td> <font face="Arial">
+              <select name="Cbo_Estado_Compromiso" id="select13">
+                                <option value=2 >
+                En trámite                </option>
+                                <option value=3 >
+                Resuelto Aprobado                </option>
+                                <option value=4 >
+                Resuelto Rechazado                </option>
+                                <option value=5 >
+                Resuelto Terminado                </option>
+                              </select>
+              </font></td>
+            <td>D&iacute;as Compromiso</td>
+            <td><input name="TxtDias" type="text"  size="2" maxlength="2" onBlur="valida_digito(this.value,this,2);"></td>
+          </tr>  
+        </table>
+        <table width="626" border="1" cellspacing="1" cellpadding="1">
+          <tr> 
+            <td width="618">Despachado por Oficina de Partes 
+              <input name="checkofpartes2" type="checkbox" id="checkofpartes2" value="S">
+            </td>
+          </tr>
+        </table>
+        <table width="626" border="1" cellspacing="1" cellpadding="1">
+          <tr> 
+            <td width="618"><strong>Observaci&oacute;n</strong><br>
+              <textarea name="TxtObservacion" cols="70" rows="3" id="TxtObservacion"></textarea>
+            </td>
+          </tr>
+        </table>
+        <table width="626" border="1" align="center" cellpadding="2" cellspacing="2">
+          <tr> 
+            <td height="48" width="306">&nbsp; </td>
+            <td width="300">&nbsp; </td>
+          </tr>
+        </table>
+     
+      </td>
+    </tr>
+	  </table>
+  </form>
+  </body>
+</html>

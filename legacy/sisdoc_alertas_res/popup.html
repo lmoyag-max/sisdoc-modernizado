@@ -1,0 +1,52 @@
+<html>
+<head>
+  <title>Base para popup</title>
+    <script language="javascript">
+  //<!--
+  var _popup=null;
+
+function cierraPopup()
+{
+  if(_popup && !_popup.closed && _popup.open)
+  {
+      _popup.close();
+	  _popup=null;
+  }
+}
+function abrePopup(dir_url,nombre,modo)
+{
+  cierraPopup();
+  _popup=window.open(dir_url,nombre,modo);
+  //_popup.document.open();
+  //_popup.document.write(_pagina[i]);
+  //_popup.document.close();
+  _popup.focus();
+}
+
+  function envialos()
+  {
+    document.formulario.submit();
+  }
+
+
+
+  //-->
+  
+  </script>
+</head>
+
+<body>
+<br><br><br>
+
+
+<font color="#8000FF"><a href="javascript:abrePopup('documento_de_referencia.php','_blank','width=350,height=200');">Prueba POPUP</a></font>
+
+<form name="formulario" action="reciberut.php" method="post">
+  <input type="text" size="20" maxlength="20" name="valor1">
+  <input type="hidden" name="rut">
+  <input type="hidden" name="el_rut">
+  <input type="hidden" name="clave">
+</form>
+
+</body>
+</html>

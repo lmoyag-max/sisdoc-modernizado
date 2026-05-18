@@ -1,0 +1,17 @@
+<html>
+<head>
+<title>Busqueda por Nomina</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+<frameset cols="117,*" frameborder="YES" border="2" framespacing="2" rows="*"> 
+  <!--frame name="leftFrame" scrolling="NO" noresize src="SuperiorIzq.htm"-->
+  <!--frameset rows="161,*" frameborder="YES" border="2" framespacing="2" cols="*"--> 
+    <frame name="topFrame" scrolling="NO" noresize src="buscanomina.php;">
+    <frame name="mainFrame" src="buscapornomina2.php">
+  </frameset>
+</frameset>
+<noframes> 
+<body bgcolor="#FFFFFF" text="#000000">
+</body>
+</noframes> 
+</html>

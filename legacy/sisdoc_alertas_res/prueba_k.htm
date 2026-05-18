@@ -1,0 +1,52 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Documento sin t&iacute;tulo</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<script language="JavaScript" type="text/JavaScript">
+<!--
+function MM_findObj(n, d) { //v4.01
+  var p,i,x;  if(!d) d=document; if((p=n.indexOf("?"))>0&&parent.frames.length) {
+    d=parent.frames[n.substring(p+1)].document; n=n.substring(0,p);}
+  if(!(x=d[n])&&d.all) x=d.all[n]; for (i=0;!x&&i<d.forms.length;i++) x=d.forms[i][n];
+  for(i=0;!x&&d.layers&&i<d.layers.length;i++) x=MM_findObj(n,d.layers[i].document);
+  if(!x && d.getElementById) x=d.getElementById(n); return x;
+}
+
+function MM_showHideLayers() { //v6.0
+  var i,p,v,obj,args=MM_showHideLayers.arguments;
+  for (i=0; i<(args.length-2); i+=3) if ((obj=MM_findObj(args[i]))!=null) { v=args[i+2];
+    if (obj.style) { obj=obj.style; v=(v=='show')?'visible':(v=='hide')?'hidden':v; }
+    obj.visibility=v; }
+}
+//-->
+</script>
+</head>
+
+<body>
+<div id="Layer1" style="position:absolute; width:219px; height:115px; z-index:1; left: 479px; top: 245px; visibility: hidden; overflow: auto; background-color: #E6EEFF; layer-background-color: #E6EEFF; border: 1px none #000000;" class="texto"> 
+  <table width="100%" border="1" bgcolor="#E6EEFF">
+    <tr> 
+      <td height="82"> <font color="#000000" size="1" face="Trebuchet MS, Verdana, Arial, sans-serif"> 
+        <font face="Arial, Helvetica, sans-serif"> 
+        <?php 
+								
+							  $k=0;
+							  while($reg_servicio = mssql_fetch_array($rs_servicio)) { ?>
+        <input type="checkbox" name="casilla" value="<?php echo $reg_servicio["id_descriptor"];?>" onClick="javascript:muestra(<?php echo $reg_servicio["id_descriptor"];?>);">
+        <?php echo $reg_servicio["desc_descriptor"];?> </font></font><font color="#000000" size="1" face="Arial, Helvetica, sans-serif"><br>
+        <?php } ?>
+        </font><font color="#000000" face="Arial, Helvetica, sans-serif">&nbsp; 
+        </font> </td>
+    </tr>
+    <tr> 
+      <td height="23"> <div align="center" onClick="MM_showHideLayers('Layer1','','hide');MM_showHideLayers('Layer1','','hide');fecha_invitacion(<?php echo $nRows;?>)"><font color="#000000"><strong>Aceptar</strong></font></div></td>
+    </tr>
+  </table>
+  <div align="right"></div>
+</div>
+<font color="#000000">Descriptores 
+<input type="radio" name="radiodescriptor" value="radiobutton"   onClick="MM_showHideLayers('Layer1','','show')">
+</font>
+</body>
+</html>

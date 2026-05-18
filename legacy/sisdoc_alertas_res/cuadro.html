@@ -1,0 +1,25 @@
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
+<title>POPUP FIJO</title>
+<SCRIPT>
+
+function fnOpen(){
+
+	var vArreglo;
+	var sFeatures="dialogHeight: " + 250 + "px; dialogWidth: " + 650 + "px; dialogTop: " + 150 + "px; dialogLeft: " + 200 + "px; edge: " + "raised" + "; center: " + "yes" + "; help: " + "yes" + "; resizable: " + "no" + "; status: " + "off" + ";";
+
+
+	vArreglo = window.showModalDialog("cuadro_popup.html","nada",sFeatures);
+	document.form1.arregloint.value = vArreglo;
+}
+</SCRIPT>
+</head>
+<body Onload="javascript:fnOpen();">
+<br>
+<form name="form1">
+<b>SELECCION</b>
+<input type="text" name="arregloint" value="nada">
+</form>
+</body>
+</html>

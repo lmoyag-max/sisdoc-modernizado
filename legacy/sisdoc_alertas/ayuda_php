@@ -1,0 +1,391 @@
+FRAMES :
+target =-Top   deja el frame sin cambios 
+
+para hacer 3 frames :
+
+<\head>
+<meta ...........>
+<frameset rows = "37%,98%" cols="*" frameborder="1">
+         <frameset clos="0,*">
+     	<frame name="escond" SRC ="consultas.php" noresize scrolline="no">   
+    	<frame name="titulo" SRC ="titulo.php" noresize scrolline="no">   
+        </frameset>
+        <frameset cols="21%,79%">
+  	 <frame name ="indice" src= "indice.php" >
+   	<frame name ="informacion" src="presentacion.php" >
+       </frameset>
+    </frameset>
+
+--------------------------------
+
+
+
+popup 
+PARA LLAMAR UN POPUP DESDE UN FORMULARIO HTML 
+
+
+<form name="envio" action="popup.php" method="get" target="_blank"> 
+<input type="text" name="nombre usuario" value=""> 
+<input type="submit" name="boton_enviar" value="enviar nombre"> 
+</form> 
+
+------
+PARA TRABAJAR CON HREF 
+  
+  $nombrearchivo="http://linux80/desarrollo/sisdoc/sisdoc3.gif";
+  
+  con parametro fijo :
+  echo '<a href="#" onClick="popup(' . "'imagen.php?imagen=http://linux80/desarrollo/sisdoc/sisdoc3.gif'" . ',850,500,1);">Ver documento</a>';
+  
+  con parametro variable 
+  
+  echo '<a href="#" onClick="popup(' . "'imagen.php?imagen=" . $nombrearchivo . "'" . ',850,500,1);">Ver documento</a>';
+  
+  
+  Con varios parametros  
+  
+  echo '<a href="ver_documento_scaneado.php?cusuario=' . $cusuario . '&idusuario=' . $idusuario . '&TxtMateria=' . $TxtMateria .
+	  '&iddocum=' . $reg_documento["id_documento"] . '&idseguim=' . $reg_documento["id_seguimiento"] . '&idfuncionario=' . $idfuncionario .
+	  '&Cbo_Tipo_Docto=' . $Cbo_Tipo_Docto . '&Txt_fecha_ini =' . $Txt_fecha_ini .'&Txt_fecha_fin =' . $Txt_fecha_fin.
+	  '&TxtInterno =' . $TxtInterno . '&TxtOficial=' .$TxtOficial . '&TxtExterno=' . $TxtExterno . 
+	 '&arreglo=' . $arreglo . '&tipo_procedencia=' . $tipo_procedencia .
+	 '&tipo_destino =' .$tipo_destino . '&Cbo_Procedencia=' . $Cbo_Procedencia . 
+	 '&Cbo_Destinatario='. $Cbo_Destinatario . '&TxtMateria =' . $TxtMateria  .
+	 '&dependencia_usuario=' . $reg_func["id_dependencia"] .'&sw_cons=' .$cons .
+	 '&si_avanza=' . $si_avanza.'">Ver Documento</a>';
+	 
+-------	 
+
+Mensajes en JAVASCRIPT: 
+
+Mensaje de alerta:
+
+<SCRIPT language=JavaScript>
+//www.turefugio.es.fm
+alert("Mensaje")
+// --></SCRIPT>
+
+Mensaje de pregunta: 
+<SCRIPT language=JavaScript>
+//www.turefugio.es.fm
+if (confirm("pones lo que quieras"))
+// --></SCRIPT>
+
+
+Mensaje de pregunta, si pinchas aceptar pasa algo y si pinchas cancelar pasa otra cosa. 
+
+<script>
+//www.turefugio.es.fm
+if(confirm("quieres entrar?"))
+alert('hola');
+else
+alert('adios')
+</script> 
+
+Desabilita boton derecho 
+
+<script LANGUAGE="JavaScript">
+//www.turefugio.es.fm
+function derecha(e) {
+if (navigator.appName == 'Netscape' && (e.which == 3 || e.which == 2)){
+alert('Botón derecho inhabilitado')
+return false;
+}
+else if (navigator.appName == 'Microsoft Internet Explorer' && (event.button == 2)){
+alert('AQUI PONES LO QUE QUIERAS')
+}
+}
+document.onmousedown=derecha
+</script>
+
+
+Te pregunta tu nombre y luego te saluda a tu nombre 
+
+<SCRIPT LANGUAGE="JavaScript">
+//www.turefugio.es.fm
+var contestacion = prompt("¿Cómo te llamas, criatura?", "");
+if (contestacion)
+alert("Hola, " + contestacion);
+</SCRIPT>
+
+
+Lo mismo ke antes pero en vez de en un cuadro es en el documento 
+
+<SCRIPT LANGUAGE="JavaScript">
+//www.turefugio.es.fm
+var contestacion = prompt("¿Cómo te llamas, criatura?", "");
+if (contestacion)
+document.write("<CENTER><H1><B>Hola, " + contestacion);
+</SCRIPT>
+
+----
+Abre una ventana about blanc 
+
+//www.turefugio.es.fm
+<script language='javascript'>window.open('','','');</script> 
+---
+Abrir una ventana pop up
+
+
+//Entre el TAG  <HEAD>: 
+
+<SCRIPT LANGUAGE="JavaScript">
+function AbrirVentana() {
+MiVentana=open("","MiPropiaVentana",
+"toolbar=no,directories=no,menubar=no,status=yes");
+MiVentana.document.write(
+"<HEAD><TITLE>Una nueva ventana</TITLE></HEAD>");
+MiVentana.document.write("<CENTER><H1><B>" +
+"Esto puede ser lo que tu quieras</B></H1></CENTER>");
+}
+
+</SCRIPT>
+//Entre el TAG <Body> 
+<FORM>
+//www.turefugio.es.fm
+<INPUT TYPE="button" NAME="Boton1" VALUE="Abreme, Sésamo"
+onClick="AbrirVentana()">
+</FORM> 
+
+----------------
+
+
+Propiedades de String 
+
+Length 
+La clase String sólo tiene una propiedad: length, que guarda el número de caracteres del String. 
+
+Métodos de String 
+
+Los objetos de la clase String tienen una buena cantidad de métodos para realizar muchas cosas interesantes. Primero vamos a ver una lista de los métodos más interesantes y luego vamos a ver otra lista de métodos menos útiles. 
+
+charAt(indice) 
+Devuelve el carácter que hay en la posición indicada como índice. Las posiciones de un string empiezan en 0. 
+
+indexOf(carácter,desde) 
+Devuelve la posición de la primera vez que aparece el carácter indicado por parámetro en un string. Si no encuentra el carácter en el string devuelve -1. El segundo parámetro es opcional y sirve para indicar a partir de que posición se desea que empiece la búsqueda. 
+
+lastIndexOf(carácter,desde) 
+Busca la posición de un carácter exáctamente igual a como lo hace la función indexOf pero desde el final en lugar del principio. El segundo parámetro indica el número de caracteres desde donde se busca, igual que en indexOf. 
+Entrega -1 si el  caracter no se encuentra .
+
+
+replace(substring_a_buscar,nuevoStr) 
+Implementado en Javascript 1.2, sirve para reemplazar porciones del texto de un string por otro texto, por ejemplo, podríamos uilizarlo para reemplazar todas las apariciones del substring "xxx" por "yyy". El método no reemplaza en el string, sino que devuelve un resultante de hacer ese reemplazo. Acepta expresiones regulares como substring a buscar. 
+
+split(separador) 
+Este método sólo es compatible con javascript 1.1 en adelante. Sirve para crear un vector a partir de un String en el que cada elemento es la parte del String que está separada por el separador indicado por parámetro. 
+
+substring(inicio,fin) 
+Devuelve el substring que empieza en el carácter de inicio y termina en el carácter de fin. Si intercambiamos los parámetros de inicio y fin también funciona. Simplemente nos da el substring que hay entre el carácter menor y el mayor. 
+
+toLowerCase() 
+Pone todas los caracteres de un string en minúsculas. 
+
+toUpperCase() 
+Pone todas los caracteres de un string en mayúsculas. 
+
+toString() 
+Este método lo tienen todos los objetos y se usa para convertirlos en cadenas. 
+
+Hasta aquí hemos visto los métodos que nos ayudarán a tratar cadenas. Ahora vamos a ver otros métodos que son menos útiles, pero hay que indicarlos para que quede constancia de ellos. Todos sirven para aplicar estilos a un texto y es como si utilizásemos etiquetas HTML. Veamos cómo. 
+
+anchor(name) 
+Convierte en un ancla (sitio a donde dirigir un enlace) una cadena de caracteres usando como el atributo name de la etiqueta <A> lo que recibe por parámetro. 
+
+big() 
+Aumenta el tamaño de letra del string. Es como si colocásemos en un string al principio la etiqueta <BIG> y al final </BIG>. 
+
+blink() 
+Para que parpadee el texto del string, es como utilizar la etiqueta <BLINK>. Solo vale para Netscape. 
+
+bold() 
+Como si utilizásemos la etiqueta <B>. 
+
+fixed() 
+Para utilizar una fuente monoespaciada, etiqueta <TT>. 
+
+fontColor(color) 
+Pone la fuente a ese color. Como utilizar la etiqueta <FONT color=el_color_indicado>. 
+
+fontSize(tamaño) 
+Pone la fuente al tamaño indicado. Como si utilizásemos la etiqueta <FONT> con el atributo size. 
+
+italics() 
+Pone la fuente en cursiva. Etiqueta <I>. 
+
+link(url) 
+Pone el texto como un enlace a la URL indicada. Es como si utilizásemos la etiqueta <A> con el atributo href indicado como parámetro. 
+
+small() 
+Es como utilizar la etiqueta <SMALL> 
+
+strike() 
+Como utilizar la etiqueta <STRIKE>, que sirve para que el texto aparezca tachado. 
+
+sub() 
+Actualiza el texto como si se estuviera utilizando la etiqueta <SUB>, de subíndice. 
+
+sup() 
+Como si utilizásemos la etiqueta <SUP>, de superíndice
+
+
+---
+
+
+Para cambiar la el color de la barra de desplazamiento 
+
+Entre el TAG <HEAD>: 
+
+<style>
+<!--www.turefugio.es.fm
+BODY
+{scrollbar-DarkShadow-Color:#00000;
+scrollbar-Track-Color:#000000;
+scrollbar-Face-Color:#cc0033;
+scrollbar-Shadow-Color:black;
+scrollbar-Highlight-Color:black;
+scrollbar-3dLight-Color:#000000;
+scrollbar-Arrow-Color:white }
+-->
+</style>
+
+--------------------------
+ejecutar procedimiento alamacenado con parametro  en php 
+	 
+$rs_doc="exec busca_doctos_asociar'" . $xx. "'";
+
+$rs_documento=mssql_query($rs_doc);   
+$reg_doc =mssql_fetch_array($rs_documento);
+$Tot = mssql_num_rows($rs_documento);
+
+
+--------------------
+Usar  comandos java a nivel de php 
+
+echo '<script>';
+echo 'alert("No Existen Documentos Para Asociar")';
+echo '</script>';
+
+
+------
+
+para generar boton con funcion asociada 
+
+ <INPUT TYPE="button" VALUE="Subir Archivo" onclick="sube_imagen();">
+con submit 
+  <input name="cmd_grabar" type="submit"  value="Asociar Archivo" >
+
+------
+Mandar parametros al siguinete programa 
+
+            <input type="hidden" name="id_documento" value="<? echo $iddocum;?>">     
+            <input type="hidden" name="idusuario" value="<? echo $idusuario;?>">
+            <input type="hidden" name="cusuario" value="<? echo $cusuario;?>">
+           <input type="hidden" name="idfuncionario" value="<? echo $idfuncionario;?>">
+           <input type="hidden" name="Txt_fecha_fin" value="<? echo $Txt_fecha_fin;?>">
+            <input type="hidden" name="Txt_fecha_ini" value="<? echo $Txt_fecha_ini;?>">
+            <input type="hidden" name="destino" value="<? echo $destino;?>">
+            <input type="hidden" name="cbo_esc_dest" value="<? echo $cbo_esc_dest  ;?>">
+            <input type="hidden" name="Cbo_Tipo_Docto" value="<? echo $Cbo_Tipo_Docto;?>">
+            <input type="hidden" name="TxtInterno" value="<? echo $TxtInterno;?>">
+            <input type="hidden" name="TxtExterno" value="<? echo $TxtExterno;?>">
+            <input type="hidden" name="TxtOficial" value="<? echo $TxtOficial;?>">
+
+
+
+-----
+Llamar popup 
+
+function popup(url,ancho,alto,scroll)
+{
+var cadena =url ;
+var posicion = cadena.lastIndexOf('http');
+if (posicion==-1)
+{
+alert ("No Existe Documento Scaneado");
+}
+else
+{newWin=window.open(url,"popup","resize=1,toolbar=0,location=0,directories=0,status=0,menubar=0,scrollbars="+scroll+",resizable=1,width="+ancho+",height="+alto+",top=0,left=100");
+ return;
+newWin.focus();}
+
+}
+
+$nombrearchivo="http://linux80/subidos/sisdoc/". $archivo; donde archivo es archivo.gif , archivo.doc u otro ....
+
+echo '<a href="#" onClick="popup(' . "'imagen.php?imagen=" . $nombrearchivo . "'" . ',850,500,1);">Ver documento</a>';
+
+------
+
+-------
+
+en php como  buscar  palabras separadas por comas 
+
+if($materia==""){
+$largo=0;}
+$materia=$largo . "," . $materia;
+$vector = split (",",$materia);
+
+$largo= $vector[0];$x=1;
+$sw_ok=0;
+$mat1="";
+$mat2="";
+$mat3 = "" ;
+if ($largo!=0){
+for($x=1;$x <=$largo;$x++){
+   //     $mat1 = $mat1 . "and a.materia  like '%" . trim($vector[$x]) . "%'" ;
+        $mat1 =  "a.materia  like '%" . trim($vector[$x]) . "%'" ;
+	  $mat2 =  "c.observaciones like '%" . trim($vector[$x]) . "%'";
+	  $mat3 = $mat3 . "and ((" . $mat1 . " ) or ( ". $mat2 . "))" ;  
+//	  echo "mat3" . $mat3. "<br>";
+}
+}
+
+
+----		
+
+
+PARA IMPRIMIR  :
+Funcion que permite que aparezca la ventana de imprimir de window 
+
+
+function imprime() 
+{
+//  MuestraEsconde('impresion','hidden');
+ // MuestraEsconde('volver','hidden');
+  window.print();
+  //MuestraEsconde('impresion','visible');
+  //MuestraEsconde('volver','visible');
+   
+}
+Se agrega antes de <meta> la linea siguiente para que haga corte de pagina 
+
+<style>div.break {page-break-before:always}</style> 
+
+
+
+-- Permite por defecto dejar un  registro especifio en un combo por defecto , dejando la opcion que la persona escoja otro e incluso en blanco---
+
+  <select name="Cbo_Tipo_Docto" class="combo" id="select5">
+                          <option value="0"> </option>
+                          <!-- por defecto muestra como tipo de documento memo , pudiendo escoger otro o ninguno--> 
+                          <?   while($reg=mssql_fetch_array($rs_tipo_docto)){
+		if($reg[id_tipo_documento]==35){$sel=" Selected";}else{$sel="";}?> 
+		<option value=<? echo $reg[id_tipo_documento] ?> <? echo $sel?>> 
+		<? echo $reg[desc_tipo_documento] ?></option> <?}?>
+                          
+                             
+                        </select>
+                        
+                        
+                        -- Carga un combo desde una tabla , dejando en la lista incluida una opcion en blanco --
+                        
+                        <select name="Cbo_Tipo_Docto" class="combo" id="select5">
+                          <option value="0"> </option>
+                          <?   while($reg=mssql_fetch_array($rs_tipo_docto)){ ?>  
+                          <option value=<? echo $reg[id_tipo_documento] ?> >  
+                          <? echo $reg[desc_tipo_documento] ?></option><?}?>
+     
+                        </select>
+                        

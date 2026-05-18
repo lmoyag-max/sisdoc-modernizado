@@ -1,0 +1,141 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<script language="JavaScript">
+
+function revisa_check() {
+
+  var x=0;
+  filas=25;
+  arregloint="";
+  arreglo1="";
+  for (k=0;k<filas;k++)
+  {
+     if (document.form1.checkbox[k].checked)
+     {
+       arreglo1=arreglo1+document.form1.checkbox[k].value+"@";
+      x=x+1;
+	  alert(document.form1.checkbox[k].value);
+	  }
+  }
+ document.form1.arregloint.value=x + "@" + arreglo1;
+
+ var vArreglo = x + "@" + arreglo1;
+
+ window.returnValue = vArreglo;
+	
+	
+}
+        
+
+</script>
+<title>Cuadro Popup</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+
+<body>
+<form name="form1" >
+  <table width="100%" border="0">
+    <tr>
+      <td><div align="center"><strong>DESCRIPTORES</strong></div></td>
+    </tr>
+  </table>
+  <table width="100%" border="0">
+    <tr> 
+      <td width="20%"><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="1" >
+        Dato 1</font></td>
+      <td width="16%"><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="6">
+        Dato 6</font></td>
+      <td width="19%"><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="11">
+        Dato 11</font></td>
+      <td width="19%"><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="16">
+        Dato 16</font></td>
+      <td width="19%"><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="21">
+        Dato 21</font></td>
+    </tr>
+    <tr> 
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input  type="checkbox" name="checkbox"id="checkbox" value="2">
+        Dato 2</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="7">
+        Dato 7</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="12">
+        Dato 12</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="17">
+        Dato 17</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="22">
+        Dato 22</font></td>
+    </tr>
+    <tr> 
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox"  id="checkbox2" value="3">
+        Dato 3</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="8">
+        Dato 8</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="14">
+        Dato 14</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="18">
+        Dato 18</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="23">
+        Dato 23</font></td>
+    </tr>
+    <tr> 
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="4">
+        Dato 4</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="9">
+        Dato 9</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="14">
+        Dato 14</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="19">
+        Dato 19</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="24">
+        Dato 24</font></td>
+    </tr>
+    <tr> 
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="5">
+        Dato 5</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="10">
+        Dato 10</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="15">
+        Dato 15</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="20">
+        Dato 20</font></td>
+      <td><font size="1" face="Verdana, Arial, Helvetica, sans-serif"> 
+        <input type="checkbox" name="checkbox" value="25">
+        Dato 25</font></td>
+    </tr>
+  </table>
+  <table width="100%" border="0">
+    <tr>
+      <td>
+      <input type="button" name="Submit" value="Aceptar" onClick="revisa_check();">
+      </td>
+    </tr>
+  </table>
+  
+
+</form>
+</body>
+</html>

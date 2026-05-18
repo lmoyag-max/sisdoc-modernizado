@@ -1,0 +1,275 @@
+<?php
+include("variables.php");
+include("conexion_bd.php");
+include("carga_tablas.php");
+global $Confidencial;
+$Usuario =  "Ximena";
+$idusuario= 3 ;
+$fecha_x = date("d-m-Y");
+
+$rs_documento ="select a.id_tipo_documento, a.fecha_documento,a.id_estado_documento,
+                a.confidencial,a.original,a.materia,b.desc_tipo_documento,a.medio 
+from  documento a, tipo_documento b
+where a.id_tipo_documento=b.id_tipo_documento and a.id_documento=$variable1";
+$qq = mssql_query($rs_documento);
+ while($rs=mssql_fetch_array($qq))
+   {
+
+?>
+
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title><?php echo $variable1,$variable2; ?>Documento sin t&iacute;tulo</title>
+
+
+<script language="JavaScript" type="text/javascript">
+function busca(Forma) {
+if (!Forma.Txt_numdoc.value=="" ) {
+return (true);
+}
+else 
+{
+return (false);
+}
+}
+
+function guardar(Forma) 
+{
+if (!Forma.Txt_numdoc.value=="" ) 
+{
+location.href="ingreso.php";
+return (false);
+}
+else
+{
+return (true);
+}
+}
+
+
+function enviar_datos() 
+{
+     	document.form1.submit();
+ }  
+function deriva_docto() 
+{
+if  (document.form1.Cbo_Estado_Docto.value == 2)
+	{
+	alert("Debe Recepcionar Documento y luego Derivar");
+	}
+else
+  {
+   document.form1.submit();
+   location.href="deriva_docto.php"  ;
+   }
+ }  
+function ingreso_docto() 
+{
+if  (document.form1.Cbo_Estado_Docto.value == 2)
+	{
+	alert("Debe Recepcionar Documento y luego Derivar");
+	}
+else
+  {
+   document.form1.submit();
+    location.href="ingreso_Docto.php";
+ }  
+} 
+ </script>
+
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+
+<body bgcolor="#FFFFFF" text="#000000" link="#CCCCCC">
+<form name="form1" 
+method="post"
+action="guardar_ingreso.php">
+
+
+    
+  <table width="914" border="2" cellpadding="1" cellspacing="1" bordercolor="#990066" bgcolor="#FFFFCC" height="400">
+    <tr>
+      <td width="904" height="396" align="center"> 
+        <table width="639" border="0" align="center" cellpadding="2" cellspacing="2" height="40">
+          <tr> 
+            <td align="center" height="27"><font size="4" color="#0000A0"><i>DERIVAR 
+              SIN DOCUMENTO </i></font></td>
+          </tr>
+        </table>
+        <table width="620" border="0" align="center" cellpadding="0" cellspacing="0">
+          <tr>
+            <td align="center">
+              <div align="right"><strong><font color="#0000A0" size="2"> 
+                <?echo "Usuario : " . $Usuario?>
+                </font></strong></div>
+            </td>
+          </tr>
+        </table>
+        <table width="796" height="534" border="1" align="center" cellpadding="2" cellspacing="2">
+          <tr> 
+            <td width="857" height="556" align="center"> 
+              <div align="center"> 
+                <table width="615" height="132" border="1" align="center" cellpadding="2" cellspacing="2">
+                  <tr> 
+                    <td width="430" valign="top" height="26"><b><i>Documento de 
+                      Referencia</i></b></td>
+                    <td width="203" valign="top" height="26"> <a href="documento_de_referencia.htm">Ver 
+                      detalle</a> 
+                  </tr>
+                  <tr> 
+                    <td valign="top" height="115" colspan="2"> 
+                      <div align="center"> 
+                        <table width="600" border="0" cellspacing="2" cellpadding="2">
+                          <tr> 
+                            <td width="131"><font >Tipo de Docto</font> </td>
+                            <td width="201" ><b>Memorandum</b></td>
+                            <td width="115">Fecha Docto<font face="Arial, Helvetica, sans-serif">&nbsp;</font></td>
+                            <td width="127"><b>17/03/2003 </b></td>
+                          </tr>
+                        </table>
+                        <table width="600" border="0" cellspacing="2" cellpadding="2" height="20">
+                          <tr valign="middle"> 
+                            <td width="84" height="25"> Interno<font size="2" face="Arial"> 
+                              </font></td>
+                            <td width="82" height="25"> <b>33333</b></td>
+                            <td width="94" height="25">Oficial<font size="2" face="Arial"> 
+                              </font></td>
+                            <td width="58" height="25">&nbsp;</td>
+                            <td height="25" width="117">Externo</td>
+                            <td height="25" width="127">&nbsp;</td>
+                          </tr>
+                          <tr valign="middle"> 
+                            <td height="25" colspan="2">Procedencia</td>
+                            <td height="25" colspan="2"><b>Gabinete</b></td>
+                            <td height="25" colspan="2">&nbsp;</td>
+                          </tr>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+                <table width="615" height="304" border="1" align="center" cellpadding="2" cellspacing="2">
+                  <tr> 
+                    <td width="703" valign="top" height="19"><b><i>Tramite Solicitado</i></b></td>
+                  </tr>
+                  <tr> 
+                    <td width="703" valign="top" height="284"> 
+                      <div align="center"> 
+                        <table width="600" border="0">
+                          <tr> 
+                            <td width="189">&nbsp;</td>
+                            <td width="97"><b>Interno</b></td>
+                            <td width="82"> 
+                              <input type="radio" name="xestado" value="D" checked>
+                            </td>
+                            <td width="90"><b>Externo</b></td>
+                            <td width="120"> 
+                              <input type="radio" name="xestado" value="D">
+                            </td>
+                          </tr>
+                        </table>
+                        <table width="600" border="0" cellspacing="2" cellpadding="2" height="41">
+                          <tr> 
+                            <td width="130" height="29">&nbsp;</td>
+                            <td   valign="5" height="29" width="127" >&nbsp;</td>
+                            <td   valign="5" height="29" width="145" ><b>Destinatario</b></td>
+                            <td   valign="5" height="29" width="172" > 
+                              <p>Depto de Informatica<font face="Arial"></font></p>
+                            </td>
+                          </tr>
+                          <tr> 
+                            <td width="130" height="24">&nbsp;</td>
+                            <td   valign="5" height="24" width="127" >&nbsp;</td>
+                            <td   valign="5" height="24" width="145" ><b>Funcionario</b></td>
+                            <td   valign="5" height="24" width="172" ><font size="2" face="Arial"> 
+                              </font> <font face="Arial"> 
+                              <select name="select4" id="select7" size="1">
+                                <option value="1" selected>Victor Osorio</option>
+                                <option value="2">Mariela Barrientos</option>
+                                <option value="3">Juan Pablo Escalona </option>
+                              </select>
+                              </font></td>
+                          </tr>
+                          <tr> 
+                            <td width="130" height="28"><b>Tipo Distribucion</b></td>
+                            <td   valign="5" height="28" width="127" > <font face="Arial"> 
+                              <select name="select4" id="select7" size="1">
+                                <option value="1" selected>Para conocimiento</option>
+                                <option value="2">Dar Respuesta</option>
+                                <option value="3">Da Respuesta </option>
+                                <option value="4">Dar visto bueno</option>
+                                <option value="5">Da visto bueno</option>
+                              </select>
+                              </font></td>
+                            <td   valign="5" height="28" width="145" ><b>Dias 
+                              Compromiso</b></td>
+                            <td   valign="5" height="28" width="172" ><font size="2" face="Arial"> 
+                              <input name="TxtOficial32" type="text" id="TxtOficial" size="2" maxlength="2" ;">
+                              </font></td>
+                          </tr>
+                          <tr> 
+                            <td width="130" height="30"><b>Tipo Compromiso</b></td>
+                            <td   valign="5" height="30" width="127" > <font face="Arial"> 
+                              <select name="select4" id="select7" size="1">
+                                <option value="1" selected>Normal</option>
+                                <option value="2">Urgente</option>
+                              </select>
+                              </font></td>
+                            <td   valign="5" height="30" width="145" ><b>Estado 
+                              Compromiso</b></td>
+                            <td   valign="5" height="30" width="172" > <font face="Arial"> 
+                              <select name="select4" id="select7" size="1">
+                                <option value="1" selected>En tramite</option>
+                                <option value="2">Cerrar</option>
+                              </select>
+                              </font></td>
+                          </tr>
+                        </table>
+                        <table width="600" border="0" height="52">
+                          <tr> 
+                            <td width="120" height="46"> 
+                              <p><b>Observaciones</b></p>
+                              <p>&nbsp;</p>
+                            </td>
+                            <td width="470" height="46"><font size="2" face="Arial"> 
+                              <textarea name="textarea2" id="TxtOficial" cols="60" onBlur="valida_digito(this.value,this,8);"></textarea>
+                              </font></td>
+                          </tr>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+                <p>&nbsp;</p>
+                
+              </div>
+            </td>
+          </tr>
+        </table>
+			<?php echo "PEPE<br>";
+				   echo $idusuario; 
+				   echo "DDD";?>
+        <table width="797" border="1" align="center" cellpadding="2" cellspacing="2" height="51">
+          <tr> 
+            <td height="40"> 
+              <div align="center"> 
+                <!--input type="button" name="cmd_grabar" value="Grabar" onClick="enviar_datos();"-->
+                <A HREF="graba_tramite2.htm">Grabar</A> 
+                <!--input type="button" name="cmd_responder1" value="Despachar" onClick="deriva_docto();"-->
+			
+                <A HREF="despachar.php?idusuario=<?php echo $idusuario; ?> ">Despachar</A> </div>
+            </td>
+          </tr>
+        </table>
+        
+      </td>
+    </tr>
+	<?
+  	}
+  	?>
+  </table>
+  </form>
+</body>
+</html>

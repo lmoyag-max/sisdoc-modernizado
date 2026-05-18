@@ -1,0 +1,4 @@
+El proceso wininit.exe inició el Reinicio del equipo P1-ADMI-MOD4 en nombre del usuario  por el siguiente motivo: No se encontraron títulos para este motivo
+ Código de motivo: 0x50006
+ Tipo de apagado: Reinicio
+ Comentario: El proceso de sistema "C:\Windows\system32\lsass.exe" finalizó inesperadamente con el código de estado 255. El sistema se cerrará y se reiniciará.

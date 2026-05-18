@@ -1,0 +1,11 @@
+select d.id_documento,d.id_tipo_documento,
+d.num_interno, d.num_oficial, d.num_externo,
+d.original, d.medio, d.fecha_documento, d.materia,
+t.id_tipo_distribucion, t.id_tipo_compromiso,
+t.id_estado_compromiso, t.id_procedencia,
+t.id_destino, t.id_estado_tramite,
+t.id_nomina_despacho, t.tipo_destinatario,
+t.fecha_recepcion, t.fecha_despacho,
+t.observaciones from documento d, tramite t
+where d.id_documento = t.id_documento
+order by d.id_documento, t.id_seguimiento

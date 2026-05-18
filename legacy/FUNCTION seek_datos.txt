@@ -1,0 +1,69 @@
+CREATE FUNCTION seek_datos (@cod_docu int)  
+RETURNS @tabla_relacion table
+                    ( padre int,
+                      hijo    int)
+AS  
+BEGIN
+DECLARE @filas int, @vhijo int, @vpadre int, @codigo int
+SET @codigo = @cod_docu
+SET @vhijo=0
+
+DECLARE @tabla_paso table
+                    ( padre int,
+                      hijo    int)
+
+DECLARE @tabla_unica table
+                    ( ide int)
+
+
+set @filas = (select count(*) from relacion_documento
+                    where id_documento = @cod_docu)
+
+set @filas = @@rowcount
+if (@filas=1)
+begin
+  WHILE (@filas=1)
+   BEGIN
+         set @filas=0
+            insert @tabla_paso
+            select id_documento, id_documento_hijo from relacion_documento
+            where id_documento = @cod_docu
+           
+           set @filas = @@rowcount
+
+            SET @cod_docu = (select id_documento_hijo from relacion_documento
+                                    where id_documento = @cod_docu)
+   END       
+end
+
+---- BUSCA HIJOS
+
+set @filas = (select count(*) from relacion_documento
+                    where id_documento_hijo = @codigo)
+
+set @filas = @@rowcount
+if (@filas=1)
+begin
+  WHILE (@filas=1)
+   BEGIN
+         set @filas=0
+            insert @tabla_paso
+            select id_documento, id_documento_hijo from relacion_documento
+            where id_documento_hijo = @codigo
+           
+           set @filas = @@rowcount
+
+            SET @codigo = (select id_documento from relacion_documento
+                                    where id_documento_hijo = @codigo)
+   END       
+end
+insert @tabla_unica
+select padre from @tabla_paso
+insert @tabla_unica
+select hijo from @tabla_paso
+
+insert @tabla_relacion
+select distinct ide, 0 from @tabla_unica order by ide
+return 
+END
+

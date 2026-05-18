@@ -1,0 +1,36 @@
+<?php
+$idusu = $idusuario;
+$cusu = $cusuario;
+$idfunc= $idfuncionario;
+$flujo= $flujo_ok;
+$cbo= $val_funcionario;
+$cbo1= $val_procedencia;
+$cbo2= $val_funcionario1;
+$cbo3= $val_destino;
+$tipop= $tipo_procedencia;
+$tipod= $tipo_destino; 
+$iddoc= 166;
+$idtra= 6; 
+?>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN" "http://www.w3.org/TR/html4/frameset.dtd">
+<html>
+<head>
+<title>Documento sin t&iacute;tulo</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+
+
+<frameset rows="50,*" frameborder="NO" border="0" framespacing="0">
+  <frame src="frame_sup.php" name="topFrame" scrolling="NO" noresize >
+   <?php 
+  echo '<frame src="responder_con_docto.php?idusuario=' . $idusu .
+       '&cusuario=' . $cusu . '&idfuncionario=' . $idfunc . '&flujook=' . $flujo .
+	   '&val_funcionario=' . $cbo . '&val_procedencia=' . $cbo1 . 
+	   '&val_funcionario1=' . $cbo2 . '&val_destino=' . $cbo3 .
+        '&tipo_procedencia=' .	 $tipop . '&tipo_destino=' . $tipod . 
+	    '$iddocant=' . iddoc . '&idtraant=' . $idtra . 	
+		'"name="mainFrame">';
+  ?>	  
+<frame src="UntitledFrame-2"></frameset>
+<noframes></noframes>
+</html>

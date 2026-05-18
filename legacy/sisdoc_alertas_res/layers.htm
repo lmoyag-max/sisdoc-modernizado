@@ -1,0 +1,50 @@
+<html>
+<head>
+<title>Documento sin t&iacute;tulo</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<script language="javascript">
+
+
+function MM_showHideLayers() { //v6.0
+  var i,p,v,obj,args=MM_showHideLayers.arguments;
+  for (i=0; i<(args.length-2); i+=3) if ((obj=MM_findObj(args[i]))!=null) { v=args[i+2];
+    if (obj.style) { obj=obj.style; v=(v=='show')?'visible':(v=='hide')?'hidden':v; }
+    obj.visibility=v; }
+}
+function MM_findObj(n, d) { //v4.01
+  var p,i,x;  if(!d) d=document; if((p=n.indexOf("?"))>0&&parent.frames.length) {
+    d=parent.frames[n.substring(p+1)].document; n=n.substring(0,p);}
+  if(!(x=d[n])&&d.all) x=d.all[n]; for (i=0;!x&&i<d.forms.length;i++) x=d.forms[i][n];
+  for(i=0;!x&&d.layers&&i<d.layers.length;i++) x=MM_findObj(n,d.layers[i].document);
+  if(!x && d.getElementById) x=d.getElementById(n); return x;
+}
+function muestrala(p)
+{
+
+
+if (p==0) {
+    MM_showHideLayers('Layer2','','hide');  }
+        else{
+	MM_showHideLayers('Layer2','','show');   	
+	}
+}
+	  
+
+
+</script>
+
+</head>
+
+<body>
+<a href="#" onClick="muestrala(0)">Cierra</a>
+<br>
+<a href="#" onClick="muestrala(1)">Abre</a>
+<div id="Layer2" style="position:absolute; width:188px; height:35px; z-index:1; left: 631px; top: 315px; visibility: hidden; overflow: auto; background-color: #E6EEFF; layer-background-color: #E6EEFF; border: 1px none #000000;" class="texto"> 
+                          <p><font color="#000000" face="Arial, Helvetica, sans-serif"> 
+                            </font> Fecha Invitacion<font color="#000000" face="Arial, Helvetica, sans-serif"> 
+                            <input name="Txt_fecha_inv" type="text" class="entradas" id="Txt_fecha_inv" size="10" maxlength="10" >
+                            </font>
+							</p>
+</div>
+</body>
+</html>

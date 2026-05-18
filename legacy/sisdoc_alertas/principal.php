@@ -1,0 +1,85 @@
+<?php 	
+
+	session_start();
+
+$idusu = $idusuario;
+$cusu = $cusuario;
+$idfunc= $idfuncionario;
+$flujo= $flujo_ok;
+$cbo= $val_funcionario;
+$cbo1= $val_procedencia;
+$cbo2= $val_funcionario1;
+$cbo3= $val_destino;
+// vacias por qué?, nosé
+$tipop= $tipo_procedencia;
+$tipod= $tipo_destino; 
+// vacias por qué?, nosé
+$num = $num_int;
+//echo "id_func" . $idfunc . "," . $idfuncionario;
+?>
+<html>
+<head>
+<title>SISDOC</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<script>
+<?php 
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+	session_register('usuario');
+	$_SESSION['usuario'] = $idusu;
+	if ($_SESSION['usuario'] == ""){
+		//echo "salio";
+		session_destroy();
+		//@header("Location: index.php");
+		echo 'location.href="index.php";';
+	} 
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+ ?>
+ 	//if (<?php echo $idusu ?>==149)
+	  // alert (navigator.appVersion);
+/* 	if (window.XMLHttpRequest) { 
+	   // IE 7, mozilla, safari, opera 9 typeof document.body.style.maxHeight != "undefined"
+	   alert ("tipo: IE 7, mozilla, safari, opera 9 ");
+	} else { 
+	   // IE6, older browsers 
+	   alert ("tipo: IE6, older browsers ");   
+	} */
+
+<?php 
+	include("busca_dependencia_acceso.php");
+?>
+
+</script>
+</head>
+<?php
+// para ver variables tiene 55 pero se achica para que no se vea tan grande en pantalla//
+//echo '<frameset rows="55,45,*" frameborder="no" border="0" framespacing="0">';
+echo '<frameset rows="0,45,*" frameborder="no" border="0" framespacing="0">' . "\n";
+/*echo '<frame src="frame_escondido.php?idusuario=' . $idusu .
+       '&cusuario=' . $cusu . '&idfuncionario=' . $idfunc . '&flujook=' . $flujo .
+	   '&val_funcionario=' . $cbo . '&val_procedencia=' . $cbo1 . 
+	   '&val_funcionario1=' . $cbo2 . '&val_destino=' . $cbo3 .
+       '&tipo_procedencia=' .	 $tipop . '&tipo_destino=' . $tipod . 
+	   '&num_int=' . $num . '" name="frame_escondido" scrolling="NO" noresize>';*/
+echo '<frame  name="frame_consultas" src="frame_consultas.php" scrolling="NO" noresize >' . "\n";
+
+echo '<frame src="frame_menuvars.php?idusuario=' . $idusu .
+       '&cusuario=' . $cusu . '&idfuncionario=' . $idfunc . '&flujook=' . $flujo .
+	   '&val_funcionario=' . $cbo . '&val_procedencia=' . $cbo1 . 
+	   '&val_funcionario1=' . $cbo2 . '&val_destino=' . $cbo3 .
+       '&tipo_procedencia=' .	 $tipop . '&tipo_destino=' . $tipod . 
+	   '&idfuncionario=' .	 $idfunc .  '&num_int=' . $num . 
+	   '&id_dependencia=' .	 $id_dependencia .'&tipo_frame=' .	 $tipo_frame .  '" name="frame_menuvars" scrolling="NO" noresize>' . "\n";
+	   	
+//echo '<frame src="frame_superior.php" name="frame_superior" scrolling="NO" noresize >';
+echo '<frame src="frame_vistas.php" name="mainFrame">' . "\n". '</frameset>';
+
+?>
+ 
+<noframes><body>
+
+</body></noframes>
+</html>

@@ -54,18 +54,19 @@ app.get("/api/tablas", async (req, res) => {
   }
 });
 
-app.get("/api/columnas", async (req, res) => {
+
+
+app.get("/api/procedimientos", async (req, res) => {
   try {
     const pool = await sql.connect(dbConfig);
 
     const result = await pool.request().query(`
       SELECT 
-        TABLE_NAME,
-        COLUMN_NAME,
-        DATA_TYPE,
-        IS_NULLABLE
-      FROM INFORMATION_SCHEMA.COLUMNS
-      ORDER BY TABLE_NAME, ORDINAL_POSITION
+        name AS procedimiento,
+        create_date,
+        modify_date
+      FROM sys.procedures
+      ORDER BY name
     `);
 
     res.json(result.recordset);
@@ -73,6 +74,31 @@ app.get("/api/columnas", async (req, res) => {
     res.status(500).json({ ok: false, error: error.message });
   }
 });
+
+app.get("/api/buscar/:texto", async (req, res) => {
+  try {
+    const texto = req.params.texto;
+    const pool = await sql.connect(dbConfig);
+
+    const result = await pool.request()
+      .input("texto", sql.VarChar, `%${texto}%`)
+      .query(`
+        SELECT 
+          TABLE_NAME,
+          COLUMN_NAME,
+          DATA_TYPE
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME LIKE @texto
+           OR COLUMN_NAME LIKE @texto
+        ORDER BY TABLE_NAME, COLUMN_NAME
+      `);
+
+    res.json(result.recordset);
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 
 app.listen(process.env.PORT, () => {
   console.log(`SISDOC API corriendo en puerto ${process.env.PORT}`);

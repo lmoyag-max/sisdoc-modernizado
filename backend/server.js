@@ -4,6 +4,7 @@ const sql = require("mssql");
 require("dotenv").config();
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -39,12 +40,34 @@ app.get("/api/health-db", async (req, res) => {
 app.get("/api/tablas", async (req, res) => {
   try {
     const pool = await sql.connect(dbConfig);
+
     const result = await pool.request().query(`
       SELECT TABLE_NAME
       FROM INFORMATION_SCHEMA.TABLES
       WHERE TABLE_TYPE='BASE TABLE'
       ORDER BY TABLE_NAME
     `);
+
+    res.json(result.recordset);
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/columnas", async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+
+    const result = await pool.request().query(`
+      SELECT 
+        TABLE_NAME,
+        COLUMN_NAME,
+        DATA_TYPE,
+        IS_NULLABLE
+      FROM INFORMATION_SCHEMA.COLUMNS
+      ORDER BY TABLE_NAME, ORDINAL_POSITION
+    `);
+
     res.json(result.recordset);
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });

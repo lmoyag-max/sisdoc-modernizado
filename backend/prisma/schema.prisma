@@ -1,0 +1,281 @@
+// SISDOC — Prisma Schema
+// Mapea las tablas legacy de SQL Server + nuevas tablas modernas
+// NOTA: Ejecutar `prisma db pull` para sincronizar con el schema real del DB
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// TABLAS LEGACY (mapeadas al esquema SISDOC existente)
+// ============================================================
+
+model Usuario {
+  idUsuario     Int       @id @default(autoincrement()) @map("id_usuario")
+  usuario       String    @unique @db.VarChar(50) @map("usuario")
+  clave         String?   @db.VarChar(100) @map("clave")
+  claveHash     String?   @db.VarChar(255) @map("clave_hash")
+  idFuncionario Int?      @map("id_funcionario")
+  activo        Boolean   @default(true) @map("activo")
+
+  funcionario       Funcionario?         @relation(fields: [idFuncionario], references: [idFuncionario])
+  accesos           Acceso[]
+  documentos        Documento[]          @relation("doc_ingresado_por")
+  tramitesOrigen    Tramite[]            @relation("tramite_origen")
+  historial         HistorialDocumento[]
+  refreshTokens     RefreshToken[]
+  usuarioRoles      UsuarioRol[]
+
+  @@map("usuario")
+}
+
+model Funcionario {
+  idFuncionario Int     @id @default(autoincrement()) @map("id_funcionario")
+  rutFun        String  @unique @db.VarChar(12) @map("rut_fun")
+  dvFun         String? @db.Char(1) @map("dv_fun")
+  nombresFun    String? @db.VarChar(100) @map("nombres_fun")
+  apPatFun      String? @db.VarChar(60) @map("ap_pat_fun")
+  apMatFun      String? @db.VarChar(60) @map("ap_mat_fun")
+  idDependencia Int?    @map("id_dependencia")
+  emailFun      String? @db.VarChar(100) @map("email_fun")
+  sexoFun       String? @db.Char(1) @map("sexo_fun")
+
+  dependencia  Dependencia? @relation(fields: [idDependencia], references: [idDependencia])
+  usuario      Usuario?
+  tramitesDest Tramite[]    @relation("tramite_funcionario_dest")
+
+  @@map("funcionario")
+}
+
+model Dependencia {
+  idDependencia    Int     @id @default(autoincrement()) @map("id_dependencia")
+  descDependencia  String  @db.VarChar(150) @map("desc_dependencia")
+  siglaDependencia String? @db.VarChar(20) @map("sigla_dependencia")
+  activa           Boolean @default(true) @map("activa")
+
+  funcionarios      Funcionario[]
+  accesos           Acceso[]
+  documentosOrigen  Documento[] @relation("doc_procedencia_interna")
+  documentosDestino Documento[] @relation("doc_destino")
+  tramitesDest      Tramite[]   @relation("tramite_dep_dest")
+
+  @@map("dependencia")
+}
+
+model DependenciaExterna {
+  idDependenciaExterna Int    @id @default(autoincrement()) @map("id_dependencia_externa")
+  descDependenciaExt   String @db.VarChar(200) @map("desc_dependencia_externa")
+  tipo                 String? @db.VarChar(50) @map("tipo")
+
+  documentosOrigen Documento[] @relation("doc_procedencia_externa")
+
+  @@map("dependencia_externa")
+}
+
+model Acceso {
+  idUsuario     Int @map("id_usuario")
+  idDependencia Int @map("id_dependencia")
+
+  usuario     Usuario     @relation(fields: [idUsuario], references: [idUsuario])
+  dependencia Dependencia @relation(fields: [idDependencia], references: [idDependencia])
+
+  @@id([idUsuario, idDependencia])
+  @@map("acceso")
+}
+
+model TipoDocumento {
+  idTipoDocumento  Int     @id @default(autoincrement()) @map("id_tipo_documento")
+  descTipoDocumento String @db.VarChar(100) @map("desc_tipo_documento")
+  activo           Boolean @default(true) @map("activo")
+
+  documentos Documento[]
+
+  @@map("tipo_documento")
+}
+
+model EstadoDocumento {
+  idEstadoDocumento  Int    @id @default(autoincrement()) @map("id_estado_documento")
+  descEstadoDocumento String @db.VarChar(50) @map("desc_estado_documento")
+
+  documentos Documento[]
+
+  @@map("estado_documento")
+}
+
+model EstadoTramite {
+  idEstadoTramite  Int    @id @default(autoincrement()) @map("id_estado_tramite")
+  descEstadoTramite String @db.VarChar(50) @map("desc_estado_tramite")
+
+  tramites Tramite[]
+
+  @@map("estado_tramite")
+}
+
+model Prioridad {
+  idPrioridad  Int    @id @default(autoincrement()) @map("id_prioridad")
+  descPrioridad String @db.VarChar(50) @map("desc_prioridad")
+  color        String? @db.VarChar(10) @map("color")
+
+  documentos Documento[]
+
+  @@map("prioridad")
+}
+
+model Descriptor {
+  idDescriptor  Int     @id @default(autoincrement()) @map("id_descriptor")
+  descDescriptor String @db.VarChar(100) @map("desc_descriptor")
+  activo        Boolean @default(true) @map("activo")
+
+  documentos DescriptorDocumento[]
+
+  @@map("descriptor")
+}
+
+model Documento {
+  idDocumento          Int       @id @default(autoincrement()) @map("id_documento")
+  idTipoDocumento      Int?      @map("id_tipo_documento")
+  numDocumento         String?   @db.VarChar(50) @map("num_documento")
+  asunto               String?   @db.VarChar(300) @map("asunto")
+  idEstadoDocumento    Int?      @map("id_estado_documento")
+  idProcedencia        Int?      @map("id_procedencia")
+  idProcedenciaExterna Int?      @map("id_procedencia_externa")
+  idDestino            Int?      @map("id_destino")
+  idUsuario            Int?      @map("id_usuario")
+  idPrioridad          Int?      @map("id_prioridad")
+  idExpediente         Int?      @map("id_expediente")
+  fechaDocumento       DateTime? @db.Date @map("fecha_documento")
+  fechaIngreso         DateTime? @default(now()) @map("fecha_ingreso")
+  fechaCierre          DateTime? @map("fecha_cierre")
+  observacion          String?   @db.VarChar(500) @map("observacion")
+
+  tipoDocumento     TipoDocumento?     @relation(fields: [idTipoDocumento], references: [idTipoDocumento])
+  estadoDocumento   EstadoDocumento?   @relation(fields: [idEstadoDocumento], references: [idEstadoDocumento])
+  procedenciaInterna Dependencia?      @relation("doc_procedencia_interna", fields: [idProcedencia], references: [idDependencia])
+  procedenciaExterna DependenciaExterna? @relation("doc_procedencia_externa", fields: [idProcedenciaExterna], references: [idDependenciaExterna])
+  destino           Dependencia?       @relation("doc_destino", fields: [idDestino], references: [idDependencia])
+  ingresadoPor      Usuario?           @relation("doc_ingresado_por", fields: [idUsuario], references: [idUsuario])
+  prioridad         Prioridad?         @relation(fields: [idPrioridad], references: [idPrioridad])
+  expediente        Expediente?        @relation(fields: [idExpediente], references: [idExpediente])
+  tramites          Tramite[]
+  historial         HistorialDocumento[]
+  descriptores      DescriptorDocumento[]
+  archivos          ArchivoDigital[]
+
+  @@map("documento")
+}
+
+model DescriptorDocumento {
+  idDocumento  Int @map("id_documento")
+  idDescriptor Int @map("id_descriptor")
+
+  documento  Documento  @relation(fields: [idDocumento], references: [idDocumento])
+  descriptor Descriptor @relation(fields: [idDescriptor], references: [idDescriptor])
+
+  @@id([idDocumento, idDescriptor])
+  @@map("descriptor_documento")
+}
+
+model Tramite {
+  idTramite           Int       @id @default(autoincrement()) @map("id_tramite")
+  idDocumento         Int?      @map("id_documento")
+  idUsuarioOrigen     Int?      @map("id_usuario_origen")
+  idDependenciaDestino Int?     @map("id_dependencia_destino")
+  idFuncionarioDestino Int?     @map("id_funcionario_destino")
+  idEstadoTramite     Int?      @map("id_estado_tramite")
+  fechaDerivacion     DateTime? @default(now()) @map("fecha_derivacion")
+  fechaCierre         DateTime? @map("fecha_cierre")
+  observacion         String?   @db.VarChar(500) @map("observacion")
+
+  documento          Documento?    @relation(fields: [idDocumento], references: [idDocumento])
+  usuarioOrigen      Usuario?      @relation("tramite_origen", fields: [idUsuarioOrigen], references: [idUsuario])
+  dependenciaDestino Dependencia?  @relation("tramite_dep_dest", fields: [idDependenciaDestino], references: [idDependencia])
+  funcionarioDestino Funcionario?  @relation("tramite_funcionario_dest", fields: [idFuncionarioDestino], references: [idFuncionario])
+  estadoTramite      EstadoTramite? @relation(fields: [idEstadoTramite], references: [idEstadoTramite])
+
+  @@map("tramite")
+}
+
+model HistorialDocumento {
+  idHistorial Int      @id @default(autoincrement()) @map("id_historial")
+  idDocumento Int?     @map("id_documento")
+  idUsuario   Int?     @map("id_usuario")
+  accion      String?  @db.VarChar(50) @map("accion")
+  observacion String?  @db.VarChar(500) @map("observacion")
+  fecha       DateTime @default(now()) @map("fecha")
+
+  documento Documento? @relation(fields: [idDocumento], references: [idDocumento])
+  usuario   Usuario?   @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("historial_documento")
+}
+
+model Expediente {
+  idExpediente    Int       @id @default(autoincrement()) @map("id_expediente")
+  numExpediente   String?   @db.VarChar(50) @map("num_expediente")
+  asuntoExpediente String?  @db.VarChar(300) @map("asunto_expediente")
+  idEstado        Int?      @map("id_estado")
+  fechaApertura   DateTime? @db.Date @map("fecha_apertura")
+  fechaCierre     DateTime? @db.Date @map("fecha_cierre")
+
+  documentos Documento[]
+
+  @@map("expediente")
+}
+
+model ArchivoDigital {
+  idArchivo     Int      @id @default(autoincrement()) @map("id_archivo")
+  idDocumento   Int?     @map("id_documento")
+  nombreArchivo String?  @db.VarChar(200) @map("nombre_archivo")
+  rutaArchivo   String?  @db.VarChar(500) @map("ruta_archivo")
+  tipoMime      String?  @db.VarChar(100) @map("tipo_mime")
+  tamano        Int?     @map("tamano")
+  fechaSubida   DateTime @default(now()) @map("fecha_subida")
+
+  documento Documento? @relation(fields: [idDocumento], references: [idDocumento])
+
+  @@map("archivo_digital")
+}
+
+// ============================================================
+// TABLAS NUEVAS (para funcionalidad moderna)
+// ============================================================
+
+model Rol {
+  idRol   Int    @id @default(autoincrement()) @map("id_rol")
+  codigo  String @unique @db.VarChar(50) @map("codigo")
+  nombre  String @db.VarChar(100) @map("nombre")
+  activo  Boolean @default(true) @map("activo")
+
+  usuarios UsuarioRol[]
+
+  @@map("rol")
+}
+
+model UsuarioRol {
+  idUsuario Int @map("id_usuario")
+  idRol     Int @map("id_rol")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+  rol     Rol     @relation(fields: [idRol], references: [idRol])
+
+  @@id([idUsuario, idRol])
+  @@map("usuario_rol")
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid()) @map("id")
+  token      String   @unique @db.VarChar(500) @map("token")
+  idUsuario  Int      @map("id_usuario")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario])
+
+  @@map("refresh_token")
+}

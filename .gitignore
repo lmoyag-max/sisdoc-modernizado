@@ -1,11 +1,47 @@
+# Dependencias
 node_modules/
-.env
+.pnp
+.pnp.js
+
+# Build outputs
 dist/
 build/
-.vscode/
-*.log
+*.tsbuildinfo
 
+# Entorno — NUNCA commitear .env real
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Uploads (datos de usuario — no commitear)
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Prisma migrations (gestionar por separado)
+# prisma/migrations/
+
+# Docker volumes locales / backups
+database/*.mdf
+database/*.ldf
+database/backups/
+
+# Archivos temporales legacy
 *.bak
 *.zip
-
-database/backups/
+*.tmp
+*.temp

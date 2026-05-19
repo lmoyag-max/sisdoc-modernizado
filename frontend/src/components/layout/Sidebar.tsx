@@ -62,7 +62,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'relative flex flex-col h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300 ease-in-out shrink-0',
+        'relative flex flex-col h-screen sidebar-gradient text-sidebar-foreground border-r border-sidebar-border transition-all duration-300 ease-in-out shrink-0',
         collapsed ? 'w-16' : 'w-64',
       )}
     >
@@ -167,19 +167,20 @@ function SidebarItem({ item, collapsed }: { item: NavItem; collapsed: boolean })
       title={collapsed ? item.label : undefined}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-150 group',
-          'text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-sidebar-accent',
-          isActive && 'bg-sidebar-primary/20 text-sidebar-primary font-medium hover:bg-sidebar-primary/25',
+          'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-150 group overflow-hidden',
+          'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
+          isActive && 'bg-sidebar-primary/15 text-sidebar-primary font-medium hover:bg-sidebar-primary/20',
           collapsed && 'justify-center px-2',
         )
       }
     >
       {({ isActive }) => (
         <>
-          <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive && 'text-sidebar-primary')} />
+          {isActive && <span className="nav-active-indicator" />}
+          <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-sidebar-primary' : 'group-hover:text-sidebar-foreground')} />
           {!collapsed && <span className="truncate animate-fade-in">{item.label}</span>}
           {!collapsed && item.badge && (
-            <span className="ml-auto shrink-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/20 text-xs font-medium text-primary px-1">
+            <span className="ml-auto shrink-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-sidebar-primary/20 text-xs font-medium text-sidebar-primary px-1">
               {item.badge}
             </span>
           )}

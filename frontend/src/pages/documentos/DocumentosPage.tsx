@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Filter, FileText, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,8 @@ export function DocumentosPage() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['documentos', queryFiltros],
     queryFn: () => documentosApi.listar(queryFiltros),
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
   });
 
   const documentos = data?.data ?? [];

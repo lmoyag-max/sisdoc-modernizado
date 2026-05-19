@@ -19,6 +19,7 @@ import catalogosRoutes from './modules/catalogos/catalogos.routes';
 import reportesRoutes from './modules/reportes/reportes.routes';
 import archivosRoutes from './modules/archivos/archivos.routes';
 import busquedaRoutes from './modules/busqueda/busqueda.routes';
+import configuracionRoutes from './modules/configuracion/configuracion.routes';
 
 const app = express();
 
@@ -93,6 +94,7 @@ app.use(`${API}/catalogos`, catalogosRoutes);
 app.use(`${API}/reportes`, reportesRoutes);
 app.use(`${API}/archivos`, archivosRoutes);
 app.use(`${API}/busqueda`, busquedaRoutes);
+app.use(`${API}/configuracion`, configuracionRoutes);
 
 app.get(`${API}`, (_req, res) => {
   res.json({ ok: true, api: 'SISDOC v2', docs: '/api-docs' });

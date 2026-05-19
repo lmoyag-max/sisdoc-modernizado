@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { authApi } from '@/lib/api/auth.api';
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';
 
@@ -30,6 +31,13 @@ export function LoginPage() {
   const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [showPassword, setShowPassword] = useState(false);
+  const [bgUrl, setBgUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiClient.get<{ ok: boolean; data: { backgroundUrl: string | null } }>('/configuracion')
+      .then((r) => { if (r.data.data.backgroundUrl) setBgUrl(r.data.data.backgroundUrl); })
+      .catch(() => {/* usa el gradiente por defecto */});
+  }, []);
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
 
@@ -55,19 +63,27 @@ export function LoginPage() {
     <div className="min-h-screen flex">
       {/* Panel izquierdo — Brand */}
       <div className="hidden lg:flex lg:w-[480px] xl:w-[560px] flex-col relative overflow-hidden bg-slate-950">
-        {/* Gradiente de fondo */}
+        {/* Fondo configurable o gradiente por defecto */}
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950" />
-          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl" />
-          {/* Grid pattern */}
-          <div
-            className="absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage: 'linear-gradient(rgb(255,255,255) 1px, transparent 1px), linear-gradient(to right, rgb(255,255,255) 1px, transparent 1px)',
-              backgroundSize: '48px 48px',
-            }}
-          />
+          {bgUrl ? (
+            <>
+              <img src={bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-950/80 via-slate-900/70 to-indigo-950/80" />
+            </>
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950" />
+              <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl" />
+              <div
+                className="absolute inset-0 opacity-[0.03]"
+                style={{
+                  backgroundImage: 'linear-gradient(rgb(255,255,255) 1px, transparent 1px), linear-gradient(to right, rgb(255,255,255) 1px, transparent 1px)',
+                  backgroundSize: '48px 48px',
+                }}
+              />
+            </>
+          )}
         </div>
 
         {/* Content */}

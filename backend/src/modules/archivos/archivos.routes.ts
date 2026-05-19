@@ -52,16 +52,14 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
     if (idDocumento) {
       const result = await pool.request()
         .input('idDocumento', sql.Int, Number(idDocumento))
-        .input('nombreArchivo', sql.VarChar(200), req.file.originalname)
-        .input('rutaArchivo', sql.VarChar(500), req.file.filename)
-        .input('tipoMime', sql.VarChar(100), req.file.mimetype)
-        .input('tamano', sql.Int, req.file.size)
-        .query<{ id_archivo: number }>(`
-          INSERT INTO archivo_digital (id_documento, nombre_archivo, ruta_archivo, tipo_mime, tamano, fecha_subida)
-          OUTPUT INSERTED.id_archivo
-          VALUES (@idDocumento, @nombreArchivo, @rutaArchivo, @tipoMime, @tamano, GETDATE())
+        .input('archivo', sql.VarChar(200), req.file.originalname)
+        .input('ruta', sql.VarChar(500), req.file.filename)
+        .query<{ id_archivo_digital: number }>(`
+          INSERT INTO archivo_digital (id_documento, archivo, ruta, fecha_sistema)
+          OUTPUT INSERTED.id_archivo_digital
+          VALUES (@idDocumento, @archivo, @ruta, GETDATE())
         `);
-      idArchivo = result.recordset[0]?.id_archivo ?? null;
+      idArchivo = result.recordset[0]?.id_archivo_digital ?? null;
     }
 
     sendCreated(res, {
@@ -87,22 +85,25 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
       where += ' AND a.id_documento = @idDocumento';
     }
     const result = await request.query<{
-      id_archivo: number; id_documento: number | null;
-      nombre_archivo: string | null; ruta_archivo: string | null;
-      tipo_mime: string | null; tamano: number | null; fecha_subida: Date;
-      materia: string | null;
+      id_archivo_digital: number; id_documento: number | null;
+      archivo: string | null; ruta: string | null;
+      fecha_sistema: Date | null; materia: string | null;
     }>(`
-      SELECT a.id_archivo, a.id_documento, a.nombre_archivo, a.ruta_archivo,
-             a.tipo_mime, a.tamano, a.fecha_subida,
-             d.materia
+      SELECT a.id_archivo_digital, a.id_documento, a.archivo, a.ruta,
+             a.fecha_sistema, d.materia
       FROM archivo_digital a
       LEFT JOIN documento d ON a.id_documento = d.id_documento
       WHERE ${where}
-      ORDER BY a.fecha_subida DESC
+      ORDER BY a.fecha_sistema DESC
     `);
     sendSuccess(res, result.recordset.map((r: typeof result.recordset[0]) => ({
-      ...r,
-      url: r.ruta_archivo ? `/uploads/${r.ruta_archivo}` : null,
+      id_archivo: r.id_archivo_digital,
+      id_documento: r.id_documento,
+      nombre_archivo: r.archivo,
+      ruta_archivo: r.ruta,
+      fecha_subida: r.fecha_sistema,
+      materia: r.materia,
+      url: r.ruta ? `/uploads/${r.ruta}` : null,
     })));
   } catch (e) { next(e); }
 });
@@ -113,19 +114,18 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction): P
     const pool = await getPool();
     const result = await pool.request()
       .input('id', sql.Int, Number(req.params.id))
-      .query<{ ruta_archivo: string | null }>(`
-        SELECT ruta_archivo FROM archivo_digital WHERE id_archivo = @id
+      .query<{ ruta: string | null }>(`
+        SELECT ruta FROM archivo_digital WHERE id_archivo_digital = @id
       `);
     const row = result.recordset[0];
     if (!row) { sendError(res, 'Archivo no encontrado', 404); return; }
 
-    // Eliminar de filesystem
-    if (row.ruta_archivo) {
-      const filePath = path.resolve(env.UPLOAD_DIR, row.ruta_archivo);
+    if (row.ruta) {
+      const filePath = path.resolve(env.UPLOAD_DIR, row.ruta);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
     await pool.request().input('id', sql.Int, Number(req.params.id))
-      .query(`DELETE FROM archivo_digital WHERE id_archivo = @id`);
+      .query(`DELETE FROM archivo_digital WHERE id_archivo_digital = @id`);
 
     sendSuccess(res, null, 'Archivo eliminado');
   } catch (e) { next(e); }

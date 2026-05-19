@@ -97,7 +97,7 @@ export async function refreshAccessToken(
 ): Promise<{ accessToken: string; expiresIn: number }> {
   let payload: JwtPayload;
   try {
-    payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as JwtPayload;
+    payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as unknown as JwtPayload;
   } catch {
     throw createAuthError('Refresh token inválido o expirado', 401);
   }
@@ -217,7 +217,7 @@ async function getUserRoles(pool: Awaited<ReturnType<typeof getPool>>, idUsuario
         JOIN rol r ON ur.id_rol = r.id_rol
         WHERE ur.id_usuario = @idUsuario AND r.activo = 1
       `);
-    return result.recordset.map((r) => r.codigo);
+    return result.recordset.map((r: { codigo: string }) => r.codigo);
   } catch {
     return ['funcionario']; // Rol por defecto si la tabla no existe aún
   }

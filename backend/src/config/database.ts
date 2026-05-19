@@ -1,4 +1,4 @@
-import sql from 'mssql';
+import * as sql from 'mssql';
 import { env } from './env';
 import { logger } from '../shared/utils/logger';
 

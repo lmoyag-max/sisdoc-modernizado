@@ -1,7 +1,14 @@
+## SISDOC v2 — Docker Compose
+## USO:
+##   Desarrollo:  docker compose up -d sqlserver
+##   Producción:  docker compose --profile prod up -d --build
+##   Todo:        docker compose --profile prod up -d --build sqlserver backend nginx
+
 services:
-  # ── SQL Server 2022 ───────────────────────────────────────
-  # IMPORTANTE: Al crear el contenedor por primera vez, ejecutar:
-  # .\scripts\restore-db.ps1
+
+  # ════════════════════════════════════════
+  # SQL Server 2022 (siempre activo)
+  # ════════════════════════════════════════
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: sisdoc_sqlserver
@@ -15,34 +22,51 @@ services:
       - ./database:/var/opt/mssql/backup
     restart: unless-stopped
     healthcheck:
-      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Adminhuap2026!" -C -Q "SELECT 1" || exit 1
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Adminhuap2026!" -C -Q "SELECT 1" -b || exit 1
       interval: 15s
       timeout: 10s
       retries: 10
       start_period: 30s
+    networks:
+      - sisdoc_net
 
-  # ── Backend Node.js (producción) ──────────────────────────
+  # ════════════════════════════════════════
+  # Backend Node.js — producción
+  # ════════════════════════════════════════
   backend:
     build:
       context: ./backend
       dockerfile: ../docker/backend/Dockerfile
     container_name: sisdoc_backend
+    image: sisdoc-backend:latest
     env_file: ./backend/.env
     environment:
-      DB_SERVER: sqlserver
       NODE_ENV: production
+      DB_SERVER: sqlserver
+      DB_PORT: "1433"
+      PORT: "3001"
     ports:
       - "3001:3001"
-    depends_on:
-      sqlserver:
-        condition: service_healthy
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
+    depends_on:
+      sqlserver:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - sisdoc_net
     profiles: ["prod"]
 
-  # ── Nginx + Frontend (producción) ─────────────────────────
+  # ════════════════════════════════════════
+  # Nginx + Frontend — producción
+  # ════════════════════════════════════════
   nginx:
     image: nginx:alpine
     container_name: sisdoc_nginx
@@ -51,10 +75,19 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./uploads:/usr/share/nginx/uploads:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      - sisdoc_net
     profiles: ["prod"]
+
+networks:
+  sisdoc_net:
+    name: sisdoc_network
+    driver: bridge
 
 volumes:
   sqlserver_data:

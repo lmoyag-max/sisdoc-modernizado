@@ -14,7 +14,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(token, env.JWT_SECRET) as unknown as JwtPayload;
     (req as AuthenticatedRequest).user = {
       idUsuario: payload.sub,
       usuario: payload.usuario,

@@ -67,7 +67,7 @@ router.get('/actividad-reciente', async (_req, res, next) => {
     `);
 
     // Mapear al formato que espera el frontend
-    const mapped = result.recordset.map(r => ({
+    const mapped = result.recordset.map((r: typeof result.recordset[0]) => ({
       id_historial: r.id_seguimiento,
       accion: r.id_estado_tramite === 1 ? 'DERIVADO' : 'RECEPCIONADO',
       fecha: r.fecha_sistema,

@@ -54,11 +54,11 @@ router.get('/', async (req, res, next) => {
 
 router.patch('/:id/recibir', async (req, res, next) => {
   try {
-    const { idUsuario } = (req as AuthenticatedRequest).user;
+    void (req as unknown as AuthenticatedRequest).user?.idUsuario; // requireAuth garantiza el user
     const pool = await getPool();
     await pool.request()
       .input('idTramite', sql.Int, Number(req.params.id))
-      .query(`UPDATE tramite SET id_estado_tramite = 2 WHERE id_tramite = @idTramite`);
+      .query(`UPDATE tramite SET id_estado_tramite = 2 WHERE id_seguimiento = @idTramite`);
     sendSuccess(res, null, 'Trámite recibido');
   } catch (e) { next(e); }
 });
@@ -68,7 +68,7 @@ router.patch('/:id/cerrar', async (req, res, next) => {
     const pool = await getPool();
     await pool.request()
       .input('idTramite', sql.Int, Number(req.params.id))
-      .query(`UPDATE tramite SET id_estado_tramite = 3, fecha_cierre = GETDATE() WHERE id_tramite = @idTramite`);
+      .query(`UPDATE tramite SET id_estado_tramite = 3, fecha_cierre = GETDATE() WHERE id_seguimiento = @idTramite`);
     sendSuccess(res, null, 'Trámite cerrado');
   } catch (e) { next(e); }
 });

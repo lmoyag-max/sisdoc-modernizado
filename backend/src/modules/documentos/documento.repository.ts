@@ -284,18 +284,42 @@ export async function getLastTramite(idDocumento: number): Promise<{ id_seguimie
 
 // ── softDelete ────────────────────────────────────────────────
 
-export async function softDelete(idDocumento: number, idUsuario: number): Promise<void> {
+export async function softDelete(idDocumento: number, _idUsuario: number): Promise<void> {
   const pool = await getPool();
-  // Mover a respaldo_documento si existe, sino marcar con estado 99
-  const respaldo = await pool.request().query(
-    "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='respaldo_documento'"
-  );
-  if (respaldo.recordset.length > 0) {
-    await pool.request().input('id', sql.Int, idDocumento).query(
-      `INSERT INTO respaldo_documento SELECT * FROM documento WHERE id_documento = @id`
-    );
-  }
-  // Borrar tramites y documento
+
+  // Intentar backup en respaldo_documento (schema legacy: documento + ultimo tramite)
+  try {
+    await pool.request().input('id', sql.Int, idDocumento).query(`
+      INSERT INTO respaldo_documento
+        (id_documento, id_tipo_documento, id_usuario,
+         num_interno, num_oficial, num_externo,
+         fecha_documento, fecha_sistema1, materia,
+         id_seguimiento, id_procedencia, id_destino,
+         tipo_procedencia, tipo_destino,
+         rut_procedencia, rut_destino, fecha_sistema2,
+         observaciones, tipo_eliminacion, fecha_eliminacion)
+      SELECT
+        d.id_documento, d.id_tipo_documento, d.id_usuario,
+        d.num_interno, d.num_oficial, d.num_externo,
+        d.fecha_documento, d.fecha_sistema, d.materia,
+        ISNULL(t.id_seguimiento, 0),
+        ISNULL(t.id_procedencia, 0), ISNULL(t.id_destino, 0),
+        ISNULL(t.tipo_procedencia, 'D'), ISNULL(t.tipo_destinatario, 'D'),
+        0, 0,
+        ISNULL(t.fecha_sistema, GETDATE()),
+        ISNULL(t.observaciones, ''),
+        'D', GETDATE()
+      FROM documento d
+      LEFT JOIN (
+        SELECT TOP 1 * FROM tramite WHERE id_documento = @id ORDER BY fecha_sistema DESC
+      ) t ON t.id_documento = d.id_documento
+      WHERE d.id_documento = @id
+    `);
+  } catch { /* si falla el backup, continuar igual */ }
+
+  // Eliminar en orden para respetar posibles FK
+  await pool.request().input('id', sql.Int, idDocumento)
+    .query('DELETE FROM archivo_digital WHERE id_documento = @id');
   await pool.request().input('id', sql.Int, idDocumento)
     .query('DELETE FROM tramite WHERE id_documento = @id');
   await pool.request().input('id', sql.Int, idDocumento)

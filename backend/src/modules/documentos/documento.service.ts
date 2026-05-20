@@ -24,11 +24,11 @@ export async function obtenerHistorial(idDocumento: number) {
 export async function crearDocumento(dto: CrearDocumentoDto, idUsuario: number) {
   const idDocumento = await repo.insert({
     idTipoDocumento: dto.idTipoDocumento,
-    numInterno: dto.numDocumento,
-    materia: dto.asunto,
-    idEstadoDocumento: 1,
+    materia: dto.materia,
+    idEstadoDocumento: dto.idEstadoDocumento ?? 1,
     idUsuario,
     fechaDocumento: dto.fechaDocumento ? new Date(dto.fechaDocumento) : undefined,
+    observaciones: dto.observaciones,
   });
 
   return obtenerDocumento(idDocumento);
@@ -59,26 +59,11 @@ export async function derivarDocumento(
   return obtenerDocumento(idDocumento);
 }
 
-// ── Helpers ──────────────────────────────────────────────────
-
-async function insertDescriptores(idDocumento: number, descriptores: number[]): Promise<void> {
-  const pool = await getPool();
-  for (const idDescriptor of descriptores) {
-    await pool
-      .request()
-      .input('idDocumento', sql.Int, idDocumento)
-      .input('idDescriptor', sql.Int, idDescriptor)
-      .query(`
-        IF NOT EXISTS (SELECT 1 FROM descriptor_documento WHERE id_documento=@idDocumento AND id_descriptor=@idDescriptor)
-          INSERT INTO descriptor_documento (id_documento, id_descriptor) VALUES (@idDocumento, @idDescriptor)
-      `);
-  }
-}
-
 function mapDocumento(row: repo.DocumentoRow) {
   return {
     idDocumento: row.id_documento,
     numDocumento: row.num_oficial ?? row.num_interno,
+    materia: row.materia,
     asunto: row.materia,
     tipoDocumento: {
       id: row.id_tipo_documento,
@@ -88,9 +73,6 @@ function mapDocumento(row: repo.DocumentoRow) {
       id: row.id_estado_documento,
       descripcion: row.desc_estado_documento,
     },
-    prioridad: { id: null, descripcion: null, color: null },
-    procedencia: { id: null, descripcion: null },
-    destino: { id: null, descripcion: null },
     ingresadoPor: {
       id: row.id_usuario,
       usuario: row.usuario,

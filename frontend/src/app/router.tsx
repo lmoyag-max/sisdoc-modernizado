@@ -12,12 +12,16 @@ import { TrazabilidadPage } from '@/pages/trazabilidad/TrazabilidadPage';
 import { BusquedaPage } from '@/pages/busqueda/BusquedaPage';
 import { ArchivosPage } from '@/pages/archivos/ArchivosPage';
 import { ConfiguracionPage } from '@/pages/configuracion/ConfiguracionPage';
+import { UsuariosPage } from '@/pages/admin/UsuariosPage';
+import { ExpedientesPage } from '@/pages/expedientes/ExpedientesPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { FolderOpen, Users, BarChart3 } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 
-const Stub = ({ title, desc, icon: Icon }: { title: string; desc: string; icon: React.ComponentType<{ className?: string }> }) => (
-  <div className="py-20"><EmptyState icon={Icon} title={title} description={desc} /></div>
+const ReportesStub = () => (
+  <div className="py-20">
+    <EmptyState icon={BarChart3} title="Reportes" description="Módulo de reportes — próximamente" />
+  </div>
 );
 
 export const router = createBrowserRouter([
@@ -39,10 +43,10 @@ export const router = createBrowserRouter([
           { path: '/trazabilidad',        element: <TrazabilidadPage /> },
           { path: '/busqueda',            element: <BusquedaPage /> },
           { path: '/archivos',            element: <ArchivosPage /> },
+          { path: '/expedientes',         element: <ExpedientesPage /> },
+          { path: '/admin/usuarios',      element: <UsuariosPage /> },
           { path: '/admin/configuracion', element: <ConfiguracionPage /> },
-          { path: '/expedientes',  element: <Stub icon={FolderOpen} title="Expedientes" desc="Gestión de expedientes — próximamente" /> },
-          { path: '/admin/usuarios', element: <Stub icon={Users} title="Usuarios" desc="Administración de usuarios — próximamente" /> },
-          { path: '/reportes',     element: <Stub icon={BarChart3} title="Reportes" desc="Módulo de reportes avanzados — próximamente" /> },
+          { path: '/reportes',            element: <ReportesStub /> },
         ],
       },
     ],

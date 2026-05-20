@@ -1,20 +1,21 @@
 import { z } from 'zod';
 
 export const crearDocumentoSchema = z.object({
-  idTipoDocumento: z.number().int().positive(),
-  numDocumento: z.string().max(50).optional(),
-  asunto: z.string().min(1).max(300),
-  idPrioridad: z.number().int().positive().default(1),
-  idProcedencia: z.number().int().positive().optional(),
-  idProcedenciaExterna: z.number().int().positive().optional(),
-  idDestino: z.number().int().positive(),
-  idExpediente: z.number().int().positive().optional(),
+  materia: z.string().min(1, 'La materia es requerida').max(250),
+  idTipoDocumento: z.number().int().positive('Selecciona un tipo de documento'),
+  idEstadoDocumento: z.number().int().positive().default(1),
+  observaciones: z.string().max(500).optional(),
   fechaDocumento: z.string().optional(),
-  observacion: z.string().max(500).optional(),
-  descriptores: z.array(z.number().int().positive()).default([]),
+  numDocumento: z.string().max(50).optional(),
 });
 
-export const actualizarDocumentoSchema = crearDocumentoSchema.partial();
+export const actualizarDocumentoSchema = z.object({
+  materia: z.string().min(1).max(250).optional(),
+  idTipoDocumento: z.number().int().positive().optional(),
+  idEstadoDocumento: z.number().int().positive().optional(),
+  observaciones: z.string().max(500).optional(),
+  fechaDocumento: z.string().optional(),
+});
 
 export const derivarDocumentoSchema = z.object({
   idDependenciaDestino: z.number().int().positive(),
@@ -27,7 +28,6 @@ export const filtrosDocumentoSchema = z.object({
   idTipo: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
   idEstado: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
   idDependencia: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
-  idPrioridad: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
   fechaDesde: z.string().optional(),
   fechaHasta: z.string().optional(),
   pagina: z.string().default('1').transform(Number),

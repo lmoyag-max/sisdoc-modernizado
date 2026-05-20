@@ -123,30 +123,47 @@ export async function findHistorial(idDocumento: number) {
 
 export async function insert(data: {
   idTipoDocumento?: number;
-  numInterno?: string;
   materia: string;
   idEstadoDocumento: number;
   idUsuario: number;
   fechaDocumento?: Date;
+  observaciones?: string;
 }): Promise<number> {
   const pool = await getPool();
+
+  // num_interno y num_oficial son INT NOT NULL — generamos el siguiente correlativo
+  const maxResult = await pool.request().query<{ maxInterno: number; maxOficial: number }>(`
+    SELECT ISNULL(MAX(num_interno), 0) AS maxInterno,
+           ISNULL(MAX(num_oficial), 0) AS maxOficial
+    FROM documento
+  `);
+  const nextInterno = (maxResult.recordset[0]?.maxInterno ?? 0) + 1;
+  const nextOficial = (maxResult.recordset[0]?.maxOficial ?? 0) + 1;
+
+  const fechaDoc = data.fechaDocumento ?? new Date();
+
   const result = await pool
     .request()
-    .input('idTipoDocumento', sql.Int, data.idTipoDocumento ?? null)
-    .input('numInterno', sql.VarChar(50), data.numInterno ?? null)
-    .input('materia', sql.VarChar(300), data.materia)
+    .input('idTipoDocumento', sql.Int, data.idTipoDocumento ?? 1)
     .input('idEstadoDocumento', sql.Int, data.idEstadoDocumento)
     .input('idUsuario', sql.Int, data.idUsuario)
-    .input('fechaDocumento', sql.Date, data.fechaDocumento ?? null)
+    .input('numInterno', sql.Int, nextInterno)
+    .input('numOficial', sql.Int, nextOficial)
+    .input('materia', sql.VarChar(250), data.materia.substring(0, 250))
+    .input('fechaDocumento', sql.DateTime, fechaDoc)
     .query<{ id_documento: number }>(`
       INSERT INTO documento (
-        id_tipo_documento, num_interno, materia, id_estado_documento,
-        id_usuario, fecha_documento, fecha_sistema
+        id_tipo_documento, id_estado_documento, id_usuario,
+        num_interno, num_oficial, num_externo,
+        original, materia,
+        fecha_documento, fecha_sistema, fecha_update
       )
       OUTPUT INSERTED.id_documento
       VALUES (
-        @idTipoDocumento, @numInterno, @materia, @idEstadoDocumento,
-        @idUsuario, @fechaDocumento, GETDATE()
+        @idTipoDocumento, @idEstadoDocumento, @idUsuario,
+        @numInterno, @numOficial, 0,
+        'S', @materia,
+        @fechaDocumento, GETDATE(), GETDATE()
       )
     `);
   return result.recordset[0].id_documento;

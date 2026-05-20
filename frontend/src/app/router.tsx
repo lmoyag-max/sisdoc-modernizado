@@ -15,14 +15,7 @@ import { ConfiguracionPage } from '@/pages/configuracion/ConfiguracionPage';
 import { UsuariosPage } from '@/pages/admin/UsuariosPage';
 import { ExpedientesPage } from '@/pages/expedientes/ExpedientesPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { BarChart3 } from 'lucide-react';
-
-const ReportesStub = () => (
-  <div className="py-20">
-    <EmptyState icon={BarChart3} title="Reportes" description="Módulo de reportes — próximamente" />
-  </div>
-);
+import { ReportesPage } from '@/pages/reportes/ReportesPage';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -46,7 +39,7 @@ export const router = createBrowserRouter([
           { path: '/expedientes',         element: <ExpedientesPage /> },
           { path: '/admin/usuarios',      element: <UsuariosPage /> },
           { path: '/admin/configuracion', element: <ConfiguracionPage /> },
-          { path: '/reportes',            element: <ReportesStub /> },
+          { path: '/reportes',            element: <ReportesPage /> },
         ],
       },
     ],

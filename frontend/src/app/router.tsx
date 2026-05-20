@@ -5,6 +5,7 @@ import { LoginPage } from '@/pages/auth/LoginPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { DocumentosPage } from '@/pages/documentos/DocumentosPage';
 import { NuevoDocumentoPage } from '@/pages/documentos/NuevoDocumentoPage';
+import { DocumentoDetallePage } from '@/pages/documentos/DocumentoDetallePage';
 import { TramitesPage } from '@/pages/tramites/TramitesPage';
 import { BandejaPage } from '@/pages/bandeja/BandejaPage';
 import { EnviadosPage } from '@/pages/enviados/EnviadosPage';
@@ -29,7 +30,7 @@ export const router = createBrowserRouter([
           { path: '/dashboard',           element: <DashboardPage /> },
           { path: '/documentos',          element: <DocumentosPage /> },
           { path: '/documentos/nuevo',    element: <NuevoDocumentoPage /> },
-          { path: '/documentos/:id',      element: <DocumentosPage /> },
+          { path: '/documentos/:id',      element: <DocumentoDetallePage /> },
           { path: '/bandeja',             element: <BandejaPage /> },
           { path: '/enviados',            element: <EnviadosPage /> },
           { path: '/tramites',            element: <TramitesPage /> },

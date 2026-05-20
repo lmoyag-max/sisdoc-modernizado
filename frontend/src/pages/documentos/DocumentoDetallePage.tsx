@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FilePreviewModal, type PreviewFile } from '@/components/shared/FilePreviewModal';
+import { DespacharModal } from '@/components/shared/DespacharModal';
 import {
   ArrowLeft, FileText, Calendar, User, Tag, Clock,
   CheckCircle2, GitBranch, Paperclip, Download, RefreshCw,
@@ -147,7 +148,8 @@ export function DocumentoDetallePage() {
     enabled: !isNaN(idDocumento),
   });
 
-  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
+  const [previewFile,    setPreviewFile]    = useState<PreviewFile | null>(null);
+  const [despacharOpen,  setDespacharOpen]  = useState(false);
 
   const { data: archivos, isLoading: loadingArchivos } = useQuery({
     queryKey: ['archivos', idDocumento],
@@ -158,13 +160,21 @@ export function DocumentoDetallePage() {
     enabled: !isNaN(idDocumento),
   });
 
+  // Invalida todo lo relacionado al documento tras cualquier acción de flujo
+  const invalidarTodo = () => {
+    qc.invalidateQueries({ queryKey: ['documento', idDocumento] });
+    qc.invalidateQueries({ queryKey: ['documento-trazabilidad', idDocumento] });
+    qc.invalidateQueries({ queryKey: ['documentos'] });
+    qc.invalidateQueries({ queryKey: ['tramites'] });
+    qc.invalidateQueries({ queryKey: ['bandeja'] });
+  };
+
   // Acciones del flujo documental
   const accion = (endpoint: string, msg: string) => useMutation({
     mutationFn: () => apiClient.post(`/documentos/${idDocumento}/${endpoint}`, { observaciones: `${msg} desde detalle` }),
     onSuccess: () => {
       toast.success(`Documento ${msg.toLowerCase()} correctamente`);
-      qc.invalidateQueries({ queryKey: ['documento', idDocumento] });
-      qc.invalidateQueries({ queryKey: ['documento-trazabilidad', idDocumento] });
+      invalidarTodo();
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? `Error al ${msg.toLowerCase()}`),
   });
@@ -384,20 +394,7 @@ export function DocumentoDetallePage() {
                 <Button
                   variant="outline" size="sm"
                   className="w-full justify-start gap-2"
-                  disabled={despacharMut.isPending}
-                  onClick={() => {
-                    const obs = prompt('Observación para el despacho (opcional):') ?? '';
-                    apiClient.post(`/documentos/${idDocumento}/despachar`, {
-                      idDestino: doc?.tramiteActual?.destino?.id ?? 1,
-                      tipoDestinatario: doc?.tramiteActual?.destino?.tipo ?? 'D',
-                      idTipoDistribucion: 5, idTipoCompromiso: 1,
-                      idEstadoCompromiso: 2, diasCompromiso: 0, observaciones: obs,
-                    }).then(() => {
-                      toast.success('Documento despachado');
-                      qc.invalidateQueries({ queryKey: ['documento', idDocumento] });
-                      qc.invalidateQueries({ queryKey: ['documento-trazabilidad', idDocumento] });
-                    }).catch((e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al despachar'));
-                  }}
+                  onClick={() => setDespacharOpen(true)}
                 >
                   <Send className="h-3.5 w-3.5 text-amber-500" />Despachar
                 </Button>
@@ -533,6 +530,18 @@ export function DocumentoDetallePage() {
         open={!!previewFile}
         onClose={() => setPreviewFile(null)}
         file={previewFile}
+      />
+
+      {/* Modal despachar */}
+      <DespacharModal
+        open={despacharOpen}
+        onClose={() => setDespacharOpen(false)}
+        idDocumento={idDocumento}
+        materia={materia}
+        onSuccess={() => {
+          toast.success('Documento despachado correctamente');
+          invalidarTodo();
+        }}
       />
     </div>
   );

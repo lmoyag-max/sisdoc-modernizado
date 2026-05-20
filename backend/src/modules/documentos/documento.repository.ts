@@ -271,12 +271,20 @@ export async function updateTramiteEstado(idSeguimiento: number, idEstadoTramite
 
 // ── getLastTramite ────────────────────────────────────────────
 
-export async function getLastTramite(idDocumento: number): Promise<{ id_seguimiento: number; id_destino: number; tipo_destinatario: string } | null> {
+export async function getLastTramite(idDocumento: number): Promise<{
+  id_seguimiento: number;
+  id_destino: number;
+  tipo_destinatario: string;
+  id_estado_tramite: number | null;
+} | null> {
   const pool = await getPool();
   const r = await pool.request().input('id', sql.Int, idDocumento).query<{
-    id_seguimiento: number; id_destino: number; tipo_destinatario: string;
+    id_seguimiento: number;
+    id_destino: number;
+    tipo_destinatario: string;
+    id_estado_tramite: number | null;
   }>(`
-    SELECT TOP 1 id_seguimiento, id_destino, tipo_destinatario
+    SELECT TOP 1 id_seguimiento, id_destino, tipo_destinatario, id_estado_tramite
     FROM tramite WHERE id_documento = @id ORDER BY fecha_sistema DESC
   `);
   return r.recordset[0] ?? null;

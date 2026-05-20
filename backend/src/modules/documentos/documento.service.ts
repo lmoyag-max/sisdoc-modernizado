@@ -81,24 +81,26 @@ export async function despacharDocumento(idDocumento: number, dto: DespacharDto,
 
   const tramiteActual = await repo.getLastTramite(idDocumento);
 
-  // Actualizar tramite actual a Despachado
-  if (tramiteActual) {
+  // Solo marcar como Despachado si el tramite aún está en Generado (estado 1).
+  // Para estados avanzados (Recepcionado, Derivado…) el registro histórico NO se toca —
+  // cada re-despacho inserta un nuevo tramite, preservando la trazabilidad íntegra.
+  if (tramiteActual && tramiteActual.id_estado_tramite === 1) {
     await repo.updateTramiteEstado(tramiteActual.id_seguimiento, 2, { fechaDespacho: new Date() });
   }
 
-  // Insertar nuevo tramite con el destino actualizado
+  // Insertar nuevo tramite representando el despacho/reasignación
   const pool = await getPool();
   await pool.request()
-    .input('idDoc',    sql.Int,        idDocumento)
-    .input('idUsr',    sql.Int,        idUsuario)
-    .input('idProc',   sql.Int,        tramiteActual?.id_destino ?? 1)
-    .input('idDest',   sql.Int,        dto.idDestino)
-    .input('tipProc',  sql.Char(1),    tramiteActual?.tipo_destinatario ?? 'D')
-    .input('tipDest',  sql.Char(1),    dto.tipoDestinatario)
-    .input('idTipDis', sql.Int,        dto.idTipoDistribucion)
-    .input('idTipCom', sql.Int,        dto.idTipoCompromiso)
-    .input('idEstCom', sql.Int,        dto.idEstadoCompromiso)
-    .input('dias',     sql.Int,        dto.diasCompromiso)
+    .input('idDoc',    sql.Int,          idDocumento)
+    .input('idUsr',    sql.Int,          idUsuario)
+    .input('idProc',   sql.Int,          tramiteActual?.id_destino ?? 1)
+    .input('idDest',   sql.Int,          dto.idDestino)
+    .input('tipProc',  sql.Char(1),      tramiteActual?.tipo_destinatario ?? 'D')
+    .input('tipDest',  sql.Char(1),      dto.tipoDestinatario)
+    .input('idTipDis', sql.Int,          dto.idTipoDistribucion)
+    .input('idTipCom', sql.Int,          dto.idTipoCompromiso)
+    .input('idEstCom', sql.Int,          dto.idEstadoCompromiso)
+    .input('dias',     sql.Int,          dto.diasCompromiso)
     .input('obs',      sql.VarChar(250), (dto.observaciones ?? '').substring(0, 250))
     .query(`
       INSERT INTO tramite

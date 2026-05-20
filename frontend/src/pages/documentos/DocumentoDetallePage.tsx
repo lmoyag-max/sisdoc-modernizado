@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { FilePreviewModal, type PreviewFile } from '@/components/shared/FilePreviewModal';
 import {
   ArrowLeft, FileText, Calendar, User, Tag, Clock,
   CheckCircle2, GitBranch, Paperclip, Download, RefreshCw,
   AlertCircle, Hash, Building2, Send, Loader2, Trash2,
+  Image as ImageIcon, FileSpreadsheet, File, Eye,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -83,6 +86,18 @@ interface ArchivoItem {
   ruta_archivo: string | null;
   fecha_subida: string | null;
   url: string | null;
+  preview_url: string | null;
+  download_url: string | null;
+}
+
+// ── Icono según extensión del archivo ────────────────────────
+function FileIcon({ nombre }: { nombre: string }) {
+  const ext = nombre.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'pdf') return <FileText className="h-4 w-4 text-red-500" />;
+  if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) return <ImageIcon className="h-4 w-4 text-violet-500" />;
+  if (['xls', 'xlsx'].includes(ext)) return <FileSpreadsheet className="h-4 w-4 text-emerald-600" />;
+  if (['doc', 'docx'].includes(ext)) return <FileText className="h-4 w-4 text-blue-500" />;
+  return <File className="h-4 w-4 text-muted-foreground" />;
 }
 
 // ── InfoRow reutilizable ──────────────────────────────────────────────────
@@ -131,6 +146,8 @@ export function DocumentoDetallePage() {
     },
     enabled: !isNaN(idDocumento),
   });
+
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
 
   const { data: archivos, isLoading: loadingArchivos } = useQuery({
     queryKey: ['archivos', idDocumento],
@@ -288,22 +305,66 @@ export function DocumentoDetallePage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {(archivos ?? []).map((a) => (
-                    <div key={a.id_archivo} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors">
-                      <FileText className="h-4 w-4 text-primary shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{safeStr(a.nombre_archivo ?? a.ruta_archivo, 'Archivo')}</p>
-                        <p className="text-xs text-muted-foreground">{a.fecha_subida ? formatRelativo(a.fecha_subida) : ''}</p>
+                  {(archivos ?? []).map((a) => {
+                    const nombre = safeStr(a.nombre_archivo ?? a.ruta_archivo, 'Archivo');
+                    const canPreview = !!(a.preview_url ?? a.url);
+                    return (
+                      <div key={a.id_archivo}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/40 hover:bg-muted/70 transition-colors group">
+                        {/* Icono */}
+                        <div className="shrink-0"><FileIcon nombre={nombre} /></div>
+
+                        {/* Nombre + fecha — clic abre modal */}
+                        <button
+                          className="flex-1 min-w-0 text-left"
+                          onClick={() => {
+                            if (!canPreview) return;
+                            setPreviewFile({
+                              id: a.id_archivo,
+                              nombre,
+                              previewUrl:  a.preview_url ?? a.url ?? '',
+                              downloadUrl: a.download_url ?? a.url ?? '',
+                            });
+                          }}
+                          title="Ver archivo"
+                        >
+                          <p className={cn(
+                            'text-sm font-medium truncate transition-colors',
+                            canPreview && 'group-hover:text-primary cursor-pointer'
+                          )}>
+                            {nombre}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {a.fecha_subida ? formatRelativo(a.fecha_subida) : ''}
+                          </p>
+                        </button>
+
+                        {/* Acciones */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {canPreview && (
+                            <Button
+                              variant="ghost" size="icon" className="h-7 w-7" title="Vista previa"
+                              onClick={() => setPreviewFile({
+                                id: a.id_archivo,
+                                nombre,
+                                previewUrl:  a.preview_url ?? a.url ?? '',
+                                downloadUrl: a.download_url ?? a.url ?? '',
+                              })}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {(a.download_url ?? a.url) && (
+                            <a href={a.download_url ?? a.url ?? ''} download>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Descargar">
+                                <Download className="h-3.5 w-3.5" />
+                              </Button>
+                            </a>
+                          )}
+                        </div>
                       </div>
-                      {a.url && (
-                        <a href={a.url} target="_blank" rel="noreferrer" download>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Descargar">
-                            <Download className="h-3.5 w-3.5" />
-                          </Button>
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -466,6 +527,13 @@ export function DocumentoDetallePage() {
           </Card>
         </div>
       </div>
+
+      {/* Modal visor de archivos */}
+      <FilePreviewModal
+        open={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+        file={previewFile}
+      />
     </div>
   );
 }

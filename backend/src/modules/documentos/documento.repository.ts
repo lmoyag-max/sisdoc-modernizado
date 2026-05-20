@@ -1,10 +1,12 @@
 import { getPool, sql } from '../../config/database';
 import { FiltrosDocumentoDto } from './documento.schema';
 
+// ── Types ────────────────────────────────────────────────────
+
 export interface DocumentoRow {
   id_documento: number;
-  num_interno: string | null;
-  num_oficial: string | null;
+  num_interno: number | null;
+  num_oficial: number | null;
   materia: string | null;
   id_tipo_documento: number | null;
   desc_tipo_documento: string | null;
@@ -16,39 +18,53 @@ export interface DocumentoRow {
   apellidos: string | null;
   fecha_documento: Date | null;
   fecha_sistema: Date | null;
+  id_expediente: number | null;
   total: number;
 }
+
+export interface TramiteRow {
+  id_seguimiento: number;
+  id_documento: number;
+  id_estado_tramite: number | null;
+  desc_estado_tramite: string | null;
+  id_procedencia: number | null;
+  id_destino: number | null;
+  tipo_procedencia: string | null;
+  tipo_destinatario: string | null;
+  desc_procedencia: string | null;
+  desc_destino: string | null;
+  id_tipo_distribucion: number | null;
+  desc_tipo_distribucion: string | null;
+  id_tipo_compromiso: number | null;
+  desc_tipo_compromiso: string | null;
+  dias_compromiso: number | null;
+  observaciones: string | null;
+  fecha_sistema: Date | null;
+  fecha_despacho: Date | null;
+  fecha_recepcion: Date | null;
+  usuario: string | null;
+  nombres_usuario: string | null;
+  usuario_recepcion: number | null;
+}
+
+// ── findMany ─────────────────────────────────────────────────
 
 export async function findMany(filtros: FiltrosDocumentoDto): Promise<DocumentoRow[]> {
   const pool = await getPool();
   const offset = (filtros.pagina - 1) * filtros.porPagina;
-
-  const request = pool.request();
-  request.input('offset', sql.Int, offset);
-  request.input('porPagina', sql.Int, filtros.porPagina);
+  const request = pool.request()
+    .input('offset', sql.Int, offset)
+    .input('porPagina', sql.Int, filtros.porPagina);
 
   let where = '1=1';
-
   if (filtros.q) {
     request.input('q', sql.NVarChar(200), `%${filtros.q}%`);
-    where += ' AND (d.materia LIKE @q OR d.num_interno LIKE @q OR d.num_oficial LIKE @q)';
+    where += ' AND (d.materia LIKE @q OR CAST(d.num_interno AS VARCHAR) LIKE @q OR CAST(d.num_oficial AS VARCHAR) LIKE @q)';
   }
-  if (filtros.idTipo) {
-    request.input('idTipo', sql.Int, filtros.idTipo);
-    where += ' AND d.id_tipo_documento = @idTipo';
-  }
-  if (filtros.idEstado) {
-    request.input('idEstado', sql.Int, filtros.idEstado);
-    where += ' AND d.id_estado_documento = @idEstado';
-  }
-  if (filtros.fechaDesde) {
-    request.input('fechaDesde', sql.Date, new Date(filtros.fechaDesde));
-    where += ' AND d.fecha_sistema >= @fechaDesde';
-  }
-  if (filtros.fechaHasta) {
-    request.input('fechaHasta', sql.Date, new Date(filtros.fechaHasta));
-    where += ' AND d.fecha_sistema <= @fechaHasta';
-  }
+  if (filtros.idTipo) { request.input('idTipo', sql.Int, filtros.idTipo); where += ' AND d.id_tipo_documento = @idTipo'; }
+  if (filtros.idEstado) { request.input('idEstado', sql.Int, filtros.idEstado); where += ' AND d.id_estado_documento = @idEstado'; }
+  if (filtros.fechaDesde) { request.input('fechaDesde', sql.Date, new Date(filtros.fechaDesde)); where += ' AND d.fecha_sistema >= @fechaDesde'; }
+  if (filtros.fechaHasta) { request.input('fechaHasta', sql.Date, new Date(filtros.fechaHasta)); where += ' AND d.fecha_sistema <= @fechaHasta'; }
 
   const result = await request.query<DocumentoRow>(`
     SELECT
@@ -57,123 +73,231 @@ export async function findMany(filtros: FiltrosDocumentoDto): Promise<DocumentoR
       d.id_estado_documento, ed.desc_estado_documento,
       d.id_usuario, u.usuario,
       f.nombres, f.apellidos,
-      d.fecha_documento, d.fecha_sistema,
+      d.fecha_documento, d.fecha_sistema, d.id_expediente,
       COUNT(*) OVER() AS total
     FROM documento d
-    LEFT JOIN tipo_documento td   ON d.id_tipo_documento = td.id_tipo_documento
+    LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
     LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
-    LEFT JOIN usuario u            ON d.id_usuario = u.id_usuario
-    LEFT JOIN funcionario f        ON u.id_funcionario = f.id_funcionario
+    LEFT JOIN usuario u           ON d.id_usuario          = u.id_usuario
+    LEFT JOIN funcionario f       ON u.id_funcionario      = f.id_funcionario
     WHERE ${where}
     ORDER BY d.fecha_sistema DESC
     OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
   `);
-
   return result.recordset;
 }
+
+// ── findById ─────────────────────────────────────────────────
 
 export async function findById(idDocumento: number): Promise<DocumentoRow | null> {
   const pool = await getPool();
-  const result = await pool
-    .request()
-    .input('id', sql.Int, idDocumento)
-    .query<DocumentoRow>(`
-      SELECT
-        d.id_documento, d.num_interno, d.num_oficial, d.materia,
-        d.id_tipo_documento, td.desc_tipo_documento,
-        d.id_estado_documento, ed.desc_estado_documento,
-        d.id_usuario, u.usuario,
-        f.nombres, f.apellidos,
-        d.fecha_documento, d.fecha_sistema,
-        0 AS total
-      FROM documento d
-      LEFT JOIN tipo_documento td   ON d.id_tipo_documento = td.id_tipo_documento
-      LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
-      LEFT JOIN usuario u            ON d.id_usuario = u.id_usuario
-      LEFT JOIN funcionario f        ON u.id_funcionario = f.id_funcionario
-      WHERE d.id_documento = @id
-    `);
+  const result = await pool.request().input('id', sql.Int, idDocumento).query<DocumentoRow>(`
+    SELECT
+      d.id_documento, d.num_interno, d.num_oficial, d.materia,
+      d.id_tipo_documento, td.desc_tipo_documento,
+      d.id_estado_documento, ed.desc_estado_documento,
+      d.id_usuario, u.usuario,
+      f.nombres, f.apellidos,
+      d.fecha_documento, d.fecha_sistema, d.id_expediente,
+      0 AS total
+    FROM documento d
+    LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
+    LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
+    LEFT JOIN usuario u           ON d.id_usuario          = u.id_usuario
+    LEFT JOIN funcionario f       ON u.id_funcionario      = f.id_funcionario
+    WHERE d.id_documento = @id
+  `);
   return result.recordset[0] ?? null;
 }
 
-export async function findHistorial(idDocumento: number) {
+// ── findTrazabilidad — historial completo con tramites ───────
+
+export async function findTrazabilidad(idDocumento: number): Promise<TramiteRow[]> {
   const pool = await getPool();
-  // SISDOC usa 'tramite' como historial de derivaciones
-  const result = await pool
-    .request()
-    .input('id', sql.Int, idDocumento)
-    .query<{
-      id_seguimiento: number;
-      id_estado_tramite: number | null;
-      observaciones: string | null;
-      fecha_sistema: Date | null;
-      usuario: string | null;
-      nombres: string | null;
-    }>(`
-      SELECT t.id_seguimiento, t.id_estado_tramite, t.observaciones, t.fecha_sistema,
-             u.usuario, f.nombres
-      FROM tramite t
-      LEFT JOIN usuario u ON t.id_usuario = u.id_usuario
-      LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
-      WHERE t.id_documento = @id
-      ORDER BY t.fecha_sistema DESC
-    `);
+  const result = await pool.request().input('id', sql.Int, idDocumento).query<TramiteRow>(`
+    SELECT
+      t.id_seguimiento, t.id_documento,
+      t.id_estado_tramite, et.desc_estado_tramite,
+      t.id_procedencia, t.id_destino,
+      t.tipo_procedencia, t.tipo_destinatario,
+      CASE t.tipo_procedencia
+        WHEN 'D' THEN (SELECT LTRIM(RTRIM(desc_dependencia)) FROM dependencia WHERE id_dependencia = t.id_procedencia)
+        WHEN 'E' THEN (SELECT desc_dependencia_externa FROM dependencia_externa WHERE id_dependencia_externa = t.id_procedencia)
+        ELSE 'Interno'
+      END AS desc_procedencia,
+      CASE t.tipo_destinatario
+        WHEN 'D' THEN (SELECT LTRIM(RTRIM(desc_dependencia)) FROM dependencia WHERE id_dependencia = t.id_destino)
+        WHEN 'E' THEN (SELECT desc_dependencia_externa FROM dependencia_externa WHERE id_dependencia_externa = t.id_destino)
+        ELSE 'Interno'
+      END AS desc_destino,
+      t.id_tipo_distribucion, td.desc_tipo_distribucion,
+      t.id_tipo_compromiso, tc.desc_tipo_compromiso,
+      t.dias_compromiso, t.observaciones,
+      t.fecha_sistema, t.fecha_despacho, t.fecha_recepcion,
+      u.usuario, f.nombres AS nombres_usuario,
+      t.usuario_recepcion
+    FROM tramite t
+    LEFT JOIN estado_tramite et       ON t.id_estado_tramite   = et.id_estado_tramite
+    LEFT JOIN tipo_distribucion td    ON t.id_tipo_distribucion = td.id_tipo_distribucion
+    LEFT JOIN tipo_compromiso tc      ON t.id_tipo_compromiso   = tc.id_tipo_compromiso
+    LEFT JOIN usuario u               ON t.id_usuario           = u.id_usuario
+    LEFT JOIN funcionario f           ON u.id_funcionario       = f.id_funcionario
+    WHERE t.id_documento = @id
+    ORDER BY t.fecha_sistema ASC
+  `);
   return result.recordset;
 }
 
+// ── insert documento + tramite inicial ───────────────────────
+
 export async function insert(data: {
-  idTipoDocumento?: number;
+  idTipoDocumento: number;
   materia: string;
   idEstadoDocumento: number;
   idUsuario: number;
   fechaDocumento?: Date;
+  idExpediente?: number;
+  medio?: string;
+  original?: string;
+  // Trámite
+  tipoProcedencia: string;
+  idProcedencia: number;
+  tipoDestinatario: string;
+  idDestino: number;
+  idTipoDistribucion: number;
+  idTipoCompromiso: number;
+  idEstadoCompromiso: number;
+  diasCompromiso: number;
   observaciones?: string;
-}): Promise<number> {
+}): Promise<{ idDocumento: number; idSeguimiento: number }> {
   const pool = await getPool();
 
-  // num_interno y num_oficial son INT NOT NULL — generamos el siguiente correlativo
-  const maxResult = await pool.request().query<{ maxInterno: number; maxOficial: number }>(`
-    SELECT ISNULL(MAX(num_interno), 0) AS maxInterno,
-           ISNULL(MAX(num_oficial), 0) AS maxOficial
+  // Correlativo siguiente
+  const maxRes = await pool.request().query<{ maxInterno: number; maxOficial: number }>(`
+    SELECT ISNULL(MAX(num_interno), 0) AS maxInterno, ISNULL(MAX(num_oficial), 0) AS maxOficial
     FROM documento
   `);
-  const nextInterno = (maxResult.recordset[0]?.maxInterno ?? 0) + 1;
-  const nextOficial = (maxResult.recordset[0]?.maxOficial ?? 0) + 1;
+  const nextInterno = (maxRes.recordset[0]?.maxInterno ?? 0) + 1;
+  const nextOficial = (maxRes.recordset[0]?.maxOficial ?? 0) + 1;
+  const fechaDoc    = data.fechaDocumento ?? new Date();
 
-  const fechaDoc = data.fechaDocumento ?? new Date();
-
-  const result = await pool
-    .request()
-    .input('idTipoDocumento', sql.Int, data.idTipoDocumento ?? 1)
-    .input('idEstadoDocumento', sql.Int, data.idEstadoDocumento)
-    .input('idUsuario', sql.Int, data.idUsuario)
-    .input('numInterno', sql.Int, nextInterno)
-    .input('numOficial', sql.Int, nextOficial)
-    .input('materia', sql.VarChar(250), data.materia.substring(0, 250))
-    .input('fechaDocumento', sql.DateTime, fechaDoc)
+  // INSERT documento
+  const docRes = await pool.request()
+    .input('idTipo',    sql.Int,        data.idTipoDocumento)
+    .input('idEstado',  sql.Int,        data.idEstadoDocumento)
+    .input('idUsr',     sql.Int,        data.idUsuario)
+    .input('numInt',    sql.Int,        nextInterno)
+    .input('numOf',     sql.Int,        nextOficial)
+    .input('materia',   sql.VarChar(250), data.materia.substring(0, 250))
+    .input('fechaDoc',  sql.DateTime,   fechaDoc)
+    .input('idExp',     sql.Int,        data.idExpediente ?? null)
+    .input('medio',     sql.VarChar(1), data.medio ?? null)
+    .input('original',  sql.VarChar(1), data.original ?? 'S')
     .query<{ id_documento: number }>(`
-      INSERT INTO documento (
-        id_tipo_documento, id_estado_documento, id_usuario,
-        num_interno, num_oficial, num_externo,
-        original, materia,
-        fecha_documento, fecha_sistema, fecha_update
-      )
+      INSERT INTO documento
+        (id_tipo_documento, id_estado_documento, id_usuario,
+         num_interno, num_oficial, num_externo, original, medio,
+         materia, fecha_documento, fecha_sistema, fecha_update, id_expediente)
       OUTPUT INSERTED.id_documento
-      VALUES (
-        @idTipoDocumento, @idEstadoDocumento, @idUsuario,
-        @numInterno, @numOficial, 0,
-        'S', @materia,
-        @fechaDocumento, GETDATE(), GETDATE()
-      )
+      VALUES
+        (@idTipo, @idEstado, @idUsr,
+         @numInt, @numOf, 0, @original, @medio,
+         @materia, @fechaDoc, GETDATE(), GETDATE(), @idExp)
     `);
-  return result.recordset[0].id_documento;
+  const idDocumento = docRes.recordset[0].id_documento;
+
+  // INSERT tramite inicial (estado 1 = Generado)
+  const tramRes = await pool.request()
+    .input('idDoc',    sql.Int,        idDocumento)
+    .input('idUsr',    sql.Int,        data.idUsuario)
+    .input('idProc',   sql.Int,        data.idProcedencia)
+    .input('idDest',   sql.Int,        data.idDestino)
+    .input('tipProc',  sql.Char(1),    data.tipoProcedencia)
+    .input('tipDest',  sql.Char(1),    data.tipoDestinatario)
+    .input('idTipDis', sql.Int,        data.idTipoDistribucion)
+    .input('idTipCom', sql.Int,        data.idTipoCompromiso)
+    .input('idEstCom', sql.Int,        data.idEstadoCompromiso)
+    .input('dias',     sql.Int,        data.diasCompromiso)
+    .input('obs',      sql.VarChar(250), (data.observaciones ?? '').substring(0, 250))
+    .query<{ id_seguimiento: number }>(`
+      INSERT INTO tramite
+        (id_documento, id_usuario, id_procedencia, id_destino,
+         tipo_procedencia, tipo_destinatario,
+         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+         id_estado_tramite, dias_compromiso, observaciones,
+         fecha_sistema, fecha_update)
+      OUTPUT INSERTED.id_seguimiento
+      VALUES
+        (@idDoc, @idUsr, @idProc, @idDest,
+         @tipProc, @tipDest,
+         @idTipDis, @idTipCom, @idEstCom,
+         1, @dias, @obs,
+         GETDATE(), GETDATE())
+    `);
+  const idSeguimiento = tramRes.recordset[0].id_seguimiento;
+
+  return { idDocumento, idSeguimiento };
 }
+
+// ── updateEstado ─────────────────────────────────────────────
 
 export async function updateEstado(idDocumento: number, idEstado: number): Promise<void> {
   const pool = await getPool();
-  await pool
-    .request()
+  await pool.request()
     .input('idEstado', sql.Int, idEstado)
-    .input('idDocumento', sql.Int, idDocumento)
-    .query(`UPDATE documento SET id_estado_documento = @idEstado, fecha_update = GETDATE() WHERE id_documento = @idDocumento`);
+    .input('idDoc',    sql.Int, idDocumento)
+    .query(`UPDATE documento SET id_estado_documento = @idEstado, fecha_update = GETDATE() WHERE id_documento = @idDoc`);
+}
+
+// ── updateTramite estado ──────────────────────────────────────
+
+export async function updateTramiteEstado(idSeguimiento: number, idEstadoTramite: number, extra?: {
+  fechaDespacho?: Date;
+  fechaRecepcion?: Date;
+  usuarioRecepcion?: number;
+}): Promise<void> {
+  const pool = await getPool();
+  let setClause = 'id_estado_tramite = @est, fecha_update = GETDATE()';
+  const req = pool.request()
+    .input('est', sql.Int, idEstadoTramite)
+    .input('id',  sql.Int, idSeguimiento);
+
+  if (extra?.fechaDespacho) { req.input('fd', sql.DateTime, extra.fechaDespacho); setClause += ', fecha_despacho = @fd'; }
+  if (extra?.fechaRecepcion) { req.input('fr', sql.DateTime, extra.fechaRecepcion); setClause += ', fecha_recepcion = @fr'; }
+  if (extra?.usuarioRecepcion) { req.input('ur', sql.Int, extra.usuarioRecepcion); setClause += ', usuario_recepcion = @ur'; }
+
+  await req.query(`UPDATE tramite SET ${setClause} WHERE id_seguimiento = @id`);
+}
+
+// ── getLastTramite ────────────────────────────────────────────
+
+export async function getLastTramite(idDocumento: number): Promise<{ id_seguimiento: number; id_destino: number; tipo_destinatario: string } | null> {
+  const pool = await getPool();
+  const r = await pool.request().input('id', sql.Int, idDocumento).query<{
+    id_seguimiento: number; id_destino: number; tipo_destinatario: string;
+  }>(`
+    SELECT TOP 1 id_seguimiento, id_destino, tipo_destinatario
+    FROM tramite WHERE id_documento = @id ORDER BY fecha_sistema DESC
+  `);
+  return r.recordset[0] ?? null;
+}
+
+// ── softDelete ────────────────────────────────────────────────
+
+export async function softDelete(idDocumento: number, idUsuario: number): Promise<void> {
+  const pool = await getPool();
+  // Mover a respaldo_documento si existe, sino marcar con estado 99
+  const respaldo = await pool.request().query(
+    "SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='respaldo_documento'"
+  );
+  if (respaldo.recordset.length > 0) {
+    await pool.request().input('id', sql.Int, idDocumento).query(
+      `INSERT INTO respaldo_documento SELECT * FROM documento WHERE id_documento = @id`
+    );
+  }
+  // Borrar tramites y documento
+  await pool.request().input('id', sql.Int, idDocumento)
+    .query('DELETE FROM tramite WHERE id_documento = @id');
+  await pool.request().input('id', sql.Int, idDocumento)
+    .query('DELETE FROM documento WHERE id_documento = @id');
 }

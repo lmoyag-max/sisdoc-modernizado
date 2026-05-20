@@ -18,8 +18,16 @@ export async function getEstadosDocumento() {
   return r.recordset;
 }
 
+export async function getEstadosTramite() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT id_estado_tramite AS id, desc_estado_tramite AS descripcion
+    FROM estado_tramite ORDER BY id_estado_tramite
+  `);
+  return r.recordset;
+}
+
 export async function getPrioridades() {
-  // La tabla prioridad puede no existir en SISDOC legacy
   return [
     { id: 1, descripcion: 'Normal', color: '#6b7280' },
     { id: 2, descripcion: 'Urgente', color: '#f59e0b' },
@@ -30,11 +38,23 @@ export async function getPrioridades() {
 export async function getDependencias(_soloActivas = true) {
   const pool = await getPool();
   const r = await pool.request().query(`
-    SELECT id_dependencia AS id, desc_dependencia AS descripcion,
-           cod_dependencia AS sigla
-    FROM dependencia ORDER BY desc_dependencia
+    SELECT id_dependencia AS id, LTRIM(RTRIM(desc_dependencia)) AS descripcion
+    FROM dependencia
+    WHERE LTRIM(RTRIM(ISNULL(desc_dependencia,''))) <> ''
+    ORDER BY desc_dependencia
   `);
   return r.recordset;
+}
+
+export async function getDependenciasExternas() {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT id_dependencia_externa AS id, desc_dependencia_externa AS descripcion
+      FROM dependencia_externa ORDER BY desc_dependencia_externa
+    `);
+    return r.recordset;
+  } catch { return []; }
 }
 
 export async function getDescriptores() {
@@ -48,28 +68,57 @@ export async function getDescriptores() {
 
 export async function getFuncionariosPorDependencia(idDependencia: number) {
   const pool = await getPool();
-  const r = await pool
-    .request()
+  const r = await pool.request()
     .input('idDep', sql.Int, idDependencia)
     .query(`
       SELECT f.id_funcionario AS id,
-             f.nombres + ' ' + f.apellidos AS nombre
+             LTRIM(RTRIM(f.nombres)) + ' ' + LTRIM(RTRIM(f.apellidos)) AS nombre
       FROM funcionario f
       WHERE f.id_dependencia = @idDep
+        AND LTRIM(RTRIM(ISNULL(f.nombres,''))) <> ''
       ORDER BY f.apellidos, f.nombres
     `);
   return r.recordset;
 }
 
-export async function getDependenciasExternas() {
-  try {
-    const pool = await getPool();
-    const r = await pool.request().query(`
-      SELECT id_dependencia_externa AS id, desc_dependencia_externa AS descripcion, tipo
-      FROM dependencia_externa ORDER BY desc_dependencia_externa
-    `);
-    return r.recordset;
-  } catch {
-    return [];
-  }
+export async function getTodosFuncionarios() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT f.id_funcionario AS id,
+           LTRIM(RTRIM(f.nombres)) + ' ' + LTRIM(RTRIM(f.apellidos)) AS nombre,
+           f.id_dependencia,
+           LTRIM(RTRIM(d.desc_dependencia)) AS dependencia
+    FROM funcionario f
+    LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
+    WHERE LTRIM(RTRIM(ISNULL(f.nombres,''))) <> ''
+    ORDER BY f.apellidos, f.nombres
+  `);
+  return r.recordset;
+}
+
+export async function getTiposDistribucion() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT id_tipo_distribucion AS id, desc_tipo_distribucion AS descripcion
+    FROM tipo_distribucion ORDER BY id_tipo_distribucion
+  `);
+  return r.recordset;
+}
+
+export async function getTiposCompromiso() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT id_tipo_compromiso AS id, desc_tipo_compromiso AS descripcion
+    FROM tipo_compromiso ORDER BY id_tipo_compromiso
+  `);
+  return r.recordset;
+}
+
+export async function getEstadosCompromiso() {
+  const pool = await getPool();
+  const r = await pool.request().query(`
+    SELECT id_estado_compromiso AS id, desc_estado_compromiso AS descripcion
+    FROM estado_compromiso ORDER BY id_estado_compromiso
+  `);
+  return r.recordset;
 }

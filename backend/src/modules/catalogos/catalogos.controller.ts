@@ -2,29 +2,30 @@ import { Request, Response, NextFunction } from 'express';
 import * as service from './catalogos.service';
 import { sendSuccess } from '../../shared/utils/response';
 
-export async function tiposDocumento(_req: Request, res: Response, next: NextFunction): Promise<void> {
-  try { sendSuccess(res, await service.getTiposDocumento()); } catch (e) { next(e); }
-}
-export async function estados(_req: Request, res: Response, next: NextFunction): Promise<void> {
-  try { sendSuccess(res, await service.getEstadosDocumento()); } catch (e) { next(e); }
-}
-export async function prioridades(_req: Request, res: Response, next: NextFunction): Promise<void> {
-  try { sendSuccess(res, await service.getPrioridades()); } catch (e) { next(e); }
-}
+const h = (fn: () => Promise<unknown>) =>
+  async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try { sendSuccess(res, await fn()); } catch (e) { next(e); }
+  };
+
+export const tiposDocumento       = h(service.getTiposDocumento);
+export const estados              = h(service.getEstadosDocumento);
+export const estadosTramite       = h(service.getEstadosTramite);
+export const prioridades          = h(service.getPrioridades);
+export const descriptores         = h(service.getDescriptores);
+export const dependenciasExternas = h(service.getDependenciasExternas);
+export const tiposDistribucion    = h(service.getTiposDistribucion);
+export const tiposCompromiso      = h(service.getTiposCompromiso);
+export const estadosCompromiso    = h(service.getEstadosCompromiso);
+export const todosFuncionarios    = h(service.getTodosFuncionarios);
+
 export async function dependencias(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const soloActivas = req.query.todas !== 'true';
-    sendSuccess(res, await service.getDependencias(soloActivas));
+    sendSuccess(res, await service.getDependencias(req.query.todas !== 'true'));
   } catch (e) { next(e); }
 }
-export async function descriptores(_req: Request, res: Response, next: NextFunction): Promise<void> {
-  try { sendSuccess(res, await service.getDescriptores()); } catch (e) { next(e); }
-}
+
 export async function funcionariosPorDependencia(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     sendSuccess(res, await service.getFuncionariosPorDependencia(Number(req.params.idDep)));
   } catch (e) { next(e); }
-}
-export async function dependenciasExternas(_req: Request, res: Response, next: NextFunction): Promise<void> {
-  try { sendSuccess(res, await service.getDependenciasExternas()); } catch (e) { next(e); }
 }

@@ -322,7 +322,7 @@ export function DocumentoDetallePage() {
                             setPreviewFile({
                               id: a.id_archivo,
                               nombre,
-                              previewUrl:  a.preview_url ?? a.url ?? '',
+                              previewUrl:  a.url ?? '',
                               downloadUrl: a.download_url ?? a.url ?? '',
                             });
                           }}
@@ -347,7 +347,7 @@ export function DocumentoDetallePage() {
                               onClick={() => setPreviewFile({
                                 id: a.id_archivo,
                                 nombre,
-                                previewUrl:  a.preview_url ?? a.url ?? '',
+                                previewUrl:  a.url ?? '',
                                 downloadUrl: a.download_url ?? a.url ?? '',
                               })}
                             >

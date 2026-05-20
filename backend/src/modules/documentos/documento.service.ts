@@ -73,6 +73,9 @@ function mapDocumento(row: repo.DocumentoRow) {
       id: row.id_estado_documento,
       descripcion: row.desc_estado_documento,
     },
+    prioridad: { id: null, descripcion: null, color: null },
+    destino: { id: null, descripcion: null },
+    procedencia: { id: null, descripcion: null },
     ingresadoPor: {
       id: row.id_usuario,
       usuario: row.usuario,

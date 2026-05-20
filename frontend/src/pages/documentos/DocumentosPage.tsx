@@ -130,7 +130,7 @@ export function DocumentosPage() {
           ) : (
             <div className={cn('divide-y', isFetching && 'opacity-60 transition-opacity')}>
               {documentos.map((doc) => {
-                const badge = ESTADO_BADGE[doc.estadoDocumento.id ?? 0] ?? { label: 'Desconocido', variant: 'secondary' as const };
+                const badge = ESTADO_BADGE[doc.estadoDocumento?.id ?? 0] ?? { label: 'Desconocido', variant: 'secondary' as const };
                 return (
                   <Link
                     key={doc.idDocumento}
@@ -152,19 +152,19 @@ export function DocumentosPage() {
                     </div>
                     <div className="col-span-2">
                       <span className="text-xs text-muted-foreground">
-                        {doc.tipoDocumento.descripcion ?? '—'}
+                        {doc.tipoDocumento?.descripcion ?? '—'}
                       </span>
                     </div>
                     <div className="col-span-2">
                       <span className="text-xs text-muted-foreground line-clamp-1">
-                        {doc.destino.descripcion ?? '—'}
+                        {doc.destino?.descripcion ?? '—'}
                       </span>
                     </div>
                     <div className="col-span-1">
-                      {doc.prioridad.descripcion && (
+                      {doc.prioridad?.descripcion && (
                         <span
                           className="inline-flex h-2 w-2 rounded-full"
-                          style={{ backgroundColor: doc.prioridad.color ?? '#94a3b8' }}
+                          style={{ backgroundColor: doc.prioridad?.color ?? '#94a3b8' }}
                           title={doc.prioridad.descripcion}
                         />
                       )}

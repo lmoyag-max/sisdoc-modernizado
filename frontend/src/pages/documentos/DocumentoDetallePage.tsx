@@ -444,7 +444,12 @@ export function DocumentoDetallePage() {
                               <span className="font-medium text-foreground">{dest}</span>
                             </p>
                           )}
-                          <p className="text-xs text-muted-foreground mt-0.5">{nombreUsuario}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {nombreUsuario}
+                            {ev.usuario?.usuario && (
+                              <span className="opacity-60 ml-1">(@{ev.usuario.usuario})</span>
+                            )}
+                          </p>
                           {ev.observaciones && (
                             <p className="text-xs text-muted-foreground/80 italic mt-0.5 line-clamp-2">"{safeStr(ev.observaciones)}"</p>
                           )}

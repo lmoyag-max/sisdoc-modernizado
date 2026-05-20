@@ -161,7 +161,11 @@ export function DocumentoDetallePage() {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const eliminarMut    = useMutation({
     mutationFn: () => apiClient.delete(`/documentos/${idDocumento}`),
-    onSuccess: () => { toast.success('Documento eliminado'); navigate('/documentos'); },
+    onSuccess: () => {
+      toast.success('Documento eliminado');
+      qc.invalidateQueries({ queryKey: ['documentos'] });
+      navigate('/documentos');
+    },
     onError: () => toast.error('No se pudo eliminar el documento'),
   });
 

@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
+import { RouteError } from '@/components/shared/AppErrorBoundary';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { DocumentosPage } from '@/pages/documentos/DocumentosPage';
@@ -22,25 +23,27 @@ export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
     element: <ProtectedRoute />,
+    errorElement: <RouteError />,
     children: [
       {
         element: <Layout />,
+        errorElement: <RouteError />,
         children: [
           { path: '/',                    element: <Navigate to="/dashboard" replace /> },
-          { path: '/dashboard',           element: <DashboardPage /> },
-          { path: '/documentos',          element: <DocumentosPage /> },
-          { path: '/documentos/nuevo',    element: <NuevoDocumentoPage /> },
-          { path: '/documentos/:id',      element: <DocumentoDetallePage /> },
-          { path: '/bandeja',             element: <BandejaPage /> },
-          { path: '/enviados',            element: <EnviadosPage /> },
-          { path: '/tramites',            element: <TramitesPage /> },
-          { path: '/trazabilidad',        element: <TrazabilidadPage /> },
-          { path: '/busqueda',            element: <BusquedaPage /> },
-          { path: '/archivos',            element: <ArchivosPage /> },
-          { path: '/expedientes',         element: <ExpedientesPage /> },
-          { path: '/admin/usuarios',      element: <UsuariosPage /> },
-          { path: '/admin/configuracion', element: <ConfiguracionPage /> },
-          { path: '/reportes',            element: <ReportesPage /> },
+          { path: '/dashboard',           element: <DashboardPage />,        errorElement: <RouteError /> },
+          { path: '/documentos',          element: <DocumentosPage />,       errorElement: <RouteError /> },
+          { path: '/documentos/nuevo',    element: <NuevoDocumentoPage />,   errorElement: <RouteError /> },
+          { path: '/documentos/:id',      element: <DocumentoDetallePage />, errorElement: <RouteError /> },
+          { path: '/bandeja',             element: <BandejaPage />,          errorElement: <RouteError /> },
+          { path: '/enviados',            element: <EnviadosPage />,         errorElement: <RouteError /> },
+          { path: '/tramites',            element: <TramitesPage />,         errorElement: <RouteError /> },
+          { path: '/trazabilidad',        element: <TrazabilidadPage />,     errorElement: <RouteError /> },
+          { path: '/busqueda',            element: <BusquedaPage />,         errorElement: <RouteError /> },
+          { path: '/archivos',            element: <ArchivosPage />,         errorElement: <RouteError /> },
+          { path: '/expedientes',         element: <ExpedientesPage />,      errorElement: <RouteError /> },
+          { path: '/admin/usuarios',      element: <UsuariosPage />,         errorElement: <RouteError /> },
+          { path: '/admin/configuracion', element: <ConfiguracionPage />,    errorElement: <RouteError /> },
+          { path: '/reportes',            element: <ReportesPage />,         errorElement: <RouteError /> },
         ],
       },
     ],

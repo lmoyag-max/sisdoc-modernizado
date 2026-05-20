@@ -322,8 +322,8 @@ export function DocumentoDetallePage() {
                             setPreviewFile({
                               id: a.id_archivo,
                               nombre,
-                              previewUrl:  a.url ?? '',
-                              downloadUrl: a.download_url ?? a.url ?? '',
+                              previewUrl:  a.preview_url ?? '',
+                              downloadUrl: a.download_url ?? '',
                             });
                           }}
                           title="Ver archivo"
@@ -347,8 +347,8 @@ export function DocumentoDetallePage() {
                               onClick={() => setPreviewFile({
                                 id: a.id_archivo,
                                 nombre,
-                                previewUrl:  a.url ?? '',
-                                downloadUrl: a.download_url ?? a.url ?? '',
+                                previewUrl:  a.preview_url ?? '',
+                                downloadUrl: a.download_url ?? '',
                               })}
                             >
                               <Eye className="h-3.5 w-3.5" />

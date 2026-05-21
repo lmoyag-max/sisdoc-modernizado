@@ -25,6 +25,7 @@ export interface UserSession {
   email: string | null;
   idDependencia: number | null;
   descDependencia: string | null;
+  todosServicios: boolean;
   roles: string[];
 }
 
@@ -44,13 +45,15 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
       apellidos: string | null;
       id_dependencia: number | null;
       desc_dependencia: string | null;
+      todos_servicios: boolean;
     }>(`
       SELECT
         u.id_usuario, u.usuario, u.clave,
         NULL AS clave_hash,
         u.id_funcionario,
         f.nombres, f.apellidos, f.id_dependencia,
-        d.desc_dependencia
+        d.desc_dependencia,
+        ISNULL(u.todos_servicios, 0) AS todos_servicios
       FROM usuario u
       LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
       LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
@@ -73,15 +76,16 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
   const roles = await getUserRoles(pool, row.id_usuario);
 
   const user: UserSession = {
-    idUsuario: row.id_usuario,
-    usuario: row.usuario,
-    idFuncionario: row.id_funcionario,
-    nombres: row.nombres ?? null,
-    apPat: row.apellidos ?? null,
-    apMat: null,
-    email: null,
-    idDependencia: row.id_dependencia,
+    idUsuario:       row.id_usuario,
+    usuario:         row.usuario,
+    idFuncionario:   row.id_funcionario,
+    nombres:         row.nombres ?? null,
+    apPat:           row.apellidos ?? null,
+    apMat:           null,
+    email:           null,
+    idDependencia:   row.id_dependencia,
     descDependencia: row.desc_dependencia,
+    todosServicios:  row.todos_servicios ?? true,
     roles,
   };
 
@@ -118,7 +122,13 @@ export async function refreshAccessToken(
   if (!result.recordset[0]) throw createAuthError('Refresh token revocado o expirado', 401);
 
   const accessToken = jwt.sign(
-    { sub: payload.sub, usuario: payload.usuario, idFuncionario: payload.idFuncionario, roles: payload.roles },
+    {
+      sub: payload.sub, usuario: payload.usuario,
+      idFuncionario: payload.idFuncionario,
+      idDependencia: payload.idDependencia,
+      todosServicios: payload.todosServicios,
+      roles: payload.roles,
+    },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions,
   );
@@ -152,10 +162,12 @@ export async function getMe(idUsuario: number): Promise<UserSession> {
       apellidos: string | null;
       id_dependencia: number | null;
       desc_dependencia: string | null;
+      todos_servicios: boolean;
     }>(`
       SELECT u.id_usuario, u.usuario, u.id_funcionario,
              f.nombres, f.apellidos, f.id_dependencia,
-             d.desc_dependencia
+             d.desc_dependencia,
+             ISNULL(u.todos_servicios, 0) AS todos_servicios
       FROM usuario u
       LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
       LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
@@ -168,15 +180,16 @@ export async function getMe(idUsuario: number): Promise<UserSession> {
   const roles = await getUserRoles(pool, idUsuario);
 
   return {
-    idUsuario: row.id_usuario,
-    usuario: row.usuario,
-    idFuncionario: row.id_funcionario,
-    nombres: row.nombres ?? null,
-    apPat: row.apellidos ?? null,
-    apMat: null,
-    email: null,
-    idDependencia: row.id_dependencia,
+    idUsuario:       row.id_usuario,
+    usuario:         row.usuario,
+    idFuncionario:   row.id_funcionario,
+    nombres:         row.nombres ?? null,
+    apPat:           row.apellidos ?? null,
+    apMat:           null,
+    email:           null,
+    idDependencia:   row.id_dependencia,
     descDependencia: row.desc_dependencia,
+    todosServicios:  row.todos_servicios ?? true,
     roles,
   };
 }
@@ -249,10 +262,12 @@ async function saveRefreshToken(
 
 function generateTokens(user: UserSession): AuthTokens {
   const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
-    sub: user.idUsuario,
-    usuario: user.usuario,
-    idFuncionario: user.idFuncionario,
-    roles: user.roles,
+    sub:            user.idUsuario,
+    usuario:        user.usuario,
+    idFuncionario:  user.idFuncionario,
+    idDependencia:  user.idDependencia,
+    todosServicios: user.todosServicios,
+    roles:          user.roles,
   };
 
   const accessToken = jwt.sign(payload, env.JWT_SECRET, {

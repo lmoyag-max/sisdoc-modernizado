@@ -29,6 +29,8 @@ export interface AuthenticatedRequest extends Request {
     idUsuario: number;
     usuario: string;
     idFuncionario: number | null;
+    idDependencia: number | null;
+    todosServicios: boolean;
     roles: string[];
   };
 }
@@ -37,6 +39,8 @@ export interface JwtPayload {
   sub: number;
   usuario: string;
   idFuncionario: number | null;
+  idDependencia: number | null;
+  todosServicios: boolean;
   roles: string[];
   iat?: number;
   exp?: number;

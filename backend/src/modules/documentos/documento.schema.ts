@@ -1,33 +1,33 @@
 import { z } from 'zod';
 
 // ── Crear documento + trámite inicial ───────────────────────
+// Nota: idEstadoDocumento, tipoProcedencia, idProcedencia y despacharAhora
+// son ignorados — el backend los asigna automáticamente desde el usuario autenticado.
 export const crearDocumentoSchema = z.object({
   // Identificación del documento
   materia: z.string().min(1, 'La materia es requerida').max(250),
   idTipoDocumento: z.number().int().positive('Selecciona un tipo de documento'),
-  idEstadoDocumento: z.number().int().positive().default(1),
   fechaDocumento: z.string().optional(),
   observaciones: z.string().max(500).optional(),
-  medio: z.string().max(1).optional(),              // M=Papel, E=Electrónico
-  original: z.string().max(1).default('S'),         // S/N
+  medio: z.string().max(1).optional(),
+  original: z.string().max(1).default('S'),
   idExpediente: z.number().int().positive().optional(),
 
-  // Trámite — Origen
-  tipoProcedencia: z.enum(['D', 'E']).default('D'), // D=Dependencia interna, E=Externa
-  idProcedencia: z.number().int().positive().optional(),
-
-  // Trámite — Destino
+  // Trámite — Destino (único campo que elige el usuario)
   tipoDestinatario: z.enum(['D', 'E']).default('D'),
   idDestino: z.number().int().positive().optional(),
 
   // Trámite — Distribución / compromiso
-  idTipoDistribucion: z.number().int().positive().default(5), // 5=Para conocimiento
-  idTipoCompromiso: z.number().int().positive().default(1),   // 1=No tiene
-  idEstadoCompromiso: z.number().int().positive().default(2), // 2=En trámite
+  idTipoDistribucion: z.number().int().positive().default(5),
+  idTipoCompromiso: z.number().int().positive().default(1),
+  idEstadoCompromiso: z.number().int().positive().default(2),
   diasCompromiso: z.number().int().min(0).default(0),
 
-  // Acción inmediata
-  despacharAhora: z.boolean().default(false),
+  // Campos ignorados desde frontend (mantenidos por retrocompatibilidad)
+  idEstadoDocumento: z.number().int().optional(),
+  tipoProcedencia: z.enum(['D', 'E']).optional(),
+  idProcedencia: z.number().int().optional(),
+  despacharAhora: z.boolean().optional(),
 });
 
 // ── Despachar documento ──────────────────────────────────────

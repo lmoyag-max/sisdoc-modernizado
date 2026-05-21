@@ -208,11 +208,17 @@ export function DocumentoDetallePage() {
   }
 
   if (error) {
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    const esForbidden = status === 403;
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <AlertCircle className="h-12 w-12 text-destructive/60" />
-        <p className="text-muted-foreground">No se pudo cargar el documento #{idDocumento}.</p>
-        <Button variant="outline" onClick={() => navigate('/documentos')}>Volver</Button>
+        <AlertCircle className={`h-12 w-12 ${esForbidden ? 'text-amber-500' : 'text-destructive/60'}`} />
+        <p className="text-muted-foreground text-center">
+          {esForbidden
+            ? 'No tienes acceso a este documento. Solo puedes ver documentos relacionados con tu servicio.'
+            : `No se pudo cargar el documento #${idDocumento}.`}
+        </p>
+        <Button variant="outline" onClick={() => navigate('/documentos')}>Volver al listado</Button>
       </div>
     );
   }

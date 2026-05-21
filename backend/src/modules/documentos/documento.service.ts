@@ -8,10 +8,40 @@ import { buildPaginationMeta } from '../../shared/utils/response';
 
 // ── Listar ───────────────────────────────────────────────────
 
-export async function listarDocumentos(filtros: FiltrosDocumentoDto) {
-  const rows = await repo.findMany(filtros);
+interface FiltroServicio {
+  idDependencia: number | null;
+  verExternos:   boolean;
+}
+
+export async function listarDocumentos(filtros: FiltrosDocumentoDto, filtroServicio?: FiltroServicio | null) {
+  const rows = await repo.findMany(filtros, filtroServicio ?? null);
   const total = rows[0]?.total ?? 0;
   return { data: rows.map(mapDocumento), meta: buildPaginationMeta(total, filtros.pagina, filtros.porPagina) };
+}
+
+// ── Control de acceso a documento individual ──────────────────
+// Retorna true si el usuario tiene relación con el documento (origen o destino).
+export async function usuarioTieneAccesoDocumento(
+  idDocumento:    number,
+  idDependencia:  number | null,
+  verExternos:    boolean,
+): Promise<boolean> {
+  if (!idDependencia) return false;
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('idDoc', sql.Int, idDocumento)
+    .input('idDep', sql.Int, idDependencia)
+    .query<{ ok: number }>(`
+      SELECT TOP 1 1 AS ok
+      FROM tramite t
+      WHERE t.id_documento = @idDoc
+        AND (
+          (t.id_destino     = @idDep AND t.tipo_destinatario = 'D')
+          OR (t.id_procedencia = @idDep AND t.tipo_procedencia  = 'D')
+          ${verExternos ? "OR t.tipo_destinatario = 'E'" : ''}
+        )
+    `);
+  return !!r.recordset[0];
 }
 
 // ── Obtener uno ───────────────────────────────────────────────
@@ -39,22 +69,30 @@ export async function obtenerTrazabilidad(idDocumento: number) {
 }
 
 // ── Crear ─────────────────────────────────────────────────────
-
-export async function crearDocumento(dto: CrearDocumentoDto, idUsuario: number) {
-  const idProcedencia = dto.idProcedencia ?? 1;
-  const idDestino     = dto.idDestino     ?? 1;
+// Regla de negocio: el origen se asigna SIEMPRE desde la dependencia del
+// usuario autenticado. El estado inicial es siempre DESPACHADO (2).
+// El frontend no puede modificar estas reglas.
+export async function crearDocumento(
+  dto: CrearDocumentoDto,
+  idUsuario: number,
+  idDependenciaUsuario: number | null,
+) {
+  // Origen siempre = dependencia del usuario autenticado
+  const idProcedencia = idDependenciaUsuario ?? 1;
+  // Destino desde el formulario (si no se provee, mismo origen como fallback)
+  const idDestino = dto.idDestino ?? idProcedencia;
 
   const { idDocumento, idSeguimiento } = await repo.insert({
     idTipoDocumento:    dto.idTipoDocumento,
     materia:            dto.materia,
-    idEstadoDocumento:  dto.despacharAhora ? 2 : (dto.idEstadoDocumento ?? 1),
+    idEstadoDocumento:  2,          // Siempre DESPACHADO al crear
     idUsuario,
     fechaDocumento:     dto.fechaDocumento ? new Date(dto.fechaDocumento) : undefined,
     idExpediente:       dto.idExpediente,
     original:           dto.original ?? 'S',
     medio:              dto.medio,
-    tipoProcedencia:    dto.tipoProcedencia,
-    idProcedencia,
+    tipoProcedencia:    'D',        // Origen siempre interno (dependencia del usuario)
+    idProcedencia,                  // Dependencia del usuario autenticado
     tipoDestinatario:   dto.tipoDestinatario,
     idDestino,
     idTipoDistribucion: dto.idTipoDistribucion,
@@ -64,10 +102,8 @@ export async function crearDocumento(dto: CrearDocumentoDto, idUsuario: number) 
     observaciones:      dto.observaciones,
   });
 
-  // Si se solicitó despachar directamente, actualizar el tramite
-  if (dto.despacharAhora) {
-    await repo.updateTramiteEstado(idSeguimiento, 2, { fechaDespacho: new Date() });
-  }
+  // Siempre marcar el trámite inicial como despachado con fecha actual
+  await repo.updateTramiteEstado(idSeguimiento, 2, { fechaDespacho: new Date() });
 
   return obtenerDocumento(idDocumento);
 }

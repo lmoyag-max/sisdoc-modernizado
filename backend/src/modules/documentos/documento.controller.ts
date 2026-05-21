@@ -1,22 +1,61 @@
 import { Request, Response, NextFunction } from 'express';
 import * as service from './documento.service';
 import { AuthenticatedRequest } from '../../shared/types/api.types';
-import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/response';
+import { sendSuccess, sendCreated, sendPaginated, sendForbidden } from '../../shared/utils/response';
 
 const user = (req: Request) => (req as AuthenticatedRequest).user;
 
+// ── Helpers de acceso ─────────────────────────────────────────
+
+function hasFullAccess(u: AuthenticatedRequest['user']): boolean {
+  return u.roles.includes('admin') || u.todosServicios === true;
+}
+
+function canSeeExternals(u: AuthenticatedRequest['user']): boolean {
+  return u.roles.includes('admin') || u.roles.includes('of.partes');
+}
+
+// ── Listar documentos (filtrado por servicio) ─────────────────
+
 export async function listar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { data, meta } = await service.listarDocumentos(req.query as never);
+    const u = user(req);
+    const filtroServicio = hasFullAccess(u)
+      ? null
+      : { idDependencia: u.idDependencia, verExternos: canSeeExternals(u) };
+
+    const { data, meta } = await service.listarDocumentos(req.query as never, filtroServicio);
     sendPaginated(res, data, meta);
   } catch (e) { next(e); }
 }
 
+// ── Obtener un documento (con control de acceso) ──────────────
+
 export async function obtener(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    sendSuccess(res, await service.obtenerDocumento(Number(req.params.id)));
+    const u   = user(req);
+    const idDoc = Number(req.params.id);
+
+    const doc = await service.obtenerDocumento(idDoc);
+
+    // Control de acceso: si el usuario no tiene acceso total, verificar relación con el doc
+    if (!hasFullAccess(u)) {
+      const tieneAcceso = await service.usuarioTieneAccesoDocumento(
+        idDoc,
+        u.idDependencia,
+        canSeeExternals(u),
+      );
+      if (!tieneAcceso) {
+        sendForbidden(res, 'No tienes acceso a este documento');
+        return;
+      }
+    }
+
+    sendSuccess(res, doc);
   } catch (e) { next(e); }
 }
+
+// ── Trazabilidad / historial ──────────────────────────────────
 
 export async function trazabilidad(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -24,17 +63,21 @@ export async function trazabilidad(req: Request, res: Response, next: NextFuncti
   } catch (e) { next(e); }
 }
 
-// alias histórico
 export async function historial(req: Request, res: Response, next: NextFunction): Promise<void> {
   return trazabilidad(req, res, next);
 }
 
+// ── Crear ─────────────────────────────────────────────────────
+
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const doc = await service.crearDocumento(req.body, user(req).idUsuario);
+    const u   = user(req);
+    const doc = await service.crearDocumento(req.body, u.idUsuario, u.idDependencia);
     sendCreated(res, doc, 'Documento creado exitosamente');
   } catch (e) { next(e); }
 }
+
+// ── Flujo documental ──────────────────────────────────────────
 
 export async function despachar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

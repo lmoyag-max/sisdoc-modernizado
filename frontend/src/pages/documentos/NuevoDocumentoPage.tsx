@@ -6,9 +6,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   FileText, ArrowLeft, Send, Paperclip, X, AlertCircle,
-  Building2, Tag, MessageSquare, Calendar, Loader2, ChevronRight,
+  Building2, Tag, MessageSquare, Calendar, Loader2, ChevronRight, Lock,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
+import { useAuthStore } from '@/stores/auth.store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,14 +18,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 // ── Schema ───────────────────────────────────────────────────
+// Origen, estado y despacharAhora son asignados automáticamente por el backend.
+// El usuario solo elige el destino.
 const schema = z.object({
   materia:            z.string().min(5, 'Mínimo 5 caracteres').max(250),
   idTipoDocumento:    z.string().min(1, 'Selecciona el tipo de documento'),
-  idEstadoDocumento:  z.string().default('1'),
   fechaDocumento:     z.string().optional(),
   observaciones:      z.string().max(500).optional(),
-  tipoProcedencia:    z.enum(['D', 'E']).default('D'),
-  idProcedencia:      z.string().min(1, 'Selecciona la procedencia'),
   tipoDestinatario:   z.enum(['D', 'E']).default('D'),
   idDestino:          z.string().min(1, 'Selecciona el destino'),
   idTipoDistribucion: z.string().default('5'),
@@ -32,25 +32,25 @@ const schema = z.object({
   idEstadoCompromiso: z.string().default('2'),
   diasCompromiso:     z.string().default('0'),
   idExpediente:       z.string().optional(),
-  despacharAhora:     z.boolean().default(false),
 });
 type FormData = z.infer<typeof schema>;
 
 interface CatItem { id: number; descripcion: string }
 
 const sel = (hasErr?: boolean) => cn(
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm',
+  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
   hasErr && 'border-destructive'
 );
 
 export function NuevoDocumentoPage() {
-  const navigate = useNavigate();
-  const [archivo, setArchivo] = useState<File | null>(null);
+  const navigate   = useNavigate();
+  const user       = useAuthStore((s) => s.user);
+  const [archivo, setArchivo]   = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
   // Catálogos
   const { data: tipos }        = useQuery({ queryKey: ['tipos-doc'],    queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/tipos-documento')).data.data });
-  const { data: estadosDoc }   = useQuery({ queryKey: ['estados-doc'],  queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/estados')).data.data });
   const { data: dependencias } = useQuery({ queryKey: ['dependencias'], queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/dependencias')).data.data });
   const { data: depExternas }  = useQuery({ queryKey: ['dep-externas'],queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/dependencias-externas')).data.data });
   const { data: tiposDist }    = useQuery({ queryKey: ['tipos-dist'],   queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/tipos-distribucion')).data.data });
@@ -60,41 +60,34 @@ export function NuevoDocumentoPage() {
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      idEstadoDocumento: '1',
-      fechaDocumento: new Date().toISOString().split('T')[0],
-      tipoProcedencia: 'D', tipoDestinatario: 'D',
-      idTipoDistribucion: '5', idTipoCompromiso: '1',
-      idEstadoCompromiso: '2', diasCompromiso: '0',
-      despacharAhora: false,
+      fechaDocumento:     new Date().toISOString().split('T')[0],
+      tipoDestinatario:   'D',
+      idTipoDistribucion: '5',
+      idTipoCompromiso:   '1',
+      idEstadoCompromiso: '2',
+      diasCompromiso:     '0',
     },
   });
 
-  const tipoProcedencia  = watch('tipoProcedencia');
   const tipoDestinatario = watch('tipoDestinatario');
   const idTipoCompromiso = watch('idTipoCompromiso');
-  const despacharAhora   = watch('despacharAhora');
   const materia          = watch('materia');
-
-  const procOptions  = tipoProcedencia  === 'D' ? (dependencias ?? []) : (depExternas ?? []);
-  const destOptions  = tipoDestinatario === 'D' ? (dependencias ?? []) : (depExternas ?? []);
+  const destOptions      = tipoDestinatario === 'D' ? (dependencias ?? []) : (depExternas ?? []);
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
       const payload = {
         materia:            data.materia,
         idTipoDocumento:    Number(data.idTipoDocumento),
-        idEstadoDocumento:  Number(data.idEstadoDocumento),
         fechaDocumento:     data.fechaDocumento,
         observaciones:      data.observaciones,
-        tipoProcedencia:    data.tipoProcedencia,
-        idProcedencia:      Number(data.idProcedencia),
+        // Origen y estado asignados automáticamente por el backend
         tipoDestinatario:   data.tipoDestinatario,
         idDestino:          Number(data.idDestino),
         idTipoDistribucion: Number(data.idTipoDistribucion),
         idTipoCompromiso:   Number(data.idTipoCompromiso),
         idEstadoCompromiso: Number(data.idEstadoCompromiso),
         diasCompromiso:     Number(data.diasCompromiso),
-        despacharAhora:     data.despacharAhora,
         idExpediente:       data.idExpediente ? Number(data.idExpediente) : undefined,
       };
       const res = await apiClient.post<{ ok: boolean; data: { idDocumento: number } }>('/documentos', payload);
@@ -108,7 +101,7 @@ export function NuevoDocumentoPage() {
       return res.data.data;
     },
     onSuccess: (data) => {
-      toast.success('Documento registrado correctamente');
+      toast.success('Documento registrado y despachado correctamente');
       navigate(`/documentos/${data?.idDocumento}`);
     },
     onError: (err: unknown) => {
@@ -118,6 +111,8 @@ export function NuevoDocumentoPage() {
   });
 
   const isPending = isSubmitting || mutation.isPending;
+  // Origen informativo — servicio del usuario autenticado
+  const origenNombre = user?.descDependencia ?? 'Sin servicio asignado';
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
@@ -150,13 +145,23 @@ export function NuevoDocumentoPage() {
                   <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
                   Materia / Asunto <span className="text-destructive">*</span>
                 </Label>
-                <textarea rows={3} {...register('materia')} placeholder="Descripción del documento..."
-                  className={cn('flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none', errors.materia && 'border-destructive')} />
+                <textarea
+                  rows={3}
+                  {...register('materia')}
+                  placeholder="Descripción del documento..."
+                  className={cn(
+                    'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm',
+                    'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none',
+                    errors.materia && 'border-destructive'
+                  )}
+                />
                 <div className="flex justify-between">
                   {errors.materia
                     ? <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.materia.message}</p>
                     : <span />}
-                  <span className={cn('text-xs', (materia?.length ?? 0) > 230 ? 'text-amber-500' : 'text-muted-foreground')}>{materia?.length ?? 0}/250</span>
+                  <span className={cn('text-xs', (materia?.length ?? 0) > 230 ? 'text-amber-500' : 'text-muted-foreground')}>
+                    {materia?.length ?? 0}/250
+                  </span>
                 </div>
               </div>
 
@@ -174,13 +179,16 @@ export function NuevoDocumentoPage() {
                   {errors.idTipoDocumento && <p className="text-xs text-destructive">{errors.idTipoDocumento.message}</p>}
                 </div>
 
-                {/* Estado */}
+                {/* Estado — solo informativo, asignado automáticamente */}
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Estado inicial</Label>
-                  <select {...register('idEstadoDocumento')} className={sel()}>
-                    {(estadosDoc ?? [{ id: 1, descripcion: 'Registrado' }]).map((e) =>
-                      <option key={e.id} value={e.id}>{e.descripcion}</option>)}
-                  </select>
+                  <Label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Lock className="h-3.5 w-3.5" />
+                    Estado inicial
+                  </Label>
+                  <div className={cn(sel(), 'bg-muted/40 text-muted-foreground cursor-not-allowed flex items-center gap-2')}>
+                    <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                    Despachado (automático)
+                  </div>
                 </div>
 
                 {/* Fecha */}
@@ -207,48 +215,36 @@ export function NuevoDocumentoPage() {
             </CardContent>
           </Card>
 
-          {/* SECCIÓN 2: TRÁMITE ORIGEN */}
-          <Card>
+          {/* SECCIÓN 2: ORIGEN AUTOMÁTICO */}
+          <Card className="border-emerald-200 dark:border-emerald-800/40">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <ChevronRight className="h-4 w-4 text-emerald-500" />
                 Origen del Trámite
+                <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                  <Lock className="h-3 w-3" />Automático
+                </span>
               </CardTitle>
-              <CardDescription>¿De dónde proviene el documento?</CardDescription>
+              <CardDescription>Asignado desde tu servicio. No es editable.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Tipo de procedencia</Label>
-                  <div className="flex gap-6">
-                    {[{ v: 'D', l: 'Interno (Dependencia)' }, { v: 'E', l: 'Externo' }].map(({ v, l }) => (
-                      <label key={v} className="flex items-center gap-2 cursor-pointer text-sm">
-                        <input type="radio" {...register('tipoProcedencia')} value={v} className="h-4 w-4" />
-                        {l}
-                      </label>
-                    ))}
-                  </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                  <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="flex items-center gap-1.5 text-sm">
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    Procedencia <span className="text-destructive">*</span>
-                  </Label>
-                  <select {...register('idProcedencia')} className={sel(!!errors.idProcedencia)}>
-                    <option value="">Seleccionar {tipoProcedencia === 'D' ? 'dependencia' : 'entidad'}...</option>
-                    {procOptions.map((d) => <option key={d.id} value={d.id}>{d.descripcion}</option>)}
-                  </select>
-                  {errors.idProcedencia && <p className="text-xs text-destructive">{errors.idProcedencia.message}</p>}
+                <div>
+                  <p className="text-sm font-medium text-foreground">{origenNombre}</p>
+                  <p className="text-xs text-muted-foreground">Dependencia / Servicio del usuario creador</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* SECCIÓN 3: TRÁMITE DESTINO */}
+          {/* SECCIÓN 3: DESTINO */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <ChevronRight className="h-4 w-4 text-primary rotate-180" />
+                <ChevronRight className="h-4 w-4 text-primary" />
                 Destino del Trámite
               </CardTitle>
               <CardDescription>¿A dónde se envía el documento?</CardDescription>
@@ -318,13 +314,6 @@ export function NuevoDocumentoPage() {
                   </>
                 )}
               </div>
-
-              <div className="flex items-center gap-3 pt-3 border-t border-border">
-                <input type="checkbox" id="despacharAhora" {...register('despacharAhora')} className="h-4 w-4 rounded" />
-                <Label htmlFor="despacharAhora" className="cursor-pointer text-sm font-medium">
-                  Guardar y despachar inmediatamente al destino seleccionado
-                </Label>
-              </div>
             </CardContent>
           </Card>
 
@@ -354,15 +343,18 @@ export function NuevoDocumentoPage() {
                   onDragLeave={() => setDragOver(false)}
                   onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setArchivo(f); }}
                   onClick={() => document.getElementById('file-input')?.click()}
-                  className={cn('flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed cursor-pointer transition-all',
-                    dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30')}
+                  className={cn(
+                    'flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed cursor-pointer transition-all',
+                    dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                  )}
                 >
                   <Paperclip className={cn('h-8 w-8', dragOver ? 'text-primary' : 'text-muted-foreground')} />
                   <div className="text-center">
                     <p className="text-sm font-medium">{dragOver ? 'Suelta el archivo' : 'Arrastra o haz clic para subir'}</p>
                     <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX, XLS, PNG, JPG — máx. 20 MB</p>
                   </div>
-                  <input id="file-input" type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                  <input id="file-input" type="file" className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) setArchivo(f); }} />
                 </div>
               )}
@@ -377,7 +369,7 @@ export function NuevoDocumentoPage() {
             <Button type="submit" disabled={isPending} className="gap-2 px-8">
               {isPending
                 ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
-                : <><Send className="h-4 w-4" />{despacharAhora ? 'Guardar y Despachar' : 'Guardar Documento'}</>
+                : <><Send className="h-4 w-4" />Registrar y Despachar</>
               }
             </Button>
           </div>

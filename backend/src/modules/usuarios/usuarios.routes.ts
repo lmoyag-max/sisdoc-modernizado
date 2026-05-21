@@ -30,11 +30,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       id_usuario: number; usuario: string;
       nombres: string | null; apellidos: string | null;
       id_dependencia: number | null; desc_dependencia: string | null;
-      roles: string | null; total: number;
+      todos_servicios: boolean; roles: string | null; total: number;
     }>(`
       SELECT u.id_usuario, u.usuario,
              f.nombres, f.apellidos, f.id_dependencia,
              d.desc_dependencia,
+             ISNULL(u.todos_servicios, 1) AS todos_servicios,
              (SELECT STRING_AGG(r.codigo, ',') FROM usuario_rol ur JOIN rol r ON ur.id_rol = r.id_rol WHERE ur.id_usuario = u.id_usuario) AS roles,
              COUNT(*) OVER() AS total
       FROM usuario u
@@ -47,13 +48,14 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const total = result.recordset[0]?.total ?? 0;
     const data = result.recordset.map((r) => ({
-      idUsuario: r.id_usuario,
-      usuario: r.usuario,
-      nombres: r.nombres,
-      apellidos: r.apellidos,
-      idDependencia: r.id_dependencia,
+      idUsuario:       r.id_usuario,
+      usuario:         r.usuario,
+      nombres:         r.nombres,
+      apellidos:       r.apellidos,
+      idDependencia:   r.id_dependencia,
       descDependencia: r.desc_dependencia,
-      roles: r.roles ? r.roles.split(',') : ['funcionario'],
+      todosServicios:  r.todos_servicios ?? true,
+      roles:           r.roles ? r.roles.split(',') : ['funcionario'],
     }));
 
     sendPaginated(res, data, buildPaginationMeta(total, pagina, porPagina));
@@ -69,10 +71,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       .query<{
         id_usuario: number; usuario: string;
         nombres: string | null; apellidos: string | null;
-        id_dependencia: number | null; desc_dependencia: string | null; roles: string | null;
+        id_dependencia: number | null; desc_dependencia: string | null;
+        todos_servicios: boolean; roles: string | null;
       }>(`
         SELECT u.id_usuario, u.usuario, f.nombres, f.apellidos, f.id_dependencia,
                d.desc_dependencia,
+               ISNULL(u.todos_servicios, 1) AS todos_servicios,
                (SELECT STRING_AGG(r.codigo, ',') FROM usuario_rol ur JOIN rol r ON ur.id_rol = r.id_rol WHERE ur.id_usuario = u.id_usuario) AS roles
         FROM usuario u
         LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
@@ -84,10 +88,14 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     if (!row) { sendError(res, 'Usuario no encontrado', 404); return; }
 
     sendSuccess(res, {
-      idUsuario: row.id_usuario, usuario: row.usuario,
-      nombres: row.nombres, apellidos: row.apellidos,
-      idDependencia: row.id_dependencia, descDependencia: row.desc_dependencia,
-      roles: row.roles ? row.roles.split(',') : ['funcionario'],
+      idUsuario:       row.id_usuario,
+      usuario:         row.usuario,
+      nombres:         row.nombres,
+      apellidos:       row.apellidos,
+      idDependencia:   row.id_dependencia,
+      descDependencia: row.desc_dependencia,
+      todosServicios:  row.todos_servicios ?? true,
+      roles:           row.roles ? row.roles.split(',') : ['funcionario'],
     });
   } catch (e) { next(e); }
 });
@@ -95,9 +103,9 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // ── POST /usuarios — crear ──────────────────────────────────
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { usuario, clave, nombres, apellidos, idDependencia, roles } = req.body as {
+    const { usuario, clave, nombres, apellidos, idDependencia, todos_servicios, roles } = req.body as {
       usuario: string; clave: string; nombres: string; apellidos: string;
-      idDependencia: number; roles?: string[];
+      idDependencia?: number; todos_servicios?: boolean; roles?: string[];
     };
 
     if (!usuario || !clave || !nombres || !apellidos) {
@@ -134,14 +142,16 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     // Crear usuario — clave en texto plano (max 10 chars, se hashea en primer login)
     const claveCorta = clave.substring(0, 10);
+    const todosServ  = todos_servicios !== false; // default true
     const usrRes = await pool.request()
-      .input('usuario', sql.VarChar(10), usuario.substring(0, 10))
-      .input('clave', sql.VarChar(10), claveCorta)
-      .input('idFun', sql.Int, idFuncionario)
+      .input('usuario',         sql.VarChar(10), usuario.substring(0, 10))
+      .input('clave',           sql.VarChar(10), claveCorta)
+      .input('idFun',           sql.Int,         idFuncionario)
+      .input('todos_servicios', sql.Bit,         todosServ)
       .query<{ id: number }>(`
-        INSERT INTO usuario (usuario, clave, id_funcionario, tipo_alertas)
+        INSERT INTO usuario (usuario, clave, id_funcionario, tipo_alertas, todos_servicios)
         OUTPUT INSERTED.id_usuario AS id
-        VALUES (@usuario, @clave, @idFun, 'A')
+        VALUES (@usuario, @clave, @idFun, 'A', @todos_servicios)
       `);
 
     const idUsuario = usrRes.recordset[0].id;
@@ -166,8 +176,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 // ── PATCH /usuarios/:id — actualizar ───────────────────────
 router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { nombres, apellidos, clave, roles, idDependencia } = req.body as {
-      nombres?: string; apellidos?: string; clave?: string; roles?: string[]; idDependencia?: number;
+    const { nombres, apellidos, clave, roles, idDependencia, todos_servicios } = req.body as {
+      nombres?: string; apellidos?: string; clave?: string; roles?: string[];
+      idDependencia?: number; todos_servicios?: boolean;
     };
     const idUsuario = Number(req.params.id);
     const pool = await getPool();
@@ -188,6 +199,14 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
           JOIN usuario u ON u.id_funcionario = f.id_funcionario
           WHERE u.id_usuario = @idUsr
         `);
+    }
+
+    // Actualizar todos_servicios si se provee
+    if (todos_servicios !== undefined) {
+      await pool.request()
+        .input('ts',     sql.Bit, todos_servicios)
+        .input('idUsr',  sql.Int, idUsuario)
+        .query('UPDATE usuario SET todos_servicios = @ts WHERE id_usuario = @idUsr');
     }
 
     // Actualizar clave si se provee

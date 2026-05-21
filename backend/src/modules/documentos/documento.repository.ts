@@ -49,7 +49,12 @@ export interface TramiteRow {
 
 // ── findMany ─────────────────────────────────────────────────
 
-export async function findMany(filtros: FiltrosDocumentoDto): Promise<DocumentoRow[]> {
+interface FiltroServicioRepo {
+  idDependencia: number | null;
+  verExternos:   boolean;
+}
+
+export async function findMany(filtros: FiltrosDocumentoDto, filtroServicio?: FiltroServicioRepo | null): Promise<DocumentoRow[]> {
   const pool = await getPool();
   const offset = (filtros.pagina - 1) * filtros.porPagina;
   const request = pool.request()
@@ -61,10 +66,30 @@ export async function findMany(filtros: FiltrosDocumentoDto): Promise<DocumentoR
     request.input('q', sql.NVarChar(200), `%${filtros.q}%`);
     where += ' AND (d.materia LIKE @q OR CAST(d.num_interno AS VARCHAR) LIKE @q OR CAST(d.num_oficial AS VARCHAR) LIKE @q)';
   }
-  if (filtros.idTipo) { request.input('idTipo', sql.Int, filtros.idTipo); where += ' AND d.id_tipo_documento = @idTipo'; }
-  if (filtros.idEstado) { request.input('idEstado', sql.Int, filtros.idEstado); where += ' AND d.id_estado_documento = @idEstado'; }
-  if (filtros.fechaDesde) { request.input('fechaDesde', sql.Date, new Date(filtros.fechaDesde)); where += ' AND d.fecha_sistema >= @fechaDesde'; }
-  if (filtros.fechaHasta) { request.input('fechaHasta', sql.Date, new Date(filtros.fechaHasta)); where += ' AND d.fecha_sistema <= @fechaHasta'; }
+  if (filtros.idTipo)    { request.input('idTipo',    sql.Int,  filtros.idTipo);                    where += ' AND d.id_tipo_documento = @idTipo'; }
+  if (filtros.idEstado)  { request.input('idEstado',  sql.Int,  filtros.idEstado);                  where += ' AND d.id_estado_documento = @idEstado'; }
+  if (filtros.fechaDesde){ request.input('fechaDesde',sql.Date, new Date(filtros.fechaDesde));       where += ' AND d.fecha_sistema >= @fechaDesde'; }
+  if (filtros.fechaHasta){ request.input('fechaHasta',sql.Date, new Date(filtros.fechaHasta));       where += ' AND d.fecha_sistema <= @fechaHasta'; }
+
+  // Filtro por servicio
+  if (filtroServicio !== null && filtroServicio !== undefined) {
+    if (filtroServicio.idDependencia) {
+      // Usuario con servicio asignado → solo docs donde su dep participa
+      request.input('idDepFiltro', sql.Int, filtroServicio.idDependencia);
+      const externalClause = filtroServicio.verExternos ? " OR t_f.tipo_destinatario = 'E'" : '';
+      where += ` AND EXISTS (
+        SELECT 1 FROM tramite t_f WHERE t_f.id_documento = d.id_documento
+        AND (
+          (t_f.id_destino     = @idDepFiltro AND t_f.tipo_destinatario = 'D')
+          OR (t_f.id_procedencia = @idDepFiltro AND t_f.tipo_procedencia  = 'D')
+          ${externalClause}
+        )
+      )`;
+    } else {
+      // Usuario sin servicio asignado y sin acceso total → bloquear todo
+      where += ' AND 1=0';
+    }
+  }
 
   const result = await request.query<DocumentoRow>(`
     SELECT

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Inbox, CheckCircle, Clock, RefreshCw, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Inbox, CheckCircle, Clock, RefreshCw, ChevronLeft, ChevronRight, FileText, Building2 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth.store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,16 +12,18 @@ import { formatRelativo, truncate } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface TramiteEntrada {
-  id_seguimiento: number;
-  id_documento: number | null;
-  materia: string | null;
-  num_interno: string | null;
+  id_seguimiento:      number;
+  id_documento:        number | null;
+  materia:             string | null;
+  num_interno:         string | null;
   desc_tipo_documento: string | null;
-  id_estado_tramite: number | null;
+  id_estado_tramite:   number | null;
   desc_estado_tramite: string | null;
-  fecha_sistema: string | null;
-  observaciones: string | null;
-  total: number;
+  desc_procedencia:    string | null;
+  desc_destino:        string | null;
+  fecha_sistema:       string | null;
+  observaciones:       string | null;
+  total:               number;
 }
 
 const ESTADO_CONFIG: Record<number, { label: string; variant: 'warning' | 'info' | 'success' | 'secondary'; icon: React.ComponentType<{ className?: string }> }> = {
@@ -79,16 +81,18 @@ export function BandejaPage() {
             )}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => qc.invalidateQueries({ queryKey: ['bandeja'] })}
-          className="gap-2"
-        >
+        <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['bandeja'] })} className="gap-2">
           <RefreshCw className="h-4 w-4" />
           Actualizar
         </Button>
       </div>
+      {/* Indicador de servicio */}
+      {user?.descDependencia && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground -mt-3">
+          <Building2 className="h-3 w-3" />
+          Mostrando documentos destinados a: <span className="font-medium text-foreground">{user.descDependencia}</span>
+        </div>
+      )}
 
       {/* Filtros rápidos */}
       <div className="flex gap-2 flex-wrap">
@@ -152,6 +156,14 @@ export function BandejaPage() {
                       <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-muted-foreground">
                         {t.num_interno && <span className="font-mono">N° {t.num_interno}</span>}
                         {t.desc_tipo_documento && <span>{t.desc_tipo_documento}</span>}
+                        {/* Origen → Destino */}
+                        {(t.desc_procedencia || t.desc_destino) && (
+                          <span className="flex items-center gap-1">
+                            <span>{t.desc_procedencia ?? '—'}</span>
+                            <span>→</span>
+                            <span className="font-medium text-foreground">{t.desc_destino ?? '—'}</span>
+                          </span>
+                        )}
                         {t.observaciones && <span className="italic">"{truncate(t.observaciones, 40)}"</span>}
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />

@@ -2,16 +2,17 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export interface UserSession {
-  idUsuario: number;
-  usuario: string;
-  idFuncionario: number | null;
-  nombres: string | null;
-  apPat: string | null;
-  apMat: string | null;
-  email: string | null;
-  idDependencia: number | null;
+  idUsuario:       number;
+  usuario:         string;
+  idFuncionario:   number | null;
+  nombres:         string | null;
+  apPat:           string | null;
+  apMat:           string | null;
+  email:           string | null;
+  idDependencia:   number | null;
   descDependencia: string | null;
-  roles: string[];
+  todosServicios:  boolean;
+  roles:           string[];
 }
 
 interface AuthState {

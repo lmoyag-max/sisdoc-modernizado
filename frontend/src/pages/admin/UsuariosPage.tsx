@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Users, Plus, Search, Pencil, Trash2, RefreshCw,
-  Shield, ChevronLeft, ChevronRight, X, Save,
+  ChevronLeft, ChevronRight, X, Save, Building2, Eye,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,25 +16,26 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 
+interface Dependencia { id: number; descripcion: string }
+
 interface Usuario {
-  idUsuario: number;
-  usuario: string;
-  nombres: string | null;
-  apellidos: string | null;
+  idUsuario:       number;
+  usuario:         string;
+  nombres:         string | null;
+  apellidos:       string | null;
+  idDependencia:   number | null;
   descDependencia: string | null;
-  roles: string[];
+  todosServicios:  boolean;
+  roles:           string[];
 }
 
-interface Rol {
-  id_rol: number;
-  codigo: string;
-  nombre: string;
-}
+interface Rol { id_rol: number; codigo: string; nombre: string }
 
 const ROL_BADGE: Record<string, { label: string; className: string }> = {
-  admin:       { label: 'Admin',        className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
-  coordinador: { label: 'Coordinador',  className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  funcionario: { label: 'Funcionario',  className: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300' },
+  admin:        { label: 'Admin',       className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
+  'of.partes':  { label: 'Of. Partes',  className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  supervisores: { label: 'Supervisor',  className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  funcionario:  { label: 'Funcionario', className: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300' },
 };
 
 function iniciales(nombre: string): string {
@@ -43,33 +44,39 @@ function iniciales(nombre: string): string {
 
 // ── Modal crear/editar ───────────────────────────────────────
 interface ModalProps {
-  usuario: Usuario | null;
-  roles: Rol[];
-  onClose: () => void;
-  onSaved: () => void;
+  usuario:     Usuario | null;
+  roles:       Rol[];
+  dependencias: Dependencia[];
+  onClose:     () => void;
+  onSaved:     () => void;
 }
 
-function UsuarioModal({ usuario, roles, onClose, onSaved }: ModalProps) {
+function UsuarioModal({ usuario, roles, dependencias, onClose, onSaved }: ModalProps) {
   const isEdit = !!usuario;
   const [form, setForm] = useState({
-    usuario: usuario?.usuario ?? '',
-    clave: '',
-    nombres: usuario?.nombres ?? '',
-    apellidos: usuario?.apellidos ?? '',
-    roles: usuario?.roles ?? ['funcionario'],
+    usuario:        usuario?.usuario        ?? '',
+    clave:          '',
+    nombres:        usuario?.nombres        ?? '',
+    apellidos:      usuario?.apellidos      ?? '',
+    idDependencia:  usuario?.idDependencia  ? String(usuario.idDependencia) : '',
+    todosServicios: usuario?.todosServicios ?? false,
+    roles:          usuario?.roles          ?? ['funcionario'],
   });
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const payload = {
+        nombres:        form.nombres,
+        apellidos:      form.apellidos,
+        roles:          form.roles,
+        idDependencia:  form.idDependencia ? Number(form.idDependencia) : undefined,
+        todos_servicios: form.todosServicios,
+        ...(form.clave ? { clave: form.clave } : {}),
+      };
       if (isEdit) {
-        await apiClient.patch(`/usuarios/${usuario!.idUsuario}`, {
-          nombres: form.nombres,
-          apellidos: form.apellidos,
-          roles: form.roles,
-          ...(form.clave ? { clave: form.clave } : {}),
-        });
+        await apiClient.patch(`/usuarios/${usuario!.idUsuario}`, payload);
       } else {
-        await apiClient.post('/usuarios', form);
+        await apiClient.post('/usuarios', { ...payload, usuario: form.usuario, clave: form.clave });
       }
     },
     onSuccess: () => {
@@ -95,42 +102,95 @@ function UsuarioModal({ usuario, roles, onClose, onSaved }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl animate-fade-in">
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-lg font-semibold">{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</h2>
+      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl animate-fade-in overflow-y-auto max-h-[90vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
+          <h2 className="text-base font-semibold">{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
         </div>
-        <div className="p-6 space-y-4">
+
+        <div className="p-6 space-y-5">
+          {/* Nombre y apellido */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Nombres</Label>
+              <Label>Nombres *</Label>
               <Input value={form.nombres} onChange={(e) => setForm((f) => ({ ...f, nombres: e.target.value }))} placeholder="Nombres" />
             </div>
             <div className="space-y-1.5">
-              <Label>Apellidos</Label>
+              <Label>Apellidos *</Label>
               <Input value={form.apellidos} onChange={(e) => setForm((f) => ({ ...f, apellidos: e.target.value }))} placeholder="Apellidos" />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Nombre de usuario</Label>
-            <Input
-              value={form.usuario}
-              onChange={(e) => setForm((f) => ({ ...f, usuario: e.target.value.slice(0, 10) }))}
-              placeholder="máx. 10 caracteres"
-              disabled={isEdit}
-              maxLength={10}
-            />
+
+          {/* Usuario y clave */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Usuario *</Label>
+              <Input
+                value={form.usuario}
+                onChange={(e) => setForm((f) => ({ ...f, usuario: e.target.value.slice(0, 10) }))}
+                placeholder="máx. 10 caracteres"
+                disabled={isEdit}
+                maxLength={10}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{isEdit ? 'Nueva contraseña' : 'Contraseña *'}</Label>
+              <Input
+                type="password"
+                value={form.clave}
+                onChange={(e) => setForm((f) => ({ ...f, clave: e.target.value.slice(0, 10) }))}
+                placeholder={isEdit ? 'Sin cambios' : 'máx. 10 caracteres'}
+                maxLength={10}
+              />
+            </div>
           </div>
+
+          {/* Servicio / Dependencia */}
           <div className="space-y-1.5">
-            <Label>{isEdit ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña'}</Label>
-            <Input
-              type="password"
-              value={form.clave}
-              onChange={(e) => setForm((f) => ({ ...f, clave: e.target.value.slice(0, 10) }))}
-              placeholder={isEdit ? 'Sin cambios' : 'máx. 10 caracteres'}
-              maxLength={10}
-            />
+            <Label className="flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+              Servicio / Dependencia
+            </Label>
+            <select
+              value={form.idDependencia}
+              onChange={(e) => setForm((f) => ({ ...f, idDependencia: e.target.value }))}
+              className={cn(
+                'w-full h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground',
+                'focus:outline-none focus:ring-2 focus:ring-ring',
+                !form.idDependencia && 'text-muted-foreground'
+              )}
+            >
+              <option value="">— Sin servicio asignado —</option>
+              {dependencias.map((d) => (
+                <option key={d.id} value={d.id}>{d.descripcion}</option>
+              ))}
+            </select>
           </div>
+
+          {/* Todos los servicios */}
+          <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30">
+            <input
+              id="todos-servicios"
+              type="checkbox"
+              checked={form.todosServicios}
+              onChange={(e) => setForm((f) => ({ ...f, todosServicios: e.target.checked }))}
+              className="mt-0.5 h-4 w-4 rounded border-input accent-primary cursor-pointer"
+            />
+            <div>
+              <label htmlFor="todos-servicios" className="text-sm font-medium cursor-pointer select-none">
+                Puede ver todos los servicios
+              </label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {form.todosServicios
+                  ? 'El usuario verá documentos de todas las dependencias.'
+                  : 'El usuario solo verá documentos de su servicio asignado.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Roles */}
           <div className="space-y-2">
             <Label>Roles</Label>
             <div className="flex flex-wrap gap-2">
@@ -143,7 +203,9 @@ function UsuarioModal({ usuario, roles, onClose, onSaved }: ModalProps) {
                     onClick={() => toggleRol(r.codigo)}
                     className={cn(
                       'px-3 py-1 rounded-full text-xs font-medium border transition-all',
-                      sel ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-border hover:border-primary/50'
+                      sel
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted text-muted-foreground border-border hover:border-primary/50'
                     )}
                   >
                     {r.nombre}
@@ -153,9 +215,15 @@ function UsuarioModal({ usuario, roles, onClose, onSaved }: ModalProps) {
             </div>
           </div>
         </div>
+
+        {/* Footer */}
         <div className="flex justify-end gap-2 px-6 pb-6">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="gap-2">
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending || !form.nombres || !form.apellidos || (!isEdit && !form.clave)}
+            className="gap-2"
+          >
             {mutation.isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {isEdit ? 'Guardar cambios' : 'Crear usuario'}
           </Button>
@@ -167,11 +235,11 @@ function UsuarioModal({ usuario, roles, onClose, onSaved }: ModalProps) {
 
 // ── Página principal ─────────────────────────────────────────
 export function UsuariosPage() {
-  const [pagina, setPagina] = useState(1);
-  const [search, setSearch] = useState('');
-  const [modal, setModal] = useState<'nuevo' | Usuario | null>(null);
-  const debouncedSearch = useDebounce(search, 300);
-  const qc = useQueryClient();
+  const [pagina, setPagina]   = useState(1);
+  const [search, setSearch]   = useState('');
+  const [modal, setModal]     = useState<'nuevo' | Usuario | null>(null);
+  const debouncedSearch       = useDebounce(search, 300);
+  const qc                    = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['usuarios', pagina, debouncedSearch],
@@ -194,6 +262,15 @@ export function UsuariosPage() {
     staleTime: Infinity,
   });
 
+  const { data: dependencias } = useQuery({
+    queryKey: ['dependencias-usuarios'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ data: Dependencia[] }>('/catalogos/dependencias');
+      return data.data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.delete(`/usuarios/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['usuarios'] }); toast.success('Usuario eliminado'); },
@@ -202,7 +279,6 @@ export function UsuariosPage() {
 
   const usuarios = data?.data ?? [];
   const meta = data?.meta;
-
   const handleSaved = () => qc.invalidateQueries({ queryKey: ['usuarios'] });
 
   return (
@@ -221,8 +297,7 @@ export function UsuariosPage() {
           </div>
         </div>
         <Button onClick={() => setModal('nuevo')} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo usuario
+          <Plus className="h-4 w-4" />Nuevo usuario
         </Button>
       </div>
 
@@ -245,10 +320,7 @@ export function UsuariosPage() {
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4 px-6 py-4">
                   <Skeleton className="h-9 w-9 rounded-full" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-3.5 w-40" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
+                  <div className="flex-1 space-y-1.5"><Skeleton className="h-3.5 w-40" /><Skeleton className="h-3 w-24" /></div>
                   <Skeleton className="h-6 w-20 rounded-full" />
                 </div>
               ))}
@@ -268,15 +340,23 @@ export function UsuariosPage() {
                         {iniciales(nombreCompleto)}
                       </AvatarFallback>
                     </Avatar>
+
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{nombreCompleto}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                         <span className="font-mono">@{u.usuario}</span>
                         {u.descDependencia && (
-                          <><span>·</span><span className="truncate">{u.descDependencia}</span></>
+                          <><span>·</span><span className="truncate max-w-[200px]">{u.descDependencia}</span></>
+                        )}
+                        {u.todosServicios && (
+                          <span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+                            <Eye className="h-3 w-3" />Todos los servicios
+                          </span>
                         )}
                       </div>
                     </div>
+
+                    {/* Roles */}
                     <div className="flex items-center gap-1.5 shrink-0">
                       {u.roles.slice(0, 2).map((rol) => {
                         const cfg = ROL_BADGE[rol] ?? { label: rol, className: 'bg-muted text-muted-foreground' };
@@ -286,18 +366,20 @@ export function UsuariosPage() {
                           </span>
                         );
                       })}
+                      {u.roles.length > 2 && (
+                        <Badge variant="secondary" className="text-[10px] h-5">+{u.roles.length - 2}</Badge>
+                      )}
                     </div>
+
+                    {/* Acciones */}
                     <div className="flex items-center gap-1 shrink-0">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setModal(u)} title="Editar">
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
-                        variant="ghost"
-                        size="icon"
+                        variant="ghost" size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                          if (confirm(`¿Eliminar usuario "${u.usuario}"?`)) deleteMutation.mutate(u.idUsuario);
-                        }}
+                        onClick={() => { if (confirm(`¿Eliminar usuario "${u.usuario}"?`)) deleteMutation.mutate(u.idUsuario); }}
                         title="Eliminar"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -333,6 +415,7 @@ export function UsuariosPage() {
         <UsuarioModal
           usuario={modal === 'nuevo' ? null : modal}
           roles={roles ?? []}
+          dependencias={dependencias ?? []}
           onClose={() => setModal(null)}
           onSaved={handleSaved}
         />

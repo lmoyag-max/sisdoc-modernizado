@@ -64,7 +64,7 @@ export function EnviadosPage() {
             Documentos Enviados
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {meta ? `${meta.total} envío${meta.total !== 1 ? 's' : ''}` : 'Cargando...'}
+            {meta ? `${meta.total} documento${meta.total !== 1 ? 's' : ''}` : 'Cargando...'}
             {recepcionados > 0 && (
               <span className="ml-2 text-emerald-600 font-medium">
                 · {recepcionados} recepcionado{recepcionados !== 1 ? 's' : ''}

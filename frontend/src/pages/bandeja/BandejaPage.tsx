@@ -27,9 +27,11 @@ interface TramiteEntrada {
 }
 
 const ESTADO_CONFIG: Record<number, { label: string; variant: 'warning' | 'info' | 'success' | 'secondary'; icon: React.ComponentType<{ className?: string }> }> = {
-  1: { label: 'Pendiente',    variant: 'warning',   icon: Clock },
-  2: { label: 'En proceso',   variant: 'info',      icon: RefreshCw },
-  3: { label: 'Completado',   variant: 'success',   icon: CheckCircle },
+  1: { label: 'Generado',     variant: 'secondary', icon: Clock },
+  2: { label: 'Por recibir',  variant: 'warning',   icon: Clock },
+  3: { label: 'Recepcionado', variant: 'success',   icon: CheckCircle },
+  4: { label: 'Derivado',     variant: 'info',      icon: RefreshCw },
+  5: { label: 'Cerrado',      variant: 'success',   icon: CheckCircle },
 };
 
 export function BandejaPage() {
@@ -61,7 +63,8 @@ export function BandejaPage() {
 
   const tramites = data?.data ?? [];
   const meta = data?.meta;
-  const pendientes = tramites.filter((t) => t.id_estado_tramite === 1).length;
+  // estado=2 (Despachado) = documentos que llegaron a la bandeja y aún no se reciben
+  const pendientes = tramites.filter((t) => t.id_estado_tramite === 2).length;
 
   return (
     <div className="space-y-6">
@@ -73,7 +76,7 @@ export function BandejaPage() {
             Bandeja de Entrada
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {meta ? `${meta.total} trámite${meta.total !== 1 ? 's' : ''} en total` : 'Cargando...'}
+            {meta ? `${meta.total} documento${meta.total !== 1 ? 's' : ''} en bandeja` : 'Cargando...'}
             {pendientes > 0 && (
               <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-medium">
                 · {pendientes} pendiente{pendientes !== 1 ? 's' : ''}
@@ -97,10 +100,10 @@ export function BandejaPage() {
       {/* Filtros rápidos */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { label: 'Todos', value: null },
-          { label: 'Pendientes', value: 1 },
-          { label: 'En proceso', value: 2 },
-          { label: 'Completados', value: 3 },
+          { label: 'Todos',         value: null },
+          { label: 'Por recibir',   value: 2 },
+          { label: 'Recepcionados', value: 3 },
+          { label: 'Cerrados',      value: 5 },
         ].map(({ label, value }) => (
           <Button
             key={label}
@@ -139,7 +142,8 @@ export function BandejaPage() {
             <div className="divide-y">
               {tramites.map((t) => {
                 const estadoConf = ESTADO_CONFIG[t.id_estado_tramite ?? 0];
-                const isPendiente = t.id_estado_tramite === 1;
+                // estado=2 (Despachado) → documento llegó a la bandeja, pendiente de recibir
+                const isPendiente = t.id_estado_tramite === 2;
 
                 return (
                   <div
@@ -199,7 +203,7 @@ export function BandejaPage() {
         {meta && meta.totalPaginas > 1 && (
           <div className="flex items-center justify-between px-6 py-4 border-t">
             <p className="text-xs text-muted-foreground">
-              Página {meta.pagina} de {meta.totalPaginas} · {meta.total} trámites
+              Página {meta.pagina} de {meta.totalPaginas} · {meta.total} documentos
             </p>
             <div className="flex gap-2">
               <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>

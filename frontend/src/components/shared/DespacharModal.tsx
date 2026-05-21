@@ -8,14 +8,15 @@ import { cn } from '@/lib/utils';
 interface Dependencia { id: number; descripcion: string }
 
 interface Props {
-  open:        boolean;
-  onClose:     () => void;
-  idDocumento: number;
-  materia:     string;
-  onSuccess:   () => void;
+  open:           boolean;
+  onClose:        () => void;
+  idDocumento:    number;
+  materia:        string;
+  esRedespacho?:  boolean;   // true cuando el doc ya está en estado Despachado
+  onSuccess:      () => void;
 }
 
-export function DespacharModal({ open, onClose, idDocumento, materia, onSuccess }: Props) {
+export function DespacharModal({ open, onClose, idDocumento, materia, esRedespacho = false, onSuccess }: Props) {
   const [tipo, setTipo]       = useState<'D' | 'E'>('D');
   const [idDest, setIdDest]   = useState<string>('');
   const [obs, setObs]         = useState('');
@@ -98,12 +99,22 @@ export function DespacharModal({ open, onClose, idDocumento, materia, onSuccess 
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
-            <Send className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <div className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+            esRedespacho ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-amber-100 dark:bg-amber-900/30'
+          )}>
+            <Send className={cn('h-4 w-4', esRedespacho ? 'text-orange-600 dark:text-orange-400' : 'text-amber-600 dark:text-amber-400')} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground">Despachar documento</p>
+            <p className="text-sm font-semibold text-foreground">
+              {esRedespacho ? 'Redespachar a otro destino' : 'Despachar documento'}
+            </p>
             <p className="text-xs text-muted-foreground truncate">{materia}</p>
+            {esRedespacho && (
+              <p className="text-[11px] text-orange-600 dark:text-orange-400 mt-0.5">
+                El doc ya estaba despachado — se registrará un nuevo movimiento en la trazabilidad
+              </p>
+            )}
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
             <X className="h-4 w-4" />

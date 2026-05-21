@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FilePreviewModal, type PreviewFile } from '@/components/shared/FilePreviewModal';
 import { DespacharModal } from '@/components/shared/DespacharModal';
+import { TrazabilidadTimeline, TrazabilidadSkeleton } from '@/components/shared/TrazabilidadTimeline';
 import {
   ArrowLeft, FileText, Calendar, User, Tag, Clock,
   CheckCircle2, GitBranch, Paperclip, Download, RefreshCw,
@@ -125,7 +126,7 @@ export function DocumentoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { canDespachar, canRecepcionar, canDerivar, canTerminar, canDelete } = useRole();
+  const { canDespachar, canRedespachar, canRecepcionar, canDerivar, canTerminar, canDelete } = useRole();
   const idDocumento = Number(id);
 
   const { data: doc, isLoading, error } = useQuery({
@@ -396,7 +397,30 @@ export function DocumentoDetallePage() {
               <CardTitle className="text-base">Acciones</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {canDespachar && estadoId !== 4 && (
+              {/* ── Estado DESPACHADO (2): Recepcionar + Redespachar ── */}
+              {canRecepcionar && estadoId === 2 && (
+                <Button
+                  variant="outline" size="sm"
+                  className="w-full justify-start gap-2"
+                  onClick={() => recepcionarMut.mutate()}
+                  disabled={recepcionarMut.isPending}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />Recepcionar
+                </Button>
+              )}
+
+              {canRedespachar && estadoId === 2 && (
+                <Button
+                  variant="outline" size="sm"
+                  className="w-full justify-start gap-2"
+                  onClick={() => setDespacharOpen(true)}
+                >
+                  <Send className="h-3.5 w-3.5 text-orange-500" />Redespachar a otro destino
+                </Button>
+              )}
+
+              {/* ── Estado RECEPCIONADO (3): Despachar ── */}
+              {canDespachar && estadoId === 3 && (
                 <Button
                   variant="outline" size="sm"
                   className="w-full justify-start gap-2"
@@ -406,14 +430,14 @@ export function DocumentoDetallePage() {
                 </Button>
               )}
 
-              {canRecepcionar && estadoId === 2 && (
+              {/* ── Estado REGISTRADO (1): Despachar inicial ── */}
+              {canDespachar && estadoId === 1 && (
                 <Button
                   variant="outline" size="sm"
                   className="w-full justify-start gap-2"
-                  onClick={() => recepcionarMut.mutate()}
-                  disabled={recepcionarMut.isPending}
+                  onClick={() => setDespacharOpen(true)}
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />Recepcionar
+                  <Send className="h-3.5 w-3.5 text-amber-500" />Despachar
                 </Button>
               )}
 
@@ -461,71 +485,23 @@ export function DocumentoDetallePage() {
             </CardContent>
           </Card>
 
-          {/* Timeline de trámites */}
+          {/* Historial completo */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <GitBranch className="h-4 w-4 text-primary" />Historial
+                <GitBranch className="h-4 w-4 text-primary" />Historial completo
               </CardTitle>
               <CardDescription>
-                {loadingTraz ? 'Cargando...' : `${(trazabilidad ?? []).length} movimiento${(trazabilidad ?? []).length !== 1 ? 's' : ''}`}
+                {loadingTraz
+                  ? 'Cargando...'
+                  : `${(trazabilidad ?? []).length} movimiento${(trazabilidad ?? []).length !== 1 ? 's' : ''} · trazabilidad íntegra`}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              {loadingTraz ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex gap-3">
-                      <Skeleton className="h-2.5 w-2.5 rounded-full shrink-0 mt-1.5" />
-                      <div className="flex-1 space-y-1.5"><Skeleton className="h-3 w-24" /><Skeleton className="h-3 w-32" /></div>
-                    </div>
-                  ))}
-                </div>
-              ) : (trazabilidad ?? []).length === 0 ? (
-                <div className="py-8 text-center">
-                  <RefreshCw className="h-7 w-7 text-muted-foreground/40 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Sin movimientos</p>
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="absolute left-1 top-2 bottom-2 w-0.5 bg-border" />
-                  <div className="space-y-5 pl-6">
-                    {(trazabilidad ?? []).map((ev) => {
-                      const cfg = TRAMITE_ESTADO[ev.estadoTramite?.id ?? 0];
-                      const nombreUsuario = safeStr(ev.usuario);
-                      const proc  = safeStr(ev.procedencia?.descripcion);
-                      const dest  = safeStr(ev.destino?.descripcion);
-                      return (
-                        <div key={ev.idSeguimiento} className="relative">
-                          <div className={cn('absolute -left-6 top-1 h-2.5 w-2.5 rounded-full border-2 border-background', cfg?.dot ?? 'bg-muted-foreground')} />
-                          <p className={cn('text-xs font-semibold', cfg?.color ?? 'text-foreground')}>
-                            {cfg?.label ?? safeStr(ev.estadoTramite?.descripcion, 'Movimiento')}
-                          </p>
-                          {(proc !== '—' || dest !== '—') && (
-                            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                              <span>{proc}</span>
-                              <span>→</span>
-                              <span className="font-medium text-foreground">{dest}</span>
-                            </p>
-                          )}
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {nombreUsuario}
-                            {ev.usuario?.usuario && (
-                              <span className="opacity-60 ml-1">(@{ev.usuario.usuario})</span>
-                            )}
-                          </p>
-                          {ev.observaciones && (
-                            <p className="text-xs text-muted-foreground/80 italic mt-0.5 line-clamp-2">"{safeStr(ev.observaciones)}"</p>
-                          )}
-                          <p className="text-[10px] text-muted-foreground/60 mt-1">
-                            {ev.fechaSistema ? formatRelativo(ev.fechaSistema) : ''}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+            <CardContent className="max-h-[420px] overflow-y-auto pr-1">
+              {loadingTraz
+                ? <TrazabilidadSkeleton count={2} />
+                : <TrazabilidadTimeline eventos={trazabilidad ?? []} variante="compacto" />
+              }
             </CardContent>
           </Card>
         </div>
@@ -538,14 +514,15 @@ export function DocumentoDetallePage() {
         file={previewFile}
       />
 
-      {/* Modal despachar */}
+      {/* Modal despachar / redespachar */}
       <DespacharModal
         open={despacharOpen}
         onClose={() => setDespacharOpen(false)}
         idDocumento={idDocumento}
         materia={materia}
+        esRedespacho={estadoId === 2}
         onSuccess={() => {
-          toast.success('Documento despachado correctamente');
+          toast.success(estadoId === 2 ? 'Documento redespachado correctamente' : 'Documento despachado correctamente');
           invalidarTodo();
         }}
       />

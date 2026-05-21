@@ -22,6 +22,7 @@ import busquedaRoutes from './modules/busqueda/busqueda.routes';
 import configuracionRoutes from './modules/configuracion/configuracion.routes';
 import usuariosRoutes from './modules/usuarios/usuarios.routes';
 import expedientesRoutes from './modules/expedientes/expedientes.routes';
+import rolesRoutes       from './modules/roles/roles.routes';
 
 const app = express();
 
@@ -99,6 +100,7 @@ app.use(`${API}/busqueda`, busquedaRoutes);
 app.use(`${API}/configuracion`, configuracionRoutes);
 app.use(`${API}/usuarios`, usuariosRoutes);
 app.use(`${API}/expedientes`, expedientesRoutes);
+app.use(`${API}/roles`,       rolesRoutes);
 
 app.get(`${API}`, (_req, res) => {
   res.json({ ok: true, api: 'SISDOC v2', docs: '/api-docs' });

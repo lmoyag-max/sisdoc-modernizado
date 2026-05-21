@@ -13,6 +13,7 @@ export interface UserSession {
   descDependencia: string | null;
   todosServicios:  boolean;
   roles:           string[];
+  modulos:         string[];
 }
 
 interface AuthState {

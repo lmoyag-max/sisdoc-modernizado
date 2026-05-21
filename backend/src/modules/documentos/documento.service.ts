@@ -158,26 +158,38 @@ export async function despacharDocumento(idDocumento: number, dto: DespacharDto,
 }
 
 // ── Recepcionar ───────────────────────────────────────────────
+// Inserta un nuevo tramite (estado 3=Recepcionado) en lugar de actualizar
+// el tramite de despacho. Preserva la trazabilidad íntegra.
 
 export async function recepcionarDocumento(idDocumento: number, dto: RecepcionarDto, idUsuario: number) {
   const doc = await repo.findById(idDocumento);
   if (!doc) throw { statusCode: 404, message: 'Documento no encontrado' };
 
-  const tramiteActual = await repo.getLastTramite(idDocumento);
-  if (tramiteActual) {
-    await repo.updateTramiteEstado(tramiteActual.id_seguimiento, 3, {
-      fechaRecepcion: new Date(),
-      usuarioRecepcion: idUsuario,
-    });
-    // Actualizar observaciones si se enviaron
-    if (dto.observaciones) {
-      const pool = await getPool();
-      await pool.request()
-        .input('obs', sql.VarChar(250), dto.observaciones.substring(0, 250))
-        .input('id',  sql.Int,          tramiteActual.id_seguimiento)
-        .query('UPDATE tramite SET observaciones = @obs WHERE id_seguimiento = @id');
-    }
-  }
+  const ultimoTramite = await repo.getLastTramite(idDocumento);
+  const idProc   = ultimoTramite?.id_destino ?? 1;
+  const tipProc  = ultimoTramite?.tipo_destinatario ?? 'D';
+
+  const pool = await getPool();
+  await pool.request()
+    .input('idDoc',  sql.Int,          idDocumento)
+    .input('idUsr',  sql.Int,          idUsuario)
+    .input('idProc', sql.Int,          idProc)
+    .input('tipProc',sql.Char(1),      tipProc)
+    .input('obs',    sql.VarChar(250), (dto.observaciones ?? '').substring(0, 250))
+    .query(`
+      INSERT INTO tramite
+        (id_documento, id_usuario, id_procedencia, id_destino,
+         tipo_procedencia, tipo_destinatario,
+         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+         id_estado_tramite, dias_compromiso, observaciones,
+         fecha_sistema, fecha_update, fecha_recepcion, usuario_recepcion)
+      VALUES
+        (@idDoc, @idUsr, @idProc, @idProc,
+         @tipProc, @tipProc,
+         5, 1, 2,
+         3, 0, @obs,
+         GETDATE(), GETDATE(), GETDATE(), @idUsr)
+    `);
 
   await repo.updateEstado(idDocumento, 3);
   return obtenerDocumento(idDocumento);
@@ -225,23 +237,38 @@ export async function derivarDocumento(idDocumento: number, dto: DerivarDto, idU
 }
 
 // ── Terminar ──────────────────────────────────────────────────
+// Inserta nuevo tramite (estado 5=Cerrado) para preservar trazabilidad.
 
 export async function terminarDocumento(idDocumento: number, dto: TerminarDto, idUsuario: number) {
   const doc = await repo.findById(idDocumento);
   if (!doc) throw { statusCode: 404, message: 'Documento no encontrado' };
   if (doc.id_estado_documento === 4) throw { statusCode: 400, message: 'El documento ya está terminado' };
 
-  const tramiteActual = await repo.getLastTramite(idDocumento);
-  if (tramiteActual) {
-    await repo.updateTramiteEstado(tramiteActual.id_seguimiento, 5); // 5=Cerrado
-    if (dto.observaciones) {
-      const pool = await getPool();
-      await pool.request()
-        .input('obs', sql.VarChar(250), dto.observaciones.substring(0, 250))
-        .input('id',  sql.Int,          tramiteActual.id_seguimiento)
-        .query('UPDATE tramite SET observaciones = @obs WHERE id_seguimiento = @id');
-    }
-  }
+  const ultimoTramite = await repo.getLastTramite(idDocumento);
+  const idProc  = ultimoTramite?.id_destino ?? 1;
+  const tipProc = ultimoTramite?.tipo_destinatario ?? 'D';
+
+  const pool = await getPool();
+  await pool.request()
+    .input('idDoc',  sql.Int,          idDocumento)
+    .input('idUsr',  sql.Int,          idUsuario)
+    .input('idProc', sql.Int,          idProc)
+    .input('tipProc',sql.Char(1),      tipProc)
+    .input('obs',    sql.VarChar(250), (dto.observaciones ?? '').substring(0, 250))
+    .query(`
+      INSERT INTO tramite
+        (id_documento, id_usuario, id_procedencia, id_destino,
+         tipo_procedencia, tipo_destinatario,
+         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+         id_estado_tramite, dias_compromiso, observaciones,
+         fecha_sistema, fecha_update)
+      VALUES
+        (@idDoc, @idUsr, @idProc, @idProc,
+         @tipProc, @tipProc,
+         5, 1, 2,
+         5, 0, @obs,
+         GETDATE(), GETDATE())
+    `);
 
   await repo.updateEstado(idDocumento, 4); // 4=Terminado
   return obtenerDocumento(idDocumento);

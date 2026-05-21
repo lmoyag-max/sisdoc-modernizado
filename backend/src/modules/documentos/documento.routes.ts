@@ -19,11 +19,12 @@ router.get('/:id/trazabilidad',  ctrl.trazabilidad);
 // Crear — cualquier usuario autenticado
 router.post('/', validate(crearDocumentoSchema), ctrl.crear);
 
-// Flujo documental — of.partes y admin
-router.post('/:id/despachar',   requireRole('admin', 'of.partes'), validate(despacharSchema),   ctrl.despachar);
-router.post('/:id/recepcionar', requireRole('admin', 'of.partes', 'funcionario'), validate(recepcionarSchema), ctrl.recepcionar);
-router.post('/:id/derivar',     requireRole('admin', 'of.partes'), validate(derivarSchema),     ctrl.derivar);
-router.post('/:id/terminar',    requireRole('admin', 'of.partes'), validate(terminarSchema),     ctrl.terminar);
+// Flujo documental
+// despachar/redespachar: todos los roles pueden redirigir un doc que llegó a su servicio
+router.post('/:id/despachar',   requireRole('admin', 'of.partes', 'supervisores', 'funcionario'), validate(despacharSchema),   ctrl.despachar);
+router.post('/:id/recepcionar', requireRole('admin', 'of.partes', 'supervisores', 'funcionario'), validate(recepcionarSchema), ctrl.recepcionar);
+router.post('/:id/derivar',     requireRole('admin', 'of.partes', 'supervisores'), validate(derivarSchema),     ctrl.derivar);
+router.post('/:id/terminar',    requireRole('admin', 'of.partes', 'supervisores'), validate(terminarSchema),     ctrl.terminar);
 
 // Eliminar — solo admin y of.partes
 router.delete('/:id', requireRole('admin', 'of.partes'), ctrl.eliminar);

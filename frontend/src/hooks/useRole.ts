@@ -18,13 +18,16 @@ export function useRole() {
     isCoordinador,
     isSupervisor,
     isFuncionario,
-    canCreate:      true,
-    canDespachar:   isAdmin || isOfPartes,
-    canRecepcionar: isAdmin || isOfPartes || isFuncionario || isSupervisor,
-    canDerivar:     isAdmin || isOfPartes,
-    canTerminar:    isAdmin || isOfPartes,
-    canDelete:      isAdmin || isOfPartes,
-    canManageUsers: isAdmin,
-    canConfig:      isAdmin,
+    canCreate:       true,
+    // Despacho inicial (solo roles con capacidad de flujo documental completo)
+    canDespachar:    isAdmin || isOfPartes || isSupervisor,
+    // Redespacho: cualquier usuario puede redirigir un doc que llegó a su servicio
+    canRedespachar:  isAdmin || isOfPartes || isSupervisor || isFuncionario,
+    canRecepcionar:  isAdmin || isOfPartes || isFuncionario || isSupervisor,
+    canDerivar:      isAdmin || isOfPartes || isSupervisor,
+    canTerminar:     isAdmin || isOfPartes || isSupervisor,
+    canDelete:       isAdmin || isOfPartes,
+    canManageUsers:  isAdmin,
+    canConfig:       isAdmin,
   };
 }

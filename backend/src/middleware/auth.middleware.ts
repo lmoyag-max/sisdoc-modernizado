@@ -22,6 +22,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       idDependencia:  payload.idDependencia ?? null,
       todosServicios: payload.todosServicios ?? true,
       roles:          payload.roles ?? [],
+      modulos:        payload.modulos ?? [],
     };
     next();
   } catch (error) {
@@ -36,15 +37,25 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 export function requireRole(...roles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const user = (req as AuthenticatedRequest).user;
-    if (!user) {
-      sendUnauthorized(res);
-      return;
-    }
-    const hasRole = roles.some((role) => user.roles.includes(role));
-    if (!hasRole) {
+    if (!user) { sendUnauthorized(res); return; }
+    if (!roles.some((role) => user.roles.includes(role))) {
       sendForbidden(res, `Requiere rol: ${roles.join(' o ')}`);
       return;
     }
     next();
+  };
+}
+
+// Verifica que el JWT del usuario incluya acceso al módulo dado.
+// Admin siempre pasa. Otros roles deben tener el módulo en su lista.
+export function requireModule(modulo: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const user = (req as AuthenticatedRequest).user;
+    if (!user) { sendUnauthorized(res); return; }
+    if (user.roles.includes('admin') || user.modulos.includes(modulo)) {
+      next();
+    } else {
+      sendForbidden(res, `Acceso denegado al módulo: ${modulo}`);
+    }
   };
 }

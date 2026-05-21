@@ -1,11 +1,14 @@
 import { Router, Request } from 'express';
-import { requireAuth } from '../../middleware/auth.middleware';
+import { requireAuth, requireModule } from '../../middleware/auth.middleware';
 import { getPool, sql } from '../../config/database';
 import { sendSuccess } from '../../shared/utils/response';
 import { AuthenticatedRequest } from '../../shared/types/api.types';
 
 const router = Router();
 router.use(requireAuth);
+// Nota: requireModule se aplica por ruta, NO globalmente.
+// /dashboard y /actividad-reciente → disponibles para cualquier rol con módulo 'dashboard'.
+// /exportar → requiere módulo 'reportes' (solo admin).
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -39,7 +42,7 @@ function buildDocWhere(
 
 // ── GET /reportes/dashboard ───────────────────────────────────
 
-router.get('/dashboard', async (req, res, next) => {
+router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
   try {
     const user = getUser(req);
     const pool = await getPool();
@@ -133,7 +136,7 @@ router.get('/dashboard', async (req, res, next) => {
 
 // ── GET /reportes/actividad-reciente ─────────────────────────
 
-router.get('/actividad-reciente', async (req, res, next) => {
+router.get('/actividad-reciente', requireModule('dashboard'), async (req, res, next) => {
   try {
     const user = getUser(req);
     const pool = await getPool();
@@ -181,7 +184,7 @@ router.get('/actividad-reciente', async (req, res, next) => {
 
 // ── GET /reportes/exportar — CSV filtrado por servicio ───────
 
-router.get('/exportar', async (req, res, next) => {
+router.get('/exportar', requireModule('reportes'), async (req, res, next) => {
   try {
     const user = getUser(req);
     const pool = await getPool();

@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { requireAuth } from '../../middleware/auth.middleware';
+import { requireAuth, requireModule } from '../../middleware/auth.middleware';
 import { getPool, sql } from '../../config/database';
 import { sendSuccess, sendCreated, sendError, sendPaginated, buildPaginationMeta } from '../../shared/utils/response';
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireModule('expedientes'));
 
 // ── GET /expedientes ────────────────────────────────────────
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {

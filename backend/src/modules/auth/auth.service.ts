@@ -16,17 +16,18 @@ export interface AuthTokens {
 }
 
 export interface UserSession {
-  idUsuario: number;
-  usuario: string;
-  idFuncionario: number | null;
-  nombres: string | null;
-  apPat: string | null;
-  apMat: string | null;
-  email: string | null;
-  idDependencia: number | null;
+  idUsuario:       number;
+  usuario:         string;
+  idFuncionario:   number | null;
+  nombres:         string | null;
+  apPat:           string | null;
+  apMat:           string | null;
+  email:           string | null;
+  idDependencia:   number | null;
   descDependencia: string | null;
-  todosServicios: boolean;
-  roles: string[];
+  todosServicios:  boolean;
+  roles:           string[];
+  modulos:         string[];
 }
 
 export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens: AuthTokens }> {
@@ -73,7 +74,8 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
     await saveClavHash(pool, row.id_usuario, hash);
   }
 
-  const roles = await getUserRoles(pool, row.id_usuario);
+  const roles   = await getUserRoles(pool, row.id_usuario);
+  const modulos = await getUserModulos(pool, roles);
 
   const user: UserSession = {
     idUsuario:       row.id_usuario,
@@ -87,6 +89,7 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
     descDependencia: row.desc_dependencia,
     todosServicios:  row.todos_servicios ?? true,
     roles,
+    modulos,
   };
 
   const tokens = generateTokens(user);
@@ -123,11 +126,13 @@ export async function refreshAccessToken(
 
   const accessToken = jwt.sign(
     {
-      sub: payload.sub, usuario: payload.usuario,
-      idFuncionario: payload.idFuncionario,
-      idDependencia: payload.idDependencia,
+      sub:            payload.sub,
+      usuario:        payload.usuario,
+      idFuncionario:  payload.idFuncionario,
+      idDependencia:  payload.idDependencia,
       todosServicios: payload.todosServicios,
-      roles: payload.roles,
+      roles:          payload.roles,
+      modulos:        payload.modulos,
     },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions,
@@ -177,7 +182,8 @@ export async function getMe(idUsuario: number): Promise<UserSession> {
   const row = result.recordset[0];
   if (!row) throw createAuthError('Usuario no encontrado', 404);
 
-  const roles = await getUserRoles(pool, idUsuario);
+  const roles   = await getUserRoles(pool, idUsuario);
+  const modulos = await getUserModulos(pool, roles);
 
   return {
     idUsuario:       row.id_usuario,
@@ -191,6 +197,7 @@ export async function getMe(idUsuario: number): Promise<UserSession> {
     descDependencia: row.desc_dependencia,
     todosServicios:  row.todos_servicios ?? true,
     roles,
+    modulos,
   };
 }
 
@@ -216,6 +223,34 @@ async function saveClavHash(pool: Awaited<ReturnType<typeof getPool>>, idUsuario
   } catch {
     // La columna clave_hash puede no existir aún en el schema legacy — no bloquear el login
     logger.warn('No se pudo guardar clave_hash (columna puede no existir aún)');
+  }
+}
+
+// Obtiene módulos permitidos para el conjunto de roles del usuario.
+// Admin siempre recibe todos los módulos sin consultar la tabla.
+async function getUserModulos(pool: Awaited<ReturnType<typeof getPool>>, roles: string[]): Promise<string[]> {
+  if (roles.includes('admin')) {
+    return [
+      'dashboard','documentos','bandeja','enviados','tramites',
+      'trazabilidad','busqueda','archivos',
+      'expedientes','usuarios','reportes','roles','configuracion',
+    ];
+  }
+  try {
+    // Módulos de todos los roles del usuario (UNION implícita con DISTINCT)
+    const placeholders = roles.map((_, i) => `@r${i}`).join(',');
+    if (!placeholders) return ['dashboard'];
+    const req = pool.request();
+    roles.forEach((r, i) => req.input(`r${i}`, sql.VarChar(50), r));
+    const result = await req.query<{ modulo: string }>(`
+      SELECT DISTINCT rm.modulo
+      FROM rol_modulo rm
+      JOIN rol r ON rm.id_rol = r.id_rol
+      WHERE r.codigo IN (${placeholders}) AND r.activo = 1
+    `);
+    return result.recordset.map((r: { modulo: string }) => r.modulo);
+  } catch {
+    return ['dashboard'];
   }
 }
 
@@ -268,6 +303,7 @@ function generateTokens(user: UserSession): AuthTokens {
     idDependencia:  user.idDependencia,
     todosServicios: user.todosServicios,
     roles:          user.roles,
+    modulos:        user.modulos,
   };
 
   const accessToken = jwt.sign(payload, env.JWT_SECRET, {

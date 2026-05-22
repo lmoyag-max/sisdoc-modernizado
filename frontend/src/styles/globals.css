@@ -86,7 +86,7 @@
 }
 
 @layer utilities {
-  /* Gradiente sidebar */
+  /* ── Gradiente sidebar ───────────────────────── */
   .sidebar-gradient {
     background: linear-gradient(
       160deg,
@@ -96,7 +96,7 @@
     );
   }
 
-  /* Glassmorphism */
+  /* ── Glassmorphism ───────────────────────────── */
   .glass {
     backdrop-filter: blur(20px) saturate(180%);
     background: rgba(255, 255, 255, 0.08);
@@ -108,16 +108,24 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  /* Card hover elegante */
+  /* ── Cards ───────────────────────────────────── */
   .card-hover {
     @apply transition-all duration-200;
   }
   .card-hover:hover {
-    @apply shadow-lg -translate-y-0.5;
+    @apply -translate-y-0.5;
     box-shadow: 0 8px 30px rgba(99, 102, 241, 0.1);
   }
 
-  /* Gradiente de texto */
+  /* Card sombra enterprise suave */
+  .card-shadow {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+  }
+  .card-shadow-md {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06);
+  }
+
+  /* ── Gradiente de texto ──────────────────────── */
   .text-gradient {
     background: linear-gradient(135deg, hsl(239 84% 60%), hsl(265 89% 62%));
     -webkit-background-clip: text;
@@ -125,15 +133,18 @@
     background-clip: text;
   }
 
-  /* Animaciones */
+  /* ── Animaciones ─────────────────────────────── */
   .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn 0.25s ease-out;
   }
   .animate-slide-up {
-    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .animate-scale-in {
+    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  /* Indicador activo sidebar */
+  /* ── Indicador activo sidebar ────────────────── */
   .nav-active-indicator {
     position: absolute;
     left: 0;
@@ -143,6 +154,54 @@
     height: 60%;
     background: hsl(var(--sidebar-primary));
     border-radius: 0 3px 3px 0;
+  }
+
+  /* ── Icono de sección decorativo ─────────────── */
+  .section-icon {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-xl;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--accent) / 0.08));
+  }
+
+  /* ── Badge de estado de documento ───────────── */
+  .badge-generado    { @apply bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300; }
+  .badge-despachado  { @apply bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
+  .badge-recepcionado{ @apply bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400; }
+  .badge-terminado   { @apply bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
+
+  /* ── Header barra superior ───────────────────── */
+  .header-border {
+    box-shadow: 0 1px 0 hsl(var(--border));
+  }
+
+  /* ── Tabla enterprise ────────────────────────── */
+  .table-row-base {
+    @apply border-b border-border/50 transition-colors duration-100;
+  }
+  .table-row-base:hover {
+    @apply bg-muted/30;
+  }
+
+  /* ── Focus visible enterprise ────────────────── */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1;
+  }
+
+  /* ── Separador de sección con label ─────────── */
+  .section-divider {
+    @apply relative flex items-center gap-2 py-1;
+  }
+  .section-divider::before,
+  .section-divider::after {
+    content: '';
+    @apply flex-1 border-t border-border;
+  }
+
+  /* ── Drawer animaciones mobile ───────────────── */
+  .animate-slide-in {
+    animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .animate-fade-backdrop {
+    animation: fadeBackdrop 0.2s ease-out;
   }
 }
 
@@ -156,9 +215,24 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
 @keyframes shimmer {
   from { background-position: -200% 0; }
   to   { background-position: 200% 0; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes fadeBackdrop {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .skeleton {

@@ -69,10 +69,10 @@ export function BandejaPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Inbox className="h-6 w-6 text-primary" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Inbox className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             Bandeja de Entrada
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -84,7 +84,7 @@ export function BandejaPage() {
             )}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['bandeja'] })} className="gap-2">
+        <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['bandeja'] })} className="gap-2 shrink-0">
           <RefreshCw className="h-4 w-4" />
           Actualizar
         </Button>
@@ -148,48 +148,64 @@ export function BandejaPage() {
                 return (
                   <div
                     key={t.id_seguimiento}
-                    className={`flex items-start gap-4 px-6 py-5 hover:bg-muted/30 transition-colors ${isPendiente ? 'border-l-4 border-l-amber-400' : ''}`}
+                    className={`flex items-start gap-3 px-4 sm:px-6 py-4 sm:py-5 hover:bg-muted/30 transition-colors ${isPendiente ? 'border-l-4 border-l-amber-400' : ''}`}
                   >
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isPendiente ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}>
-                      <FileText className={`h-5 w-5 ${isPendiente ? 'text-amber-600' : 'text-muted-foreground'}`} />
+                    <div className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl ${isPendiente ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}>
+                      <FileText className={`h-4 w-4 sm:h-5 sm:w-5 ${isPendiente ? 'text-amber-600' : 'text-muted-foreground'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground line-clamp-1">
-                        {truncate(t.materia ?? 'Sin materia', 80)}
+                      <p className="text-sm font-semibold text-foreground line-clamp-2">
+                        {t.materia ?? 'Sin materia'}
                       </p>
-                      <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-muted-foreground">
                         {t.num_interno && <span className="font-mono">N° {t.num_interno}</span>}
-                        {t.desc_tipo_documento && <span>{t.desc_tipo_documento}</span>}
-                        {/* Origen → Destino */}
+                        {t.desc_tipo_documento && <span className="hidden sm:inline">{t.desc_tipo_documento}</span>}
                         {(t.desc_procedencia || t.desc_destino) && (
                           <span className="flex items-center gap-1">
-                            <span>{t.desc_procedencia ?? '—'}</span>
-                            <span>→</span>
+                            <span className="hidden sm:inline">{t.desc_procedencia ?? '—'} →</span>
                             <span className="font-medium text-foreground">{t.desc_destino ?? '—'}</span>
                           </span>
                         )}
-                        {t.observaciones && <span className="italic">"{truncate(t.observaciones, 40)}"</span>}
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {formatRelativo(t.fecha_sistema)}
                         </span>
                       </div>
+                      {/* Acción en mobile: debajo del contenido */}
+                      {isPendiente && (
+                        <div className="mt-2 sm:hidden">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1"
+                            loading={recibirMutation.isPending}
+                            onClick={() => recibirMutation.mutate(t.id_seguimiento)}
+                          >
+                            <CheckCircle className="h-3 w-3" />
+                            Recibir
+                          </Button>
+                        </div>
+                      )}
                     </div>
+                    {/* Badge + botón — en desktop a la derecha */}
                     <div className="flex items-center gap-2 shrink-0">
                       {estadoConf && (
-                        <Badge variant={estadoConf.variant}>{estadoConf.label}</Badge>
+                        <Badge variant={estadoConf.variant} className="hidden sm:inline-flex">{estadoConf.label}</Badge>
                       )}
                       {isPendiente && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs gap-1"
+                          className="h-7 text-xs gap-1 hidden sm:flex"
                           loading={recibirMutation.isPending}
                           onClick={() => recibirMutation.mutate(t.id_seguimiento)}
                         >
                           <CheckCircle className="h-3 w-3" />
                           Recibir
                         </Button>
+                      )}
+                      {!isPendiente && estadoConf && (
+                        <Badge variant={estadoConf.variant} className="sm:hidden">{estadoConf.label}</Badge>
                       )}
                     </div>
                   </div>

@@ -83,17 +83,18 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Hero greeting */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
             {saludo}, {nombre.split(' ')[0]}.
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">{fechaCapitalizada}</p>
         </div>
         <Link to="/documentos/nuevo">
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2 shrink-0">
             <FileText className="h-4 w-4" />
-            Nuevo documento
+            <span className="hidden xs:inline">Nuevo documento</span>
+            <span className="xs:hidden">Nuevo</span>
           </Button>
         </Link>
       </div>
@@ -222,15 +223,20 @@ export function DashboardPage() {
               {(actividad ?? []).map((item) => {
                 const badgeConfig = ACCION_BADGE[item.accion ?? ''] ?? { label: item.accion ?? '', variant: 'secondary' as const };
                 return (
-                  <div key={item.id_historial} className="flex items-start gap-4">
+                  <div key={item.id_historial} className="flex items-start gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
                       {(item.nombres_fun ?? item.usuario ?? '?')[0]?.toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {truncate(item.asunto ?? 'Sin asunto', 55)}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-0.5">
+                        <p className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
+                          {truncate(item.asunto ?? 'Sin asunto', 55)}
+                        </p>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                          {formatRelativo(item.fecha)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <Badge variant={badgeConfig.variant}>{badgeConfig.label}</Badge>
                         {item.num_documento && (
                           <span className="text-xs text-muted-foreground">{item.num_documento}</span>
@@ -240,9 +246,6 @@ export function DashboardPage() {
                         </span>
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                      {formatRelativo(item.fecha)}
-                    </span>
                   </div>
                 );
               })}

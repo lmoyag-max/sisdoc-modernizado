@@ -57,10 +57,10 @@ export function EnviadosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Send className="h-6 w-6 text-primary" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Send className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             Documentos Enviados
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -129,33 +129,30 @@ export function EnviadosPage() {
                 const isCompleto = t.id_estado_tramite === 5 || t.id_estado_tramite === 3;
 
                 return (
-                  <div key={t.id_seguimiento} className="flex items-start gap-4 px-6 py-5 hover:bg-muted/30 transition-colors">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isCompleto ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-primary/10'}`}>
+                  <div key={t.id_seguimiento} className="flex items-start gap-3 px-4 sm:px-6 py-4 sm:py-5 hover:bg-muted/30 transition-colors">
+                    <div className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl ${isCompleto ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-primary/10'}`}>
                       {isCompleto
-                        ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                        : <FileText className="h-5 w-5 text-primary" />
+                        ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
+                        : <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                       }
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground line-clamp-1">
-                        {truncate(t.materia ?? 'Sin materia', 75)}
+                      <p className="text-sm font-medium text-foreground line-clamp-2">
+                        {t.materia ?? 'Sin materia'}
                       </p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                         {t.num_interno && <span className="font-mono">N° {t.num_interno}</span>}
-                        {t.desc_tipo_documento && <span>{t.desc_tipo_documento}</span>}
-                        {/* Origen → Destino */}
+                        {t.desc_tipo_documento && <span className="hidden sm:inline">{t.desc_tipo_documento}</span>}
                         {(t.desc_procedencia || t.desc_destino) && (
                           <span className="flex items-center gap-1">
-                            <span>{t.desc_procedencia ?? '—'}</span>
-                            <span>→</span>
+                            <span className="hidden sm:inline">{t.desc_procedencia ?? '—'} →</span>
                             <span className="font-medium text-foreground">{t.desc_destino ?? '—'}</span>
                           </span>
                         )}
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {t.fecha_sistema ? formatFechaHora(t.fecha_sistema) : '—'}
+                          {formatRelativo(t.fecha_sistema)}
                         </span>
-                        <span className="text-muted-foreground/60">{formatRelativo(t.fecha_sistema)}</span>
                       </div>
                     </div>
                     {badge && <Badge variant={badge.variant} className="shrink-0">{badge.label}</Badge>}

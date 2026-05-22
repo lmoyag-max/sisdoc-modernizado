@@ -46,15 +46,15 @@ export function DocumentosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Documentos</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Documentos</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {meta ? `${meta.total} documento${meta.total !== 1 ? 's' : ''} en total` : 'Cargando...'}
           </p>
         </div>
         <Link to="/documentos/nuevo">
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2 shrink-0">
             <Plus className="h-4 w-4" />
             Nuevo documento
           </Button>
@@ -87,102 +87,106 @@ export function DocumentosPage() {
 
       {/* Tabla */}
       <Card>
-        <CardHeader className="px-6 py-4 border-b">
-          <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-1">N°</div>
-            <div className="col-span-4 flex items-center gap-1 cursor-pointer hover:text-foreground">
-              Asunto <ArrowUpDown className="h-3 w-3" />
-            </div>
-            <div className="col-span-2">Tipo</div>
-            <div className="col-span-2">Destino</div>
-            <div className="col-span-1">Prioridad</div>
-            <div className="col-span-1">Estado</div>
-            <div className="col-span-1">Fecha</div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="divide-y">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 items-center">
-                  <Skeleton className="col-span-1 h-4 w-16" />
-                  <Skeleton className="col-span-4 h-4" />
-                  <Skeleton className="col-span-2 h-4 w-20" />
-                  <Skeleton className="col-span-2 h-4 w-24" />
-                  <Skeleton className="col-span-1 h-5 w-14 rounded-full" />
-                  <Skeleton className="col-span-1 h-5 w-16 rounded-full" />
-                  <Skeleton className="col-span-1 h-4 w-20" />
+        <div className="overflow-x-auto">
+          <div className="min-w-[640px]">
+            <CardHeader className="px-6 py-4 border-b">
+              <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="col-span-1">N°</div>
+                <div className="col-span-4 flex items-center gap-1 cursor-pointer hover:text-foreground">
+                  Asunto <ArrowUpDown className="h-3 w-3" />
                 </div>
-              ))}
-            </div>
-          ) : documentos.length === 0 ? (
-            <EmptyState
-              title="Sin documentos"
-              description="No se encontraron documentos con los filtros seleccionados."
-              action={
-                search ? (
-                  <Button variant="outline" onClick={() => setSearch('')}>
-                    Limpiar búsqueda
-                  </Button>
-                ) : undefined
-              }
-            />
-          ) : (
-            <div className={cn('divide-y', isFetching && 'opacity-60 transition-opacity')}>
-              {documentos.map((doc) => {
-                const badge = ESTADO_BADGE[doc.estadoDocumento?.id ?? 0] ?? { label: 'Desconocido', variant: 'secondary' as const };
-                return (
-                  <Link
-                    key={doc.idDocumento}
-                    to={`/documentos/${doc.idDocumento}`}
-                    className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-muted/40 transition-colors cursor-pointer group"
-                  >
-                    <div className="col-span-1">
-                      <span className="text-xs font-mono text-muted-foreground">
-                        {doc.numDocumento ?? `#${doc.idDocumento}`}
-                      </span>
+                <div className="col-span-2">Tipo</div>
+                <div className="col-span-2">Destino</div>
+                <div className="col-span-1">Prioridad</div>
+                <div className="col-span-1">Estado</div>
+                <div className="col-span-1">Fecha</div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="divide-y">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 items-center">
+                      <Skeleton className="col-span-1 h-4 w-16" />
+                      <Skeleton className="col-span-4 h-4" />
+                      <Skeleton className="col-span-2 h-4 w-20" />
+                      <Skeleton className="col-span-2 h-4 w-24" />
+                      <Skeleton className="col-span-1 h-5 w-14 rounded-full" />
+                      <Skeleton className="col-span-1 h-5 w-16 rounded-full" />
+                      <Skeleton className="col-span-1 h-4 w-20" />
                     </div>
-                    <div className="col-span-4">
-                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                        {doc.asunto ?? 'Sin asunto'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {doc.ingresadoPor.nombre || doc.ingresadoPor.usuario || '—'}
-                      </p>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-xs text-muted-foreground">
-                        {doc.tipoDocumento?.descripcion ?? '—'}
-                      </span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-xs text-muted-foreground line-clamp-1">
-                        {doc.destino?.descripcion ?? '—'}
-                      </span>
-                    </div>
-                    <div className="col-span-1">
-                      {doc.prioridad?.descripcion && (
-                        <span
-                          className="inline-flex h-2 w-2 rounded-full"
-                          style={{ backgroundColor: doc.prioridad?.color ?? '#94a3b8' }}
-                          title={doc.prioridad.descripcion}
-                        />
-                      )}
-                    </div>
-                    <div className="col-span-1">
-                      <Badge variant={badge.variant}>{badge.label}</Badge>
-                    </div>
-                    <div className="col-span-1">
-                      <span className="text-xs text-muted-foreground">
-                        {doc.fechaIngreso ? formatFechaHora(doc.fechaIngreso).split(' ')[0] : '—'}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
+                  ))}
+                </div>
+              ) : documentos.length === 0 ? (
+                <EmptyState
+                  title="Sin documentos"
+                  description="No se encontraron documentos con los filtros seleccionados."
+                  action={
+                    search ? (
+                      <Button variant="outline" onClick={() => setSearch('')}>
+                        Limpiar búsqueda
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <div className={cn('divide-y', isFetching && 'opacity-60 transition-opacity')}>
+                  {documentos.map((doc) => {
+                    const badge = ESTADO_BADGE[doc.estadoDocumento?.id ?? 0] ?? { label: 'Desconocido', variant: 'secondary' as const };
+                    return (
+                      <Link
+                        key={doc.idDocumento}
+                        to={`/documentos/${doc.idDocumento}`}
+                        className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-muted/40 transition-colors cursor-pointer group"
+                      >
+                        <div className="col-span-1">
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {doc.numDocumento ?? `#${doc.idDocumento}`}
+                          </span>
+                        </div>
+                        <div className="col-span-4">
+                          <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                            {doc.asunto ?? 'Sin asunto'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {doc.ingresadoPor.nombre || doc.ingresadoPor.usuario || '—'}
+                          </p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-xs text-muted-foreground">
+                            {doc.tipoDocumento?.descripcion ?? '—'}
+                          </span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-xs text-muted-foreground line-clamp-1">
+                            {doc.destino?.descripcion ?? '—'}
+                          </span>
+                        </div>
+                        <div className="col-span-1">
+                          {doc.prioridad?.descripcion && (
+                            <span
+                              className="inline-flex h-2 w-2 rounded-full"
+                              style={{ backgroundColor: doc.prioridad?.color ?? '#94a3b8' }}
+                              title={doc.prioridad.descripcion}
+                            />
+                          )}
+                        </div>
+                        <div className="col-span-1">
+                          <Badge variant={badge.variant}>{badge.label}</Badge>
+                        </div>
+                        <div className="col-span-1">
+                          <span className="text-xs text-muted-foreground">
+                            {doc.fechaIngreso ? formatFechaHora(doc.fechaIngreso).split(' ')[0] : '—'}
+                          </span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </div>
+        </div>
 
         {/* Paginación */}
         {meta && meta.totalPaginas > 1 && (

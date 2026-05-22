@@ -19,12 +19,7 @@ const loginSchema = z.object({
 });
 type LoginForm = z.infer<typeof loginSchema>;
 
-const features = [
-  { icon: FileText, label: 'Gestión documental' },
-  { icon: GitBranch, label: 'Flujo de derivaciones' },
-  { icon: Shield, label: 'Trazabilidad completa' },
-  { icon: Clock, label: 'Historial documental' },
-];
+const FEATURE_ICONS = [FileText, GitBranch, Shield, Clock];
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -33,14 +28,50 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [bgUrl,   setBgUrl]   = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [textos, setTextos] = useState({
+    nombreSistema:        'SISDOC',
+    subtitulo:            'Sistema de Gestión Documental',
+    tituloPrincipal:      'Gestión documental',
+    tituloPrincipalAcento:'moderna',
+    descripcion:          'Plataforma enterprise para la gestión, seguimiento y trazabilidad de documentos institucionales.',
+    card1: 'Gestión documental',
+    card2: 'Flujo de derivaciones',
+    card3: 'Trazabilidad completa',
+    card4: 'Historial documental',
+    footer: '© 2026 SISDOC v2.0 — Sistema institucional de gestión documental',
+  });
 
   useEffect(() => {
-    apiClient.get<{ ok: boolean; data: { backgroundUrl: string | null; logoUrl: string | null } }>('/configuracion')
+    apiClient.get<{ ok: boolean; data: {
+      backgroundUrl: string | null; logoUrl: string | null;
+      loginNombreSistema?: string; loginSubtitulo?: string;
+      loginTituloPrincipal?: string; loginDescripcion?: string;
+      loginCard1?: string; loginCard2?: string; loginCard3?: string; loginCard4?: string;
+      loginFooter?: string;
+    } }>('/configuracion')
       .then((r) => {
-        if (r.data.data.backgroundUrl) setBgUrl(uploadUrl(r.data.data.backgroundUrl));
-        if (r.data.data.logoUrl)       setLogoUrl(uploadUrl(r.data.data.logoUrl));
+        const d = r.data.data;
+        if (d.backgroundUrl) setBgUrl(uploadUrl(d.backgroundUrl));
+        if (d.logoUrl)       setLogoUrl(uploadUrl(d.logoUrl));
+        // Parsear título principal: la última palabra va en color acento
+        const titulo = d.loginTituloPrincipal ?? 'Gestión documental moderna';
+        const palabras = titulo.trim().split(' ');
+        const acento = palabras.pop() ?? 'moderna';
+        const base   = palabras.join(' ');
+        setTextos({
+          nombreSistema:         d.loginNombreSistema ?? 'SISDOC',
+          subtitulo:             d.loginSubtitulo     ?? 'Sistema de Gestión Documental',
+          tituloPrincipal:       base,
+          tituloPrincipalAcento: acento,
+          descripcion:           d.loginDescripcion   ?? 'Plataforma enterprise para la gestión, seguimiento y trazabilidad de documentos institucionales.',
+          card1:                 d.loginCard1         ?? 'Gestión documental',
+          card2:                 d.loginCard2         ?? 'Flujo de derivaciones',
+          card3:                 d.loginCard3         ?? 'Trazabilidad completa',
+          card4:                 d.loginCard4         ?? 'Historial documental',
+          footer:                d.loginFooter        ?? '© 2026 SISDOC v2.0 — Sistema institucional de gestión documental',
+        });
       })
-      .catch(() => {/* usa el gradiente por defecto */});
+      .catch(() => {/* usa valores por defecto */});
   }, []);
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
@@ -98,42 +129,43 @@ export function LoginPage() {
               SD
             </div>
             <div>
-              <p className="text-white font-semibold text-sm tracking-wide">SISDOC</p>
-              <p className="text-slate-400 text-xs">Sistema de Gestión Documental</p>
+              <p className="text-white font-semibold text-sm tracking-wide">{textos.nombreSistema}</p>
+              <p className="text-slate-400 text-xs">{textos.subtitulo}</p>
             </div>
           </div>
 
           {/* Hero */}
           <div className="flex-1 flex flex-col justify-center mt-12">
             <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
-              Gestión documental{' '}
-              <span className="text-indigo-400">moderna</span>
+              {textos.tituloPrincipal}{' '}
+              <span className="text-indigo-400">{textos.tituloPrincipalAcento}</span>
             </h1>
             <p className="text-slate-400 text-lg leading-relaxed mb-12">
-              Plataforma enterprise para la gestión, seguimiento y trazabilidad de documentos institucionales.
+              {textos.descripcion}
             </p>
 
             {/* Features */}
             <div className="grid grid-cols-2 gap-3">
-              {features.map(({ icon: Icon, label }) => (
-                <div
-                  key={label}
-                  className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3 backdrop-blur-sm"
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20">
-                    <Icon className="h-4 w-4 text-indigo-400" />
+              {[textos.card1, textos.card2, textos.card3, textos.card4].map((label, i) => {
+                const Icon = FEATURE_ICONS[i];
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3 backdrop-blur-sm"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20">
+                      <Icon className="h-4 w-4 text-indigo-400" />
+                    </div>
+                    <span className="text-sm text-slate-300 font-medium">{label}</span>
                   </div>
-                  <span className="text-sm text-slate-300 font-medium">{label}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Footer */}
           <div className="mt-8">
-            <p className="text-slate-600 text-xs">
-              © 2026 SISDOC v2.0 — Sistema institucional de gestión documental
-            </p>
+            <p className="text-slate-600 text-xs">{textos.footer}</p>
           </div>
         </div>
       </div>
@@ -168,8 +200,8 @@ export function LoginPage() {
               SD
             </div>
             <div>
-              <p className="font-semibold text-foreground text-sm">SISDOC</p>
-              <p className="text-muted-foreground text-xs">Sistema de Gestión Documental</p>
+              <p className="font-semibold text-foreground text-sm">{textos.nombreSistema}</p>
+              <p className="text-muted-foreground text-xs">{textos.subtitulo}</p>
             </div>
           </div>
 

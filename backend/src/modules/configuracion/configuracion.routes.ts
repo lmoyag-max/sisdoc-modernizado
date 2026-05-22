@@ -45,6 +45,19 @@ const upload = multer({
   },
 });
 
+// Textos del login con sus valores por defecto
+const LOGIN_DEFAULTS = {
+  loginNombreSistema:   'SISDOC',
+  loginSubtitulo:       'Sistema de Gestión Documental',
+  loginTituloPrincipal: 'Gestión documental moderna',
+  loginDescripcion:     'Plataforma enterprise para la gestión, seguimiento y trazabilidad de documentos institucionales.',
+  loginCard1:           'Gestión documental',
+  loginCard2:           'Flujo de derivaciones',
+  loginCard3:           'Trazabilidad completa',
+  loginCard4:           'Historial documental',
+  loginFooter:          '© 2026 SISDOC v2.0 — Sistema institucional de gestión documental',
+};
+
 // ── GET /configuracion — leer config completa (pública) ────
 router.get('/', (req, res) => {
   const cfg = readConfig();
@@ -56,21 +69,44 @@ router.get('/', (req, res) => {
   res.json({
     ok: true,
     data: {
-      nombreSistema: cfg.nombreSistema ?? 'SISDOC',
+      nombreSistema:     cfg.nombreSistema     ?? 'SISDOC',
       nombreInstitucion: cfg.nombreInstitucion ?? 'HUAP',
-      logoUrl: logoFile ? `/uploads/config/${logoFile}` : null,
-      backgroundUrl: bgFile ? `/uploads/config/${bgFile}` : null,
-      version: '2.0.0',
+      logoUrl:           logoFile ? `/uploads/config/${logoFile}` : null,
+      backgroundUrl:     bgFile   ? `/uploads/config/${bgFile}`   : null,
+      version:           '2.0.0',
+      // Textos configurables del login
+      loginNombreSistema:   cfg.loginNombreSistema   ?? LOGIN_DEFAULTS.loginNombreSistema,
+      loginSubtitulo:       cfg.loginSubtitulo       ?? LOGIN_DEFAULTS.loginSubtitulo,
+      loginTituloPrincipal: cfg.loginTituloPrincipal ?? LOGIN_DEFAULTS.loginTituloPrincipal,
+      loginDescripcion:     cfg.loginDescripcion     ?? LOGIN_DEFAULTS.loginDescripcion,
+      loginCard1:           cfg.loginCard1           ?? LOGIN_DEFAULTS.loginCard1,
+      loginCard2:           cfg.loginCard2           ?? LOGIN_DEFAULTS.loginCard2,
+      loginCard3:           cfg.loginCard3           ?? LOGIN_DEFAULTS.loginCard3,
+      loginCard4:           cfg.loginCard4           ?? LOGIN_DEFAULTS.loginCard4,
+      loginFooter:          cfg.loginFooter          ?? LOGIN_DEFAULTS.loginFooter,
     },
   });
 });
 
-// ── PATCH /configuracion — actualizar nombres ───────────────
+// ── PATCH /configuracion — actualizar nombres y textos ─────
 router.patch('/', requireAuth, (req, res) => {
-  const { nombreSistema, nombreInstitucion } = req.body as { nombreSistema?: string; nombreInstitucion?: string };
-  const cfg = readConfig();
-  if (nombreSistema !== undefined) cfg.nombreSistema = nombreSistema;
-  if (nombreInstitucion !== undefined) cfg.nombreInstitucion = nombreInstitucion;
+  const body = req.body as Record<string, string | undefined>;
+  const cfg  = readConfig();
+
+  // Campos de identidad
+  if (body.nombreSistema     !== undefined) cfg.nombreSistema     = body.nombreSistema;
+  if (body.nombreInstitucion !== undefined) cfg.nombreInstitucion = body.nombreInstitucion;
+
+  // Textos configurables del login
+  const loginFields: (keyof typeof LOGIN_DEFAULTS)[] = [
+    'loginNombreSistema', 'loginSubtitulo', 'loginTituloPrincipal',
+    'loginDescripcion', 'loginCard1', 'loginCard2', 'loginCard3',
+    'loginCard4', 'loginFooter',
+  ];
+  for (const field of loginFields) {
+    if (body[field] !== undefined) cfg[field] = body[field];
+  }
+
   writeConfig(cfg);
   res.json({ ok: true, data: cfg });
 });

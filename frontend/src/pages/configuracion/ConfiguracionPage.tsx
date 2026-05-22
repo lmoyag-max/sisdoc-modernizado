@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Settings, Upload, ImageIcon, Building2, Save,
-  CheckCircle2, RefreshCw, Palette, Monitor, X,
+  CheckCircle2, RefreshCw, Palette, Monitor, X, Type,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,11 +15,21 @@ import { toast } from 'sonner';
 import { cn, uploadUrl } from '@/lib/utils';
 
 interface SistemaConfig {
-  nombreSistema: string;
-  nombreInstitucion: string;
-  logoUrl: string | null;
-  backgroundUrl: string | null;
-  version: string;
+  nombreSistema:        string;
+  nombreInstitucion:    string;
+  logoUrl:              string | null;
+  backgroundUrl:        string | null;
+  version:              string;
+  // Textos del login
+  loginNombreSistema:   string;
+  loginSubtitulo:       string;
+  loginTituloPrincipal: string;
+  loginDescripcion:     string;
+  loginCard1:           string;
+  loginCard2:           string;
+  loginCard3:           string;
+  loginCard4:           string;
+  loginFooter:          string;
 }
 
 async function fetchConfig(): Promise<SistemaConfig> {
@@ -133,8 +143,21 @@ export function ConfiguracionPage() {
   const qc = useQueryClient();
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [bgPreview, setBgPreview] = useState<string | null>(null);
-  const [nombreSistema, setNombreSistema] = useState('');
+  const [nombreSistema,     setNombreSistema]     = useState('');
   const [nombreInstitucion, setNombreInstitucion] = useState('');
+
+  // Textos del login
+  const [loginTextos, setLoginTextos] = useState({
+    loginNombreSistema:   '',
+    loginSubtitulo:       '',
+    loginTituloPrincipal: '',
+    loginDescripcion:     '',
+    loginCard1:           '',
+    loginCard2:           '',
+    loginCard3:           '',
+    loginCard4:           '',
+    loginFooter:          '',
+  });
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['configuracion'],
@@ -145,6 +168,17 @@ export function ConfiguracionPage() {
     if (config) {
       setNombreSistema(config.nombreSistema);
       setNombreInstitucion(config.nombreInstitucion);
+      setLoginTextos({
+        loginNombreSistema:   config.loginNombreSistema   ?? '',
+        loginSubtitulo:       config.loginSubtitulo       ?? '',
+        loginTituloPrincipal: config.loginTituloPrincipal ?? '',
+        loginDescripcion:     config.loginDescripcion     ?? '',
+        loginCard1:           config.loginCard1           ?? '',
+        loginCard2:           config.loginCard2           ?? '',
+        loginCard3:           config.loginCard3           ?? '',
+        loginCard4:           config.loginCard4           ?? '',
+        loginFooter:          config.loginFooter          ?? '',
+      });
     }
   }, [config]);
 
@@ -192,6 +226,18 @@ export function ConfiguracionPage() {
       qc.invalidateQueries({ queryKey: ['configuracion'] });
     },
     onError: () => toast.error('Error al guardar la configuración'),
+  });
+
+  const saveLoginTextos = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.patch('/configuracion', loginTextos);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success('Textos del login guardados');
+      qc.invalidateQueries({ queryKey: ['configuracion'] });
+    },
+    onError: () => toast.error('Error al guardar los textos del login'),
   });
 
   const handleLogoFile = (file: File) => {
@@ -316,6 +362,108 @@ export function ConfiguracionPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Textos del Login */}
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Type className="h-4 w-4 text-primary" />
+            Textos del Login
+          </CardTitle>
+          <CardDescription>Personaliza los textos que aparecen en el panel izquierdo de la pantalla de inicio de sesión</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+
+          {/* Nombre sistema + subtítulo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Nombre del sistema <span className="text-muted-foreground font-normal">(encabezado)</span></Label>
+              <Input
+                value={isLoading ? '' : loginTextos.loginNombreSistema}
+                onChange={(e) => setLoginTextos((p) => ({ ...p, loginNombreSistema: e.target.value }))}
+                placeholder="SISDOC"
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Subtítulo del sistema</Label>
+              <Input
+                value={isLoading ? '' : loginTextos.loginSubtitulo}
+                onChange={(e) => setLoginTextos((p) => ({ ...p, loginSubtitulo: e.target.value }))}
+                placeholder="Sistema de Gestión Documental"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          {/* Título principal + descripción */}
+          <div className="space-y-1.5">
+            <Label>Título principal</Label>
+            <Input
+              value={isLoading ? '' : loginTextos.loginTituloPrincipal}
+              onChange={(e) => setLoginTextos((p) => ({ ...p, loginTituloPrincipal: e.target.value }))}
+              placeholder="Gestión documental moderna"
+              disabled={isLoading}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Descripción principal</Label>
+            <textarea
+              value={isLoading ? '' : loginTextos.loginDescripcion}
+              onChange={(e) => setLoginTextos((p) => ({ ...p, loginDescripcion: e.target.value }))}
+              placeholder="Plataforma enterprise para la gestión, seguimiento y trazabilidad…"
+              rows={3}
+              disabled={isLoading}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            />
+          </div>
+
+          {/* Tarjetas */}
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 block">
+              Tarjetas informativas (4 íconos)
+            </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(['loginCard1', 'loginCard2', 'loginCard3', 'loginCard4'] as const).map((key, i) => (
+                <div key={key} className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Tarjeta {i + 1}</Label>
+                  <Input
+                    value={isLoading ? '' : loginTextos[key]}
+                    onChange={(e) => setLoginTextos((p) => ({ ...p, [key]: e.target.value }))}
+                    placeholder={['Gestión documental', 'Flujo de derivaciones', 'Trazabilidad completa', 'Historial documental'][i]}
+                    disabled={isLoading}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="space-y-1.5">
+            <Label>Texto de pie de página</Label>
+            <Input
+              value={isLoading ? '' : loginTextos.loginFooter}
+              onChange={(e) => setLoginTextos((p) => ({ ...p, loginFooter: e.target.value }))}
+              placeholder="© 2026 SISDOC v2.0 — Sistema institucional de gestión documental"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <Button
+              onClick={() => saveLoginTextos.mutate()}
+              disabled={isLoading || saveLoginTextos.isPending}
+              className="gap-2"
+              size="sm"
+            >
+              {saveLoginTextos.isPending
+                ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                : <Save className="h-3.5 w-3.5" />}
+              Guardar textos del login
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Info del sistema */}
       <Card>

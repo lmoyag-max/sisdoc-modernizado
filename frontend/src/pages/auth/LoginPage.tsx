@@ -31,11 +31,15 @@ export function LoginPage() {
   const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [showPassword, setShowPassword] = useState(false);
-  const [bgUrl, setBgUrl] = useState<string | null>(null);
+  const [bgUrl,   setBgUrl]   = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get<{ ok: boolean; data: { backgroundUrl: string | null } }>('/configuracion')
-      .then((r) => { if (r.data.data.backgroundUrl) setBgUrl(uploadUrl(r.data.data.backgroundUrl)); })
+    apiClient.get<{ ok: boolean; data: { backgroundUrl: string | null; logoUrl: string | null } }>('/configuracion')
+      .then((r) => {
+        if (r.data.data.backgroundUrl) setBgUrl(uploadUrl(r.data.data.backgroundUrl));
+        if (r.data.data.logoUrl)       setLogoUrl(uploadUrl(r.data.data.logoUrl));
+      })
       .catch(() => {/* usa el gradiente por defecto */});
   }, []);
 
@@ -86,8 +90,29 @@ export function LoginPage() {
           )}
         </div>
 
+        {/* Watermark — logo institucional como marca de agua decorativa */}
+        {logoUrl && (
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+            style={{ zIndex: 1 }}
+            aria-hidden="true"
+          >
+            <img
+              src={logoUrl}
+              alt=""
+              className="w-[65%] max-w-[320px] object-contain"
+              style={{
+                opacity: 0.08,
+                filter: 'blur(1.5px) brightness(1.8)',
+                mixBlendMode: 'luminosity',
+              }}
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          </div>
+        )}
+
         {/* Content */}
-        <div className="relative flex flex-col h-full p-10">
+        <div className="relative flex flex-col h-full p-10" style={{ zIndex: 2 }}>
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-lg shadow-indigo-900/50">

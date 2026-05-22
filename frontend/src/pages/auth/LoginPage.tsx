@@ -90,29 +90,8 @@ export function LoginPage() {
           )}
         </div>
 
-        {/* Watermark — logo institucional como marca de agua decorativa */}
-        {logoUrl && (
-          <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
-            style={{ zIndex: 1 }}
-            aria-hidden="true"
-          >
-            <img
-              src={logoUrl}
-              alt=""
-              className="w-[65%] max-w-[320px] object-contain"
-              style={{
-                opacity: 0.08,
-                filter: 'blur(1.5px) brightness(1.8)',
-                mixBlendMode: 'luminosity',
-              }}
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            />
-          </div>
-        )}
-
         {/* Content */}
-        <div className="relative flex flex-col h-full p-10" style={{ zIndex: 2 }}>
+        <div className="relative flex flex-col h-full p-10">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-lg shadow-indigo-900/50">
@@ -160,8 +139,29 @@ export function LoginPage() {
       </div>
 
       {/* Panel derecho — Formulario */}
-      <div className="flex-1 flex items-center justify-center bg-background p-6">
-        <div className="w-full max-w-md">
+      <div className="flex-1 flex items-center justify-center bg-background p-6 relative overflow-hidden">
+
+        {/* Watermark — logo institucional detrás del formulario */}
+        {logoUrl && (
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+            aria-hidden="true"
+          >
+            <img
+              src={logoUrl}
+              alt=""
+              className="w-[80%] max-w-[420px] object-contain"
+              style={{
+                opacity: 0.05,
+                filter: 'blur(1px)',
+                mixBlendMode: 'multiply',
+              }}
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          </div>
+        )}
+
+        <div className="w-full max-w-md relative z-10">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-sm">

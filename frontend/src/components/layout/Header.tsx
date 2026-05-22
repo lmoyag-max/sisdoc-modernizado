@@ -8,17 +8,16 @@ import { useRole } from '@/hooks/useRole';
 import { useState } from 'react';
 
 interface HeaderProps {
-  title?: string;
   onMenuToggle?: () => void;
 }
 
-export function Header({ title, onMenuToggle }: HeaderProps) {
-  const user      = useAuthStore((s) => s.user);
-  const nombre    = displayName(user);
-  const initials  = iniciales(nombre);
-  const navigate  = useNavigate();
+export function Header({ onMenuToggle }: HeaderProps) {
+  const user     = useAuthStore((s) => s.user);
+  const nombre   = displayName(user);
+  const initials = iniciales(nombre);
+  const navigate = useNavigate();
   const { isAdmin, isOfPartes, isSupervisor } = useRole();
-  const rolLabel  = isAdmin ? 'Administrador' : isOfPartes ? 'Of. Partes' : isSupervisor ? 'Supervisor' : 'Funcionario';
+  const rolLabel = isAdmin ? 'Administrador' : isOfPartes ? 'Of. Partes' : isSupervisor ? 'Supervisor' : 'Funcionario';
 
   const [searchVal, setSearchVal] = useState('');
 
@@ -32,7 +31,7 @@ export function Header({ title, onMenuToggle }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 header-border">
 
-      {/* Botón hamburguesa — solo visible en mobile */}
+      {/* Hamburguesa — mobile únicamente */}
       <button
         onClick={onMenuToggle}
         className="flex lg:hidden h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
@@ -42,39 +41,33 @@ export function Header({ title, onMenuToggle }: HeaderProps) {
         <Menu className="h-5 w-5" />
       </button>
 
-      {title && (
-        <h1 className="text-base font-semibold text-foreground hidden md:block">{title}</h1>
-      )}
+      {/* Búsqueda — ocupa el espacio central disponible */}
+      <div className="relative flex-1 max-w-xs hidden sm:block">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <Input
+          type="search"
+          value={searchVal}
+          onChange={(e) => setSearchVal(e.target.value)}
+          onKeyDown={handleSearch}
+          placeholder="Buscar documentos, trámites…"
+          className="pl-9 h-8 text-sm bg-muted/40 border-transparent focus-visible:border-border focus-visible:bg-background transition-colors rounded-lg"
+        />
+      </div>
 
-      <div className="flex flex-1 items-center gap-3 min-w-0">
-        {/* Barra de búsqueda — se oculta en pantallas muy pequeñas */}
-        <div className="relative flex-1 max-w-sm hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          <Input
-            type="search"
-            value={searchVal}
-            onChange={(e) => setSearchVal(e.target.value)}
-            onKeyDown={handleSearch}
-            placeholder="Buscar documentos, trámites…"
-            className="pl-9 h-8 text-sm bg-muted/40 border-transparent focus-visible:border-border focus-visible:bg-background transition-colors rounded-lg"
-          />
+      {/* Empuja el bloque usuario hacia la derecha */}
+      <div className="flex-1" />
+
+      {/* Usuario — alineado a la derecha */}
+      <div className="flex items-center gap-2.5">
+        <div className="hidden sm:block text-right leading-tight">
+          <p className="text-xs font-medium text-foreground truncate max-w-[160px]">{nombre || user?.usuario}</p>
+          <p className="text-[10px] text-muted-foreground">{rolLabel}</p>
         </div>
-
-        {/* Spacer cuando la búsqueda está oculta */}
-        <div className="flex-1 sm:hidden" />
-
-        {/* Info usuario */}
-        <div className="flex items-center gap-2.5 pl-2 border-l border-border/50 shrink-0">
-          <div className="hidden sm:block text-right leading-tight">
-            <p className="text-xs font-medium text-foreground truncate max-w-[140px]">{nombre || user?.usuario}</p>
-            <p className="text-[10px] text-muted-foreground">{rolLabel}</p>
-          </div>
-          <Avatar className="h-7 w-7 cursor-pointer ring-2 ring-primary/20 transition-all hover:ring-primary/40">
-            <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-        </div>
+        <Avatar className="h-7 w-7 cursor-pointer ring-2 ring-primary/20 transition-all hover:ring-primary/40">
+          <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
       </div>
     </header>
   );

@@ -25,9 +25,10 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [showPassword, setShowPassword] = useState(false);
-  const [bgUrl,   setBgUrl]   = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [showPassword,   setShowPassword]   = useState(false);
+  const [bgUrl,          setBgUrl]          = useState<string | null>(null);
+  const [logoUrl,        setLogoUrl]        = useState<string | null>(null);
+  const [logoImgError,   setLogoImgError]   = useState(false);
   const [textos, setTextos] = useState({
     nombreSistema:        'SISDOC',
     subtitulo:            'Sistema de Gestión Documental',
@@ -52,7 +53,7 @@ export function LoginPage() {
       .then((r) => {
         const d = r.data.data;
         if (d.backgroundUrl) setBgUrl(uploadUrl(d.backgroundUrl));
-        if (d.logoUrl)       setLogoUrl(uploadUrl(d.logoUrl));
+        if (d.logoUrl)       { setLogoUrl(uploadUrl(d.logoUrl)); setLogoImgError(false); }
         // Parsear título principal: la última palabra va en color acento
         const titulo = d.loginTituloPrincipal ?? 'Gestión documental moderna';
         const palabras = titulo.trim().split(' ');
@@ -123,11 +124,22 @@ export function LoginPage() {
 
         {/* Content */}
         <div className="relative flex flex-col h-full p-10">
-          {/* Logo */}
+          {/* Logo institucional o fallback SD */}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-lg shadow-indigo-900/50">
-              SD
-            </div>
+            {logoUrl && !logoImgError ? (
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm p-1.5 shadow-lg overflow-hidden">
+                <img
+                  src={logoUrl}
+                  alt={textos.nombreSistema}
+                  className="max-h-full max-w-full object-contain"
+                  onError={() => setLogoImgError(true)}
+                />
+              </div>
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-lg shadow-indigo-900/50">
+                SD
+              </div>
+            )}
             <div>
               <p className="text-white font-semibold text-sm tracking-wide">{textos.nombreSistema}</p>
               <p className="text-slate-400 text-xs">{textos.subtitulo}</p>
@@ -196,9 +208,20 @@ export function LoginPage() {
         <div className="w-full max-w-md relative z-10">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-sm">
-              SD
-            </div>
+            {logoUrl && !logoImgError ? (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted p-1.5 overflow-hidden">
+                <img
+                  src={logoUrl}
+                  alt={textos.nombreSistema}
+                  className="max-h-full max-w-full object-contain"
+                  onError={() => setLogoImgError(true)}
+                />
+              </div>
+            ) : (
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-sm">
+                SD
+              </div>
+            )}
             <div>
               <p className="font-semibold text-foreground text-sm">{textos.nombreSistema}</p>
               <p className="text-muted-foreground text-xs">{textos.subtitulo}</p>

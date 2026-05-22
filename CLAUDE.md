@@ -38,7 +38,7 @@ Modernización del sistema legacy SISDOC (Sistema de Gestión Documental) del HU
 - **Motor:** SQL Server 2022 (contenedor Docker)
 - **Contenedor:** `sisdoc_sqlserver`
 - **Volumen persistente:** `sisdoc_sqlserver_data` → `/var/opt/mssql/data`
-- **Credenciales dev:** `sa` / `Adminhuap2026!`
+- **Credenciales dev:** `sa` / `<DB_PASSWORD>`
 - **Base de datos:** `SISDOC`
 
 ### Infraestructura
@@ -367,14 +367,14 @@ GET    /dependencias
 NODE_ENV=development
 PORT=3001
 DB_USER=sa
-DB_PASSWORD=Adminhuap2026!
+DB_PASSWORD=<DB_PASSWORD>
 DB_SERVER=localhost
 DB_PORT=1433
 DB_DATABASE=SISDOC
 DB_TRUST_CERT=true
 DB_ENCRYPT=false
-JWT_SECRET=sisdoc-jwt-secret-2026-enterprise-key-cambia-en-produccion
-JWT_REFRESH_SECRET=sisdoc-refresh-secret-2026-enterprise-key-cambia-en-produccion
+JWT_SECRET=<JWT_SECRET>
+JWT_REFRESH_SECRET=<JWT_REFRESH_SECRET>
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 CORS_ORIGIN=http://localhost:5173
@@ -392,7 +392,7 @@ docker ps
 
 # Ejecutar query SQL directa
 docker exec sisdoc_sqlserver /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U sa -P "Adminhuap2026!" -C -d SISDOC -Q "SELECT TOP 5 * FROM documento"
+  -S localhost -U sa -P "<DB_PASSWORD>" -C -d SISDOC -Q "SELECT TOP 5 * FROM documento"
 
 # Reiniciar backend (si hay cambios en .env)
 # Ctrl+C en la terminal del backend, luego: npm run dev

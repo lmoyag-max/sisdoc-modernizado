@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getPool, sql } from '../../config/database';
 import { env } from '../../config/env';
 import { logger } from '../../shared/utils/logger';
+import { logAuditoria } from '../../shared/utils/auditoria';
 import { JwtPayload } from '../../shared/types/api.types';
 import { LoginDto } from './auth.schema';
 
@@ -50,7 +51,7 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
     }>(`
       SELECT
         u.id_usuario, u.usuario, u.clave,
-        NULL AS clave_hash,
+        u.clave_hash,
         u.id_funcionario,
         f.nombres, f.apellidos, f.id_dependencia,
         d.desc_dependencia,
@@ -63,10 +64,16 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
 
   const row = result.recordset[0];
 
-  if (!row) throw createAuthError('Credenciales inválidas');
+  if (!row) {
+    await logAuditoria(pool, { accion: 'LOGIN_FALLIDO', detalle: `usuario no encontrado: ${dto.usuario}` });
+    throw createAuthError('Credenciales inválidas');
+  }
 
   const isValid = await verifyPassword(dto.clave, row.clave, row.clave_hash);
-  if (!isValid) throw createAuthError('Credenciales inválidas');
+  if (!isValid) {
+    await logAuditoria(pool, { idUsuario: row.id_usuario, accion: 'LOGIN_FALLIDO', detalle: 'contraseña incorrecta' });
+    throw createAuthError('Credenciales inválidas');
+  }
 
   // Intento de migración gradual a bcrypt (silencioso si la columna no existe)
   if (!row.clave_hash) {
@@ -95,6 +102,7 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
   const tokens = generateTokens(user);
   await saveRefreshToken(pool, row.id_usuario, tokens.refreshToken);
 
+  await logAuditoria(pool, { idUsuario: user.idUsuario, accion: 'LOGIN_EXITOSO', recurso: user.usuario });
   logger.info(`Login exitoso: ${user.usuario} (id: ${user.idUsuario})`);
   return { user, tokens };
 }
@@ -290,6 +298,11 @@ async function saveRefreshToken(
         INSERT INTO refresh_token (id, token, id_usuario, expires_at, created_at)
         VALUES (@id, @token, @idUsuario, @expiresAt, GETDATE())
       `);
+
+    // Fire-and-forget: limpiar tokens expirados y revocados — no bloquea la respuesta
+    pool.request()
+      .query('DELETE FROM refresh_token WHERE expires_at < GETDATE() AND revoked_at IS NOT NULL')
+      .catch(() => { /* silencioso — no crítico */ });
   } catch {
     logger.warn('No se pudo guardar refresh token (tabla puede no existir aún)');
   }

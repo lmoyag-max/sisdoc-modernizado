@@ -22,12 +22,21 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
 
     const pool = await getPool();
     const like = `%${q}%`;
+    // Sanitizar operadores FTS para prevenir manipulación de consultas Full-Text Search
+    const qSanitized = q
+      .replace(/"/g, ' ')
+      .replace(/\b(AND|OR|NOT|NEAR|FORMSOF|ISABOUT)\b/gi, ' ')
+      .replace(/[~*]/g, '')
+      .trim();
+    // Formato para CONTAINS: "palabra*" busca prefijos; requiere script 05-full-text-index.sql
+    const ftsQ = `"${qSanitized}*"`;
 
     const [docs, trams, funcs] = await Promise.all([
-      // Documentos
+      // Documentos — CONTAINS en materia (FTS), LIKE en num_interno/num_oficial (INT, sin FTS)
       tipo === 'documentos' || tipo === 'todos'
         ? pool.request()
-            .input('q', sql.NVarChar(200), like)
+            .input('ftsQ', sql.NVarChar(200), ftsQ)
+            .input('like', sql.NVarChar(200), like)
             .input('offset', sql.Int, offset)
             .input('n', sql.Int, porPagina)
             .query<{
@@ -42,16 +51,19 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
               FROM documento d
               LEFT JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
               LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
-              WHERE d.materia LIKE @q OR d.num_interno LIKE @q OR d.num_oficial LIKE @q
+              WHERE CONTAINS(d.materia, @ftsQ)
+                 OR CAST(d.num_interno AS NVARCHAR) LIKE @like
+                 OR CAST(d.num_oficial AS NVARCHAR) LIKE @like
               ORDER BY d.fecha_sistema DESC
               OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
             `)
         : Promise.resolve({ recordset: [] as never[] }),
 
-      // Trámites
+      // Trámites — CONTAINS en materia (FTS), LIKE en observaciones
       tipo === 'tramites' || tipo === 'todos'
         ? pool.request()
-            .input('q', sql.NVarChar(200), like)
+            .input('ftsQ', sql.NVarChar(200), ftsQ)
+            .input('like', sql.NVarChar(200), like)
             .input('offset', sql.Int, offset)
             .input('n', sql.Int, porPagina)
             .query<{
@@ -63,16 +75,17 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
                      t.fecha_sistema, COUNT(*) OVER() AS total
               FROM tramite t
               LEFT JOIN documento d ON t.id_documento = d.id_documento
-              WHERE d.materia LIKE @q OR t.observaciones LIKE @q
+              WHERE CONTAINS(d.materia, @ftsQ) OR t.observaciones LIKE @like
               ORDER BY t.fecha_sistema DESC
               OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
             `)
         : Promise.resolve({ recordset: [] as never[] }),
 
-      // Funcionarios
+      // Funcionarios — CONTAINS en nombres/apellidos (FTS), LIKE en rut (VARCHAR corto)
       tipo === 'funcionarios' || tipo === 'todos'
         ? pool.request()
-            .input('q', sql.NVarChar(200), like)
+            .input('ftsQ', sql.NVarChar(200), ftsQ)
+            .input('like', sql.NVarChar(200), like)
             .query<{
               id_funcionario: number; nombres: string | null;
               apellidos: string | null; rut: string | null; desc_dependencia: string | null;
@@ -81,7 +94,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
                      d.desc_dependencia
               FROM funcionario f
               LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
-              WHERE f.nombres LIKE @q OR f.apellidos LIKE @q OR f.rut LIKE @q
+              WHERE CONTAINS((f.nombres, f.apellidos), @ftsQ) OR f.rut LIKE @like
               ORDER BY f.apellidos, f.nombres
             `)
         : Promise.resolve({ recordset: [] as never[] }),

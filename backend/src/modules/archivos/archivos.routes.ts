@@ -4,7 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { getPool, sql } from '../../config/database';
-import { sendSuccess, sendError, sendCreated } from '../../shared/utils/response';
+import { sendSuccess, sendError, sendCreated, sendForbidden } from '../../shared/utils/response';
+import { AuthenticatedRequest } from '../../shared/types/api.types';
 import { env } from '../../config/env';
 
 const router = Router();
@@ -20,13 +21,13 @@ const MIME_MAP: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.gif':  'image/gif',
-  '.svg':  'image/svg+xml',
+  // SVG eliminado: puede contener <script> → riesgo de XSS almacenado
+  // ZIP eliminado: riesgo de malware y zip-slip al descomprimir
   '.doc':  'application/msword',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.xls':  'application/vnd.ms-excel',
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.txt':  'text/plain',
-  '.zip':  'application/zip',
 };
 
 function getMime(filename: string): string {
@@ -48,7 +49,9 @@ const upload = multer({
   storage,
   limits: { fileSize: env.MAX_FILE_SIZE },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp', '.txt', '.zip'];
+    // SVG eliminado: puede contener <script> → riesgo de XSS almacenado
+    // ZIP eliminado: riesgo de malware y zip-slip al descomprimir
+    const allowed = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.webp', '.txt'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowed.includes(ext)) return cb(null, true);
     cb(new Error(`Tipo no permitido: ${ext}`));
@@ -178,17 +181,41 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
 // ── DELETE /archivos/:id ─────────────────────────────────────
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const pool = await getPool();
+    const user      = (req as unknown as AuthenticatedRequest).user;
+    const idArchivo = Number(req.params.id);
+    const pool      = await getPool();
+
     const res2 = await pool.request()
-      .input('id', sql.Int, Number(req.params.id))
+      .input('id', sql.Int, idArchivo)
       .query<{ ruta: string | null }>('SELECT ruta FROM archivo_digital WHERE id_archivo_digital = @id');
     const row = res2.recordset[0];
     if (!row) { sendError(res, 'Archivo no encontrado', 404); return; }
+
+    // Verificar que el archivo pertenezca a un documento de la dependencia del usuario
+    if (!user.roles.includes('admin') && !user.todosServicios) {
+      const idDep = user.idDependencia;
+      if (!idDep) { sendForbidden(res, 'No tienes permiso para eliminar este archivo'); return; }
+      const ownerCheck = await pool.request()
+        .input('id',    sql.Int, idArchivo)
+        .input('idDep', sql.Int, idDep)
+        .query(`
+          SELECT 1 AS ok FROM archivo_digital a
+          JOIN tramite t ON t.id_documento = a.id_documento
+          WHERE a.id_archivo_digital = @id
+            AND t.id_destino = @idDep AND t.tipo_destinatario = 'D'
+        `);
+      if (!ownerCheck.recordset[0]) {
+        sendForbidden(res, 'No tienes permiso para eliminar este archivo');
+        return;
+      }
+    }
+
     if (row.ruta) {
       const fp = path.resolve(UPLOAD_DIR, row.ruta);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
     }
-    await pool.request().input('id', sql.Int, Number(req.params.id))
+    await pool.request()
+      .input('id', sql.Int, idArchivo)
       .query('DELETE FROM archivo_digital WHERE id_archivo_digital = @id');
     sendSuccess(res, null, 'Archivo eliminado');
   } catch (e) { next(e); }

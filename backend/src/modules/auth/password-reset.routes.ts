@@ -236,6 +236,11 @@ router.post('/reset-password', resetLimiter, async (req: Request, res: Response,
         WHERE id_usuario = @idUsr AND usado = 0
       `);
 
+    // Revocar todos los refresh tokens activos — fuerza re-login con la nueva contraseña
+    await pool.request()
+      .input('idUsr', sql.Int, tkRow.id_usuario)
+      .query('UPDATE refresh_token SET revoked_at = GETDATE() WHERE id_usuario = @idUsr AND revoked_at IS NULL');
+
     await audit(pool, 'RESET_CONTRASENA_CAMBIADA', { idUsuario: tkRow.id_usuario, ip, userAgent });
     logger.info(`reset-password: contraseña cambiada para usuario id=${tkRow.id_usuario}`);
 

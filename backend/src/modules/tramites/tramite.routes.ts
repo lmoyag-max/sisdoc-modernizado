@@ -222,9 +222,25 @@ router.patch('/:id/recibir', async (req, res, next) => {
 // ── PATCH /tramites/:id/cerrar ────────────────────────────────
 router.patch('/:id/cerrar', async (req, res, next) => {
   try {
-    const pool = await getPool();
+    const user   = (req as unknown as AuthenticatedRequest).user;
+    const idTram = Number(req.params.id);
+    const pool   = await getPool();
+
+    if (!hasFullAccess(user) && user.idDependencia) {
+      const check = await pool.request()
+        .input('id',    sql.Int, idTram)
+        .input('idDep', sql.Int, user.idDependencia)
+        .query(`SELECT 1 AS ok FROM tramite
+                WHERE id_seguimiento = @id
+                  AND id_destino = @idDep AND tipo_destinatario = 'D'`);
+      if (!check.recordset[0]) {
+        sendForbidden(res, 'No tienes permiso para cerrar este trámite');
+        return;
+      }
+    }
+
     await pool.request()
-      .input('idTramite', sql.Int, Number(req.params.id))
+      .input('idTramite', sql.Int, idTram)
       .query(`UPDATE tramite SET id_estado_tramite = 5, fecha_update = GETDATE()
               WHERE id_seguimiento = @idTramite`);
     sendSuccess(res, null, 'Trámite cerrado');

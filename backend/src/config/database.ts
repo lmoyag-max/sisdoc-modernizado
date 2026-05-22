@@ -26,6 +26,7 @@ let pool: sql.ConnectionPool | null = null;
 
 export async function getPool(): Promise<sql.ConnectionPool> {
   if (pool && pool.connected) return pool;
+  if (pool && !pool.connected) { pool = null; }
 
   try {
     pool = await sql.connect(dbConfig);

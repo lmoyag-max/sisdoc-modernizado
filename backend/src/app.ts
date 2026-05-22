@@ -12,6 +12,7 @@ import { swaggerSpec } from './config/swagger';
 import { requestLogger } from './middleware/logger.middleware';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
+import { requireAuth } from './middleware/auth.middleware';
 import authRoutes from './modules/auth/auth.routes';
 import documentosRoutes from './modules/documentos/documento.routes';
 import tramitesRoutes from './modules/tramites/tramite.routes';
@@ -26,14 +27,13 @@ import rolesRoutes       from './modules/roles/roles.routes';
 
 const app = express();
 
-// ── CORS: permitir localhost + red local ───────────────────
+// ── CORS: lista explícita de orígenes en todos los entornos ───────────────
 app.use(cors({
   origin: (origin, callback) => {
-    // En desarrollo: permitir cualquier origen (red local incluida)
-    if (env.NODE_ENV !== 'production') return callback(null, true);
-    // En producción: validar contra lista de orígenes permitidos
+    // Requests sin origin (curl, Postman, server-to-server) se permiten siempre
+    if (!origin) return callback(null, true);
     const allowed = env.CORS_ORIGIN.split(',').map((s) => s.trim());
-    if (!origin || allowed.includes('*') || allowed.some((o) => origin.startsWith(o))) {
+    if (allowed.includes('*') || allowed.some((o) => origin.startsWith(o))) {
       return callback(null, true);
     }
     callback(new Error(`CORS bloqueado: ${origin}`));
@@ -46,8 +46,21 @@ app.use(cors({
 // ── Seguridad ──────────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: false, // Desactivado para API
+  // CSP desactivado para rutas API puras; se activa selectivamente abajo para UI
+  contentSecurityPolicy: false,
 }));
+
+// CSP básico solo para rutas de UI (Swagger, health) — la API JSON no lo necesita
+const uiCsp = helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc:  ["'self'"],
+    scriptSrc:   ["'self'", "'unsafe-inline'"], // Swagger UI requiere inline scripts
+    styleSrc:    ["'self'", "'unsafe-inline'"],
+    imgSrc:      ["'self'", 'data:'],
+    connectSrc:  ["'self'"],
+    frameAncestors: ["'none'"],
+  },
+});
 
 // Rate limiting — autenticación
 const authLimiter = rateLimit({
@@ -67,25 +80,35 @@ app.use(cookieParser());
 // ── Logging ────────────────────────────────────────────────
 app.use(requestLogger);
 
-// ── Archivos estáticos (uploads públicos) ──────────────────
-app.use('/uploads', express.static(path.resolve(env.UPLOAD_DIR)));
+// ── Config files: público — usados en la página de login (logo, fondo) ────
+app.use('/uploads/config', express.static(path.resolve(env.UPLOAD_DIR, 'config')));
+
+// ── Archivos de documentos: requieren autenticación ────────────────────────
+// path.basename() previene path traversal (ej. ../../etc/passwd)
+app.get('/uploads/:filename', requireAuth, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.resolve(env.UPLOAD_DIR, filename);
+  res.sendFile(filePath, (err) => {
+    if (err) res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
+  });
+});
 
 // ── Health checks ─────────────────────────────────────────
-const healthResponse = () => ({
-  ok: true,
-  sistema: 'SISDOC API v2',
-  version: '2.0.0',
-  entorno: env.NODE_ENV,
-  timestamp: new Date().toISOString(),
-});
-app.get('/health', (_req, res) => res.json(healthResponse()));
-app.get('/api/health', (_req, res) => res.json(healthResponse())); // alias
+// En producción solo devuelve { ok: true } — sin version ni entorno (fingerprinting)
+const healthResponse = () =>
+  env.NODE_ENV === 'production'
+    ? { ok: true }
+    : { ok: true, sistema: 'SISDOC API v2', version: '2.0.0', entorno: env.NODE_ENV, timestamp: new Date().toISOString() };
+app.get('/health', uiCsp, (_req, res) => res.json(healthResponse()));
+app.get('/api/health', uiCsp, (_req, res) => res.json(healthResponse())); // alias
 
-// ── API Docs ───────────────────────────────────────────────
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'SISDOC API Docs',
-}));
+// ── API Docs — solo en entornos no productivos ─────────────
+if (env.NODE_ENV !== 'production') {
+  app.use('/api-docs', uiCsp, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'SISDOC API Docs',
+  }));
+}
 
 // ── Rutas ──────────────────────────────────────────────────
 const API = '/api/v1';

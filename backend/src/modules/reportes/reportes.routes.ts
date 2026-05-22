@@ -1,16 +1,13 @@
 import { Router, Request } from 'express';
+import { z } from 'zod';
 import { requireAuth, requireModule } from '../../middleware/auth.middleware';
 import { getPool, sql } from '../../config/database';
-import { sendSuccess } from '../../shared/utils/response';
+import { sendSuccess, sendError } from '../../shared/utils/response';
+import { logAuditoria } from '../../shared/utils/auditoria';
 import { AuthenticatedRequest } from '../../shared/types/api.types';
 
 const router = Router();
 router.use(requireAuth);
-// Nota: requireModule se aplica por ruta, NO globalmente.
-// /dashboard y /actividad-reciente → disponibles para cualquier rol con módulo 'dashboard'.
-// /exportar → requiere módulo 'reportes' (solo admin).
-
-// ── Helpers ───────────────────────────────────────────────────
 
 function getUser(req: Request) {
   return (req as unknown as AuthenticatedRequest).user;
@@ -18,26 +15,6 @@ function getUser(req: Request) {
 
 function hasFullAccess(user: AuthenticatedRequest['user']): boolean {
   return user.roles.includes('admin') || user.todosServicios === true;
-}
-
-// Retorna cláusula WHERE y registra el parámetro @idDep si aplica.
-// Si el usuario no tiene acceso total: filtra documentos donde su dep participa.
-// Si no tiene dependencia asignada: bloquea todo.
-function buildDocWhere(
-  user: AuthenticatedRequest['user'],
-  req: ReturnType<typeof getPool> extends Promise<infer P> ? P : never,
-  alias = 'd',
-): string {
-  if (hasFullAccess(user)) return '1=1';
-  if (!user.idDependencia) return '1=0';
-  return `EXISTS (
-    SELECT 1 FROM tramite t_w
-    WHERE t_w.id_documento = ${alias}.id_documento
-    AND (
-      (t_w.id_destino     = @idDep AND t_w.tipo_destinatario = 'D')
-      OR (t_w.id_procedencia = @idDep AND t_w.tipo_procedencia  = 'D')
-    )
-  )`;
 }
 
 // ── GET /reportes/dashboard ───────────────────────────────────
@@ -49,7 +26,6 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
     const full = hasFullAccess(user);
     const idDep = user.idDependencia;
 
-    // Subconsulta para filtrar documentos del servicio del usuario
     const docFilter = full
       ? ''
       : idDep
@@ -57,23 +33,30 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
             SELECT 1 FROM tramite t_f
             WHERE t_f.id_documento = d.id_documento
             AND (
-              (t_f.id_destino     = ${idDep} AND t_f.tipo_destinatario = 'D')
-              OR (t_f.id_procedencia = ${idDep} AND t_f.tipo_procedencia  = 'D')
+              (t_f.id_destino     = @idDep AND t_f.tipo_destinatario = 'D')
+              OR (t_f.id_procedencia = @idDep AND t_f.tipo_procedencia  = 'D')
             )
           )`
-        : 'AND 1=0'; // Sin dependencia y sin acceso total → bloquear todo
+        : 'AND 1=0';
 
     const tramiteFilter = full
       ? ''
       : idDep
         ? `AND (
-            (t.id_destino     = ${idDep} AND t.tipo_destinatario = 'D')
-            OR (t.id_procedencia = ${idDep} AND t.tipo_procedencia  = 'D')
+            (t.id_destino     = @idDep AND t.tipo_destinatario = 'D')
+            OR (t.id_procedencia = @idDep AND t.tipo_procedencia  = 'D')
           )`
         : 'AND 1=0';
 
+    // Crea un request con @idDep pre-registrado cuando aplica filtro por servicio
+    const makeDepReq = () => {
+      const r = pool.request();
+      if (!full && idDep) r.input('idDep', sql.Int, idDep);
+      return r;
+    };
+
     const [totales, porEstado, porMes, porTipo] = await Promise.all([
-      pool.request().query<{ total: number; pendientes: number; cerradosHoy: number; urgentes: number; tramites: number }>(`
+      makeDepReq().query<{ total: number; pendientes: number; cerradosHoy: number; urgentes: number; tramites: number }>(`
         SELECT
           (SELECT COUNT(*) FROM documento d WHERE 1=1 ${docFilter}) AS total,
           (SELECT COUNT(*) FROM documento d WHERE id_estado_documento NOT IN (4,5) ${docFilter}) AS pendientes,
@@ -82,7 +65,7 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
           (SELECT COUNT(*) FROM tramite t WHERE 1=1 ${tramiteFilter}) AS tramites
       `),
 
-      pool.request().query<{ id_estado_documento: number; desc_estado_documento: string; cantidad: number }>(`
+      makeDepReq().query<{ id_estado_documento: number; desc_estado_documento: string; cantidad: number }>(`
         SELECT d.id_estado_documento, ed.desc_estado_documento, COUNT(*) AS cantidad
         FROM documento d
         LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
@@ -91,7 +74,7 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
         ORDER BY cantidad DESC
       `),
 
-      pool.request().query<{ mes: string; cantidad: number }>(`
+      makeDepReq().query<{ mes: string; cantidad: number }>(`
         SELECT FORMAT(d.fecha_sistema, 'yyyy-MM') AS mes, COUNT(*) AS cantidad
         FROM documento d
         WHERE d.fecha_sistema >= DATEADD(MONTH, -6, GETDATE()) ${docFilter}
@@ -99,7 +82,7 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
         ORDER BY mes
       `),
 
-      pool.request().query<{ desc_tipo_documento: string; cantidad: number }>(`
+      makeDepReq().query<{ desc_tipo_documento: string; cantidad: number }>(`
         SELECT TOP 8 td.desc_tipo_documento, COUNT(*) AS cantidad
         FROM documento d
         LEFT JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
@@ -109,7 +92,6 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
       `),
     ]);
 
-    // Extras globales solo para admin
     let extras = { expedientes: 0, archivos: 0, usuarios: 0 };
     if (full) {
       const extRes = await pool.request().query<{ expedientes: number; archivos: number; usuarios: number }>(`
@@ -147,12 +129,15 @@ router.get('/actividad-reciente', requireModule('dashboard'), async (req, res, n
       ? ''
       : idDep
         ? `AND (
-            (t.id_destino     = ${idDep} AND t.tipo_destinatario = 'D')
-            OR (t.id_procedencia = ${idDep} AND t.tipo_procedencia  = 'D')
+            (t.id_destino     = @idDep AND t.tipo_destinatario = 'D')
+            OR (t.id_procedencia = @idDep AND t.tipo_procedencia  = 'D')
           )`
         : 'AND 1=0';
 
-    const result = await pool.request().query<{
+    const request = pool.request();
+    if (!full && idDep) request.input('idDep', sql.Int, idDep);
+
+    const result = await request.query<{
       id_seguimiento: number; id_estado_tramite: number | null;
       fecha_sistema: Date | null; materia: string | null;
       num_interno: number | null; usuario: string | null; nombres: string | null;
@@ -184,8 +169,21 @@ router.get('/actividad-reciente', requireModule('dashboard'), async (req, res, n
 
 // ── GET /reportes/exportar — CSV filtrado por servicio ───────
 
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+const exportQuerySchema = z.object({
+  fechaDesde: z.string().regex(dateRegex, 'Formato inválido, se espera YYYY-MM-DD').optional(),
+  fechaHasta: z.string().regex(dateRegex, 'Formato inválido, se espera YYYY-MM-DD').optional(),
+});
+
 router.get('/exportar', requireModule('reportes'), async (req, res, next) => {
   try {
+    const parsed = exportQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      sendError(res, 'Parámetros de fecha inválidos', 400, parsed.error.flatten().fieldErrors);
+      return;
+    }
+    const { fechaDesde, fechaHasta } = parsed.data;
+
     const user = getUser(req);
     const pool = await getPool();
     const full = hasFullAccess(user);
@@ -198,13 +196,23 @@ router.get('/exportar', requireModule('reportes'), async (req, res, next) => {
             SELECT 1 FROM tramite t_f
             WHERE t_f.id_documento = d.id_documento
             AND (
-              (t_f.id_destino     = ${idDep} AND t_f.tipo_destinatario = 'D')
-              OR (t_f.id_procedencia = ${idDep} AND t_f.tipo_procedencia  = 'D')
+              (t_f.id_destino     = @idDep AND t_f.tipo_destinatario = 'D')
+              OR (t_f.id_procedencia = @idDep AND t_f.tipo_procedencia  = 'D')
             )
           )`
         : 'AND 1=0';
 
-    const result = await pool.request().query<{
+    const dateFilter = [
+      fechaDesde ? 'AND d.fecha_sistema >= @fechaDesde' : '',
+      fechaHasta ? 'AND d.fecha_sistema < DATEADD(DAY, 1, @fechaHasta)' : '',
+    ].join(' ');
+
+    const request = pool.request();
+    if (!full && idDep) request.input('idDep', sql.Int, idDep);
+    if (fechaDesde) request.input('fechaDesde', sql.Date, new Date(fechaDesde));
+    if (fechaHasta) request.input('fechaHasta', sql.Date, new Date(fechaHasta));
+
+    const result = await request.query<{
       id_documento: number; materia: string | null;
       num_interno: number | null; num_oficial: number | null;
       desc_tipo_documento: string | null; desc_estado_documento: string | null;
@@ -217,7 +225,7 @@ router.get('/exportar', requireModule('reportes'), async (req, res, next) => {
       LEFT JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
       LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
       LEFT JOIN usuario u ON d.id_usuario = u.id_usuario
-      WHERE 1=1 ${docFilter}
+      WHERE 1=1 ${docFilter} ${dateFilter}
       ORDER BY d.fecha_sistema DESC
     `);
 
@@ -234,6 +242,12 @@ router.get('/exportar', requireModule('reportes'), async (req, res, next) => {
     ].join(','));
 
     const csv = [headers.join(','), ...rows].join('\n');
+    await logAuditoria(pool, {
+      idUsuario: user.idUsuario,
+      accion: 'EXPORTAR_CSV',
+      detalle: `registros: ${result.recordset.length}${fechaDesde ? ` desde ${fechaDesde}` : ''}${fechaHasta ? ` hasta ${fechaHasta}` : ''}`,
+      ip: (req as import('express').Request).ip ?? null,
+    });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="documentos_${Date.now()}.csv"`);
     res.send('﻿' + csv);

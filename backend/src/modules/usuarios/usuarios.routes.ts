@@ -1,8 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import { requireAuth, requireModule } from '../../middleware/auth.middleware';
+import { validate } from '../../middleware/validate.middleware';
 import { getPool, sql } from '../../config/database';
 import { sendSuccess, sendCreated, sendError, sendPaginated, buildPaginationMeta } from '../../shared/utils/response';
+import { logAuditoria } from '../../shared/utils/auditoria';
+import { crearUsuarioSchema, actualizarUsuarioSchema } from './usuarios.schema';
 
 const router = Router();
 router.use(requireAuth);
@@ -104,21 +107,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // ── POST /usuarios — crear ──────────────────────────────────
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', validate(crearUsuarioSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { usuario, clave, nombres, apellidos, idDependencia, todos_servicios, roles, email } = req.body as {
       usuario: string; clave: string; nombres: string; apellidos: string;
       idDependencia?: number; todos_servicios?: boolean; roles?: string[]; email?: string;
     };
-
-    if (!usuario || !clave || !nombres || !apellidos) {
-      sendError(res, 'Campos requeridos: usuario, clave, nombres, apellidos', 400); return;
-    }
-
-    // Validar formato email si se provee
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      sendError(res, 'Formato de correo electrónico inválido', 400); return;
-    }
 
     const pool = await getPool();
 
@@ -188,18 +182,32 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         `);
     }
 
+    const actor = (req as unknown as import('../../shared/types/api.types').AuthenticatedRequest).user;
+    await logAuditoria(pool, {
+      idUsuario: actor.idUsuario,
+      accion: 'USUARIO_CREADO',
+      recurso: String(idUsuario),
+      detalle: `usuario: ${usuario}`,
+      ip: req.ip ?? null,
+    });
     sendCreated(res, { idUsuario, usuario, nombres, apellidos, roles: rolList }, 'Usuario creado correctamente');
   } catch (e) { next(e); }
 });
 
 // ── PATCH /usuarios/:id — actualizar ───────────────────────
-router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/:id', validate(actualizarUsuarioSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { nombres, apellidos, clave, roles, idDependencia, todos_servicios, email } = req.body as {
       nombres?: string; apellidos?: string; clave?: string; roles?: string[];
       idDependencia?: number; todos_servicios?: boolean; email?: string | null;
     };
-    const idUsuario = Number(req.params.id);
+    const idUsuario    = Number(req.params.id);
+    const currentUser  = (req as unknown as import('../../shared/types/api.types').AuthenticatedRequest).user;
+
+    // Solo administradores pueden modificar roles
+    if (roles !== undefined && !currentUser.roles.includes('admin')) {
+      sendError(res, 'Solo administradores pueden modificar roles', 403); return;
+    }
 
     // Validar formato email si se provee
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -255,10 +263,22 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
     // Actualizar clave si se provee
     if (clave) {
       const claveCorta = clave.substring(0, 10);
+      const claveHash  = await bcrypt.hash(clave, 12);
       await pool.request()
-        .input('clave', sql.VarChar(10), claveCorta)
+        .input('clave',     sql.VarChar(10),  claveCorta)
+        .input('claveHash', sql.VarChar(255), claveHash)
+        .input('idUsr',     sql.Int,          idUsuario)
+        .query('UPDATE usuario SET clave = @clave, clave_hash = @claveHash WHERE id_usuario = @idUsr');
+      // Revocar todos los refresh tokens activos para forzar re-login
+      await pool.request()
         .input('idUsr', sql.Int, idUsuario)
-        .query('UPDATE usuario SET clave = @clave WHERE id_usuario = @idUsr');
+        .query('UPDATE refresh_token SET revoked_at = GETDATE() WHERE id_usuario = @idUsr AND revoked_at IS NULL');
+      await logAuditoria(pool, {
+        idUsuario: currentUser.idUsuario,
+        accion: 'CONTRASENA_CAMBIADA',
+        recurso: String(idUsuario),
+        ip: req.ip ?? null,
+      });
     }
 
     // Actualizar roles si se provee
@@ -283,12 +303,40 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
 // ── DELETE /usuarios/:id — eliminar ────────────────────────
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const idUsuario = Number(req.params.id);
+    const idUsuario   = Number(req.params.id);
+    const currentUser = (req as unknown as import('../../shared/types/api.types').AuthenticatedRequest).user;
+
+    if (idUsuario === currentUser.idUsuario) {
+      sendError(res, 'No puedes eliminar tu propio usuario', 400); return;
+    }
+
     const pool = await getPool();
+
+    // Verificar si es el último administrador activo del sistema
+    const adminCheck = await pool.request()
+      .input('id', sql.Int, idUsuario)
+      .query<{ esAdmin: number; totalAdmins: number }>(`
+        SELECT
+          (SELECT COUNT(*) FROM usuario_rol ur JOIN rol r ON ur.id_rol = r.id_rol
+           WHERE ur.id_usuario = @id AND r.codigo = 'admin') AS esAdmin,
+          (SELECT COUNT(DISTINCT ur2.id_usuario) FROM usuario_rol ur2 JOIN rol r2 ON ur2.id_rol = r2.id_rol
+           WHERE r2.codigo = 'admin') AS totalAdmins
+      `);
+    const { esAdmin, totalAdmins } = adminCheck.recordset[0] ?? { esAdmin: 0, totalAdmins: 0 };
+    if (esAdmin > 0 && totalAdmins <= 1) {
+      sendError(res, 'No se puede eliminar el único administrador del sistema', 400); return;
+    }
+
     await pool.request().input('id', sql.Int, idUsuario)
       .query('DELETE FROM usuario_rol WHERE id_usuario = @id');
     await pool.request().input('id', sql.Int, idUsuario)
       .query('DELETE FROM usuario WHERE id_usuario = @id');
+    await logAuditoria(pool, {
+      idUsuario: currentUser.idUsuario,
+      accion: 'USUARIO_ELIMINADO',
+      recurso: String(idUsuario),
+      ip: req.ip ?? null,
+    });
     sendSuccess(res, null, 'Usuario eliminado');
   } catch (e) { next(e); }
 });

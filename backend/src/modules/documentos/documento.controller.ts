@@ -59,7 +59,22 @@ export async function obtener(req: Request, res: Response, next: NextFunction): 
 
 export async function trazabilidad(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    sendSuccess(res, await service.obtenerTrazabilidad(Number(req.params.id)));
+    const u     = user(req);
+    const idDoc = Number(req.params.id);
+
+    if (!hasFullAccess(u)) {
+      const tieneAcceso = await service.usuarioTieneAccesoDocumento(
+        idDoc,
+        u.idDependencia,
+        canSeeExternals(u),
+      );
+      if (!tieneAcceso) {
+        sendForbidden(res, 'No tienes acceso a este documento');
+        return;
+      }
+    }
+
+    sendSuccess(res, await service.obtenerTrazabilidad(idDoc));
   } catch (e) { next(e); }
 }
 

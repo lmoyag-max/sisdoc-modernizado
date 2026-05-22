@@ -173,7 +173,7 @@ docker compose --profile prod build backend --no-cache
 .\scripts\restore-db.ps1
 
 # O manualmente:
-docker exec sisdoc_sqlserver bash -c "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Adminhuap2026!' -C -Q \"RESTORE DATABASE [SISDOC] FROM DISK='/var/opt/mssql/backup/respaldo anterior.bak' WITH MOVE 'sisdoc_Data' TO '/var/opt/mssql/data/SISDOC.mdf', MOVE 'sisdoc_Log' TO '/var/opt/mssql/data/SISDOC_log.ldf', REPLACE\""
+docker exec sisdoc_sqlserver bash -c "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '<DB_PASSWORD>' -C -Q \"RESTORE DATABASE [SISDOC] FROM DISK='/var/opt/mssql/backup/respaldo anterior.bak' WITH MOVE 'sisdoc_Data' TO '/var/opt/mssql/data/SISDOC.mdf', MOVE 'sisdoc_Log' TO '/var/opt/mssql/data/SISDOC_log.ldf', REPLACE\""
 ```
 
 ---

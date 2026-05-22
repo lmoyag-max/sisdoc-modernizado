@@ -40,7 +40,8 @@ const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = /\.(png|jpg|jpeg|svg|webp)$/i;
+    // SVG eliminado: puede contener <script> → riesgo de XSS almacenado
+    const allowed = /\.(png|jpg|jpeg|webp)$/i;
     cb(null, allowed.test(file.originalname));
   },
 });
@@ -61,7 +62,7 @@ const LOGIN_DEFAULTS = {
 // ── GET /configuracion — leer config completa (pública) ────
 router.get('/', (req, res) => {
   const cfg = readConfig();
-  const logoFile = ['logo.png', 'logo.jpg', 'logo.jpeg', 'logo.svg', 'logo.webp']
+  const logoFile = ['logo.png', 'logo.jpg', 'logo.jpeg', 'logo.webp']
     .find((f) => fs.existsSync(path.join(CONFIG_DIR, f)));
   const bgFile = ['background.jpg', 'background.jpeg', 'background.png', 'background.webp']
     .find((f) => fs.existsSync(path.join(CONFIG_DIR, f)));

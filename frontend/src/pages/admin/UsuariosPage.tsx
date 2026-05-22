@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Users, Plus, Search, Pencil, Trash2, RefreshCw,
-  ChevronLeft, ChevronRight, X, Save, Building2, Eye,
+  ChevronLeft, ChevronRight, X, Save, Building2, Eye, Mail,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,6 +21,7 @@ interface Dependencia { id: number; descripcion: string }
 interface Usuario {
   idUsuario:       number;
   usuario:         string;
+  email:           string | null;
   nombres:         string | null;
   apellidos:       string | null;
   idDependencia:   number | null;
@@ -56,6 +57,7 @@ function UsuarioModal({ usuario, roles, dependencias, onClose, onSaved }: ModalP
   const [form, setForm] = useState({
     usuario:        usuario?.usuario        ?? '',
     clave:          '',
+    email:          usuario?.email          ?? '',
     nombres:        usuario?.nombres        ?? '',
     apellidos:      usuario?.apellidos      ?? '',
     idDependencia:  usuario?.idDependencia  ? String(usuario.idDependencia) : '',
@@ -71,6 +73,7 @@ function UsuarioModal({ usuario, roles, dependencias, onClose, onSaved }: ModalP
         roles:          form.roles,
         idDependencia:  form.idDependencia ? Number(form.idDependencia) : undefined,
         todos_servicios: form.todosServicios,
+        email:          form.email.trim() || null,
         ...(form.clave ? { clave: form.clave } : {}),
       };
       if (isEdit) {
@@ -145,6 +148,22 @@ function UsuarioModal({ usuario, roles, dependencias, onClose, onSaved }: ModalP
                 maxLength={10}
               />
             </div>
+          </div>
+
+          {/* Correo electrónico */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+              Correo electrónico
+              <span className="font-normal text-muted-foreground">(opcional — para recuperar contraseña)</span>
+            </Label>
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              placeholder="usuario@huap.cl"
+              maxLength={100}
+            />
           </div>
 
           {/* Servicio / Dependencia */}
@@ -345,6 +364,11 @@ export function UsuariosPage() {
                       <p className="text-sm font-semibold text-foreground truncate">{nombreCompleto}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                         <span className="font-mono">@{u.usuario}</span>
+                        {u.email && (
+                          <span className="flex items-center gap-0.5">
+                            <Mail className="h-3 w-3" />{u.email}
+                          </span>
+                        )}
                         {u.descDependencia && (
                           <><span>·</span><span className="truncate max-w-[200px]">{u.descDependencia}</span></>
                         )}

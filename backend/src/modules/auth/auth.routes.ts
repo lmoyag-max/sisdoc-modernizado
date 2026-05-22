@@ -3,6 +3,7 @@ import { validate } from '../../middleware/validate.middleware';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { loginSchema } from './auth.schema';
 import * as authController from './auth.controller';
+import passwordResetRoutes from './password-reset.routes';
 
 const router = Router();
 
@@ -67,5 +68,8 @@ router.post('/logout', requireAuth, authController.logout);
  *         description: Datos del usuario actual
  */
 router.get('/me', requireAuth, authController.me);
+
+// Recuperación de contraseña (rutas públicas con rate limit propio)
+router.use(passwordResetRoutes);
 
 export default router;

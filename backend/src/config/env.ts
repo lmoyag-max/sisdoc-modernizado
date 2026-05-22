@@ -21,6 +21,15 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_FILE_SIZE: z.string().default('20971520').transform(Number),
+  // SMTP — recuperación de contraseña
+  SMTP_HOST:    z.string().default(''),
+  SMTP_PORT:    z.string().default('587').transform(Number),
+  SMTP_SECURE:  z.string().default('false').transform((v) => v === 'true'),
+  SMTP_USER:    z.string().default(''),
+  SMTP_PASS:    z.string().default(''),
+  SMTP_FROM:    z.string().default('SISDOC <noreply@sisdoc.cl>'),
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  RESET_TOKEN_EXPIRES_MINUTES: z.string().default('30').transform(Number),
 });
 
 const parsed = envSchema.safeParse(process.env);

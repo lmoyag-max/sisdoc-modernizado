@@ -4,6 +4,8 @@ import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 import { RouteError } from '@/components/shared/AppErrorBoundary';
 import { ModuleGuard } from '@/components/shared/ModuleGuard';
 import { LoginPage } from '@/pages/auth/LoginPage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { DocumentosPage } from '@/pages/documentos/DocumentosPage';
 import { NuevoDocumentoPage } from '@/pages/documentos/NuevoDocumentoPage';
@@ -27,7 +29,9 @@ function M({ m, children }: { m: string; children: React.ReactNode }) {
 }
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
+  { path: '/login',            element: <LoginPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password',  element: <ResetPasswordPage /> },
   {
     element: <ProtectedRoute />,
     errorElement: <RouteError />,

@@ -28,12 +28,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const result = await request.query<{
-      id_usuario: number; usuario: string;
+      id_usuario: number; usuario: string; email: string | null;
       nombres: string | null; apellidos: string | null;
       id_dependencia: number | null; desc_dependencia: string | null;
       todos_servicios: boolean; roles: string | null; total: number;
     }>(`
-      SELECT u.id_usuario, u.usuario,
+      SELECT u.id_usuario, u.usuario, u.email,
              f.nombres, f.apellidos, f.id_dependencia,
              d.desc_dependencia,
              ISNULL(u.todos_servicios, 1) AS todos_servicios,
@@ -51,6 +51,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const data = result.recordset.map((r) => ({
       idUsuario:       r.id_usuario,
       usuario:         r.usuario,
+      email:           r.email ?? null,
       nombres:         r.nombres,
       apellidos:       r.apellidos,
       idDependencia:   r.id_dependencia,
@@ -70,12 +71,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const result = await pool.request()
       .input('id', sql.Int, Number(req.params.id))
       .query<{
-        id_usuario: number; usuario: string;
+        id_usuario: number; usuario: string; email: string | null;
         nombres: string | null; apellidos: string | null;
         id_dependencia: number | null; desc_dependencia: string | null;
         todos_servicios: boolean; roles: string | null;
       }>(`
-        SELECT u.id_usuario, u.usuario, f.nombres, f.apellidos, f.id_dependencia,
+        SELECT u.id_usuario, u.usuario, u.email, f.nombres, f.apellidos, f.id_dependencia,
                d.desc_dependencia,
                ISNULL(u.todos_servicios, 1) AS todos_servicios,
                (SELECT STRING_AGG(r.codigo, ',') FROM usuario_rol ur JOIN rol r ON ur.id_rol = r.id_rol WHERE ur.id_usuario = u.id_usuario) AS roles
@@ -91,6 +92,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     sendSuccess(res, {
       idUsuario:       row.id_usuario,
       usuario:         row.usuario,
+      email:           row.email ?? null,
       nombres:         row.nombres,
       apellidos:       row.apellidos,
       idDependencia:   row.id_dependencia,
@@ -104,13 +106,18 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // ── POST /usuarios — crear ──────────────────────────────────
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { usuario, clave, nombres, apellidos, idDependencia, todos_servicios, roles } = req.body as {
+    const { usuario, clave, nombres, apellidos, idDependencia, todos_servicios, roles, email } = req.body as {
       usuario: string; clave: string; nombres: string; apellidos: string;
-      idDependencia?: number; todos_servicios?: boolean; roles?: string[];
+      idDependencia?: number; todos_servicios?: boolean; roles?: string[]; email?: string;
     };
 
     if (!usuario || !clave || !nombres || !apellidos) {
       sendError(res, 'Campos requeridos: usuario, clave, nombres, apellidos', 400); return;
+    }
+
+    // Validar formato email si se provee
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      sendError(res, 'Formato de correo electrónico inválido', 400); return;
     }
 
     const pool = await getPool();
@@ -120,6 +127,15 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       .query('SELECT 1 FROM usuario WHERE usuario = @u');
     if (exists.recordset.length > 0) {
       sendError(res, 'El nombre de usuario ya está en uso', 409); return;
+    }
+
+    // Verificar unicidad de email si se provee
+    if (email) {
+      const emailExists = await pool.request().input('email', sql.VarChar(100), email)
+        .query('SELECT 1 FROM usuario WHERE email = @email');
+      if (emailExists.recordset.length > 0) {
+        sendError(res, 'El correo electrónico ya está registrado en otro usuario', 409); return;
+      }
     }
 
     const defaultDep = await pool.request()
@@ -144,15 +160,17 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     // Crear usuario — clave en texto plano (max 10 chars, se hashea en primer login)
     const claveCorta = clave.substring(0, 10);
     const todosServ  = todos_servicios !== false; // default true
+    const emailVal   = email ? email.substring(0, 100).toLowerCase() : null;
     const usrRes = await pool.request()
-      .input('usuario',         sql.VarChar(10), usuario.substring(0, 10))
-      .input('clave',           sql.VarChar(10), claveCorta)
-      .input('idFun',           sql.Int,         idFuncionario)
-      .input('todos_servicios', sql.Bit,         todosServ)
+      .input('usuario',         sql.VarChar(10),  usuario.substring(0, 10))
+      .input('clave',           sql.VarChar(10),  claveCorta)
+      .input('idFun',           sql.Int,          idFuncionario)
+      .input('todos_servicios', sql.Bit,          todosServ)
+      .input('email',           sql.VarChar(100), emailVal)
       .query<{ id: number }>(`
-        INSERT INTO usuario (usuario, clave, id_funcionario, tipo_alertas, todos_servicios)
+        INSERT INTO usuario (usuario, clave, id_funcionario, tipo_alertas, todos_servicios, email)
         OUTPUT INSERTED.id_usuario AS id
-        VALUES (@usuario, @clave, @idFun, 'A', @todos_servicios)
+        VALUES (@usuario, @clave, @idFun, 'A', @todos_servicios, @email)
       `);
 
     const idUsuario = usrRes.recordset[0].id;
@@ -177,11 +195,17 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 // ── PATCH /usuarios/:id — actualizar ───────────────────────
 router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { nombres, apellidos, clave, roles, idDependencia, todos_servicios } = req.body as {
+    const { nombres, apellidos, clave, roles, idDependencia, todos_servicios, email } = req.body as {
       nombres?: string; apellidos?: string; clave?: string; roles?: string[];
-      idDependencia?: number; todos_servicios?: boolean;
+      idDependencia?: number; todos_servicios?: boolean; email?: string | null;
     };
     const idUsuario = Number(req.params.id);
+
+    // Validar formato email si se provee
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      sendError(res, 'Formato de correo electrónico inválido', 400); return;
+    }
+
     const pool = await getPool();
 
     // Actualizar funcionario si hay campos de nombre
@@ -200,6 +224,24 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
           JOIN usuario u ON u.id_funcionario = f.id_funcionario
           WHERE u.id_usuario = @idUsr
         `);
+    }
+
+    // Actualizar email si se provee (null para borrarlo, string para asignarlo)
+    if (email !== undefined) {
+      if (email) {
+        // Verificar unicidad: no debe existir en otro usuario
+        const emailExists = await pool.request()
+          .input('email', sql.VarChar(100), email)
+          .input('idUsr', sql.Int, idUsuario)
+          .query('SELECT 1 FROM usuario WHERE email = @email AND id_usuario <> @idUsr');
+        if (emailExists.recordset.length > 0) {
+          sendError(res, 'El correo electrónico ya está registrado en otro usuario', 409); return;
+        }
+      }
+      await pool.request()
+        .input('email', sql.VarChar(100), email ? email.substring(0, 100).toLowerCase() : null)
+        .input('idUsr', sql.Int, idUsuario)
+        .query('UPDATE usuario SET email = @email WHERE id_usuario = @idUsr');
     }
 
     // Actualizar todos_servicios si se provee

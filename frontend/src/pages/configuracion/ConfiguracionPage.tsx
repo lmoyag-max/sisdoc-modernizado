@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, uploadUrl } from '@/lib/utils';
 
 interface SistemaConfig {
   nombreSistema: string;
@@ -285,7 +285,7 @@ export function ConfiguracionPage() {
             <ImageUploadZone
               label="Logo institucional"
               sublabel="Fondo transparente — PNG o SVG recomendado"
-              currentUrl={config?.logoUrl ?? null}
+              currentUrl={uploadUrl(config?.logoUrl)}
               preview={logoPreview}
               onUpload={handleLogoFile}
               isPending={uploadLogo.isPending}
@@ -307,7 +307,7 @@ export function ConfiguracionPage() {
             <ImageUploadZone
               label="Imagen de fondo"
               sublabel="Mínimo 1280×800 px — JPG o PNG recomendado"
-              currentUrl={config?.backgroundUrl ?? null}
+              currentUrl={uploadUrl(config?.backgroundUrl)}
               preview={bgPreview}
               onUpload={handleBgFile}
               isPending={uploadBackground.isPending}

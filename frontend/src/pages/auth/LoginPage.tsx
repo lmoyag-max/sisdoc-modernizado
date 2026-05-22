@@ -7,7 +7,7 @@ import { Eye, EyeOff, Lock, User, FileText, Shield, Clock, GitBranch } from 'luc
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, uploadUrl } from '@/lib/utils';
 import { authApi } from '@/lib/api/auth.api';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth.store';
@@ -35,7 +35,7 @@ export function LoginPage() {
 
   useEffect(() => {
     apiClient.get<{ ok: boolean; data: { backgroundUrl: string | null } }>('/configuracion')
-      .then((r) => { if (r.data.data.backgroundUrl) setBgUrl(r.data.data.backgroundUrl); })
+      .then((r) => { if (r.data.data.backgroundUrl) setBgUrl(uploadUrl(r.data.data.backgroundUrl)); })
       .catch(() => {/* usa el gradiente por defecto */});
   }, []);
 

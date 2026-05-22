@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as service from './documento.service';
 import { AuthenticatedRequest } from '../../shared/types/api.types';
-import { sendSuccess, sendCreated, sendPaginated, sendForbidden } from '../../shared/utils/response';
+import { sendSuccess, sendCreated, sendPaginated, sendForbidden, sendError } from '../../shared/utils/response';
 
 const user = (req: Request) => (req as AuthenticatedRequest).user;
 
@@ -67,6 +67,21 @@ export async function historial(req: Request, res: Response, next: NextFunction)
   return trazabilidad(req, res, next);
 }
 
+// ── Buscar por número exacto (num_interno o id_documento) ─────
+// Endpoint rápido para trazabilidad: sin LIKE, sin paginación.
+export async function buscarPorNumero(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const raw = String(req.query.numero ?? '').trim();
+    const numero = parseInt(raw, 10);
+    if (!raw || isNaN(numero) || numero <= 0) {
+      sendError(res, 'El parámetro "numero" debe ser un número entero positivo', 400);
+      return;
+    }
+    const rows = await service.buscarDocumentosPorNumero(numero);
+    sendSuccess(res, rows);
+  } catch (e) { next(e); }
+}
+
 // ── Crear ─────────────────────────────────────────────────────
 
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -104,6 +119,13 @@ export async function terminar(req: Request, res: Response, next: NextFunction):
   try {
     const doc = await service.terminarDocumento(Number(req.params.id), req.body, user(req).idUsuario);
     sendSuccess(res, doc, 'Documento terminado');
+  } catch (e) { next(e); }
+}
+
+export async function reabrir(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const doc = await service.reabrirDocumento(Number(req.params.id), req.body, user(req).idUsuario);
+    sendSuccess(res, doc, 'Documento reabierto y devuelto a estado Recepcionado');
   } catch (e) { next(e); }
 }
 

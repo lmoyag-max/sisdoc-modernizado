@@ -112,6 +112,32 @@ export async function findMany(filtros: FiltrosDocumentoDto, filtroServicio?: Fi
   return result.recordset;
 }
 
+// ── findByNumero — búsqueda exacta por num_interno o id_documento ──
+// Usa comparación INT directa (no LIKE) — aprovecha índices existentes.
+export async function findByNumero(numero: number): Promise<DocumentoRow[]> {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('num', sql.Int, numero)
+    .query<DocumentoRow>(`
+      SELECT
+        d.id_documento, d.num_interno, d.num_oficial, d.materia,
+        d.id_tipo_documento, td.desc_tipo_documento,
+        d.id_estado_documento, ed.desc_estado_documento,
+        d.id_usuario, u.usuario,
+        f.nombres, f.apellidos,
+        d.fecha_documento, d.fecha_sistema, d.id_expediente,
+        0 AS total
+      FROM documento d
+      LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
+      LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
+      LEFT JOIN usuario u           ON d.id_usuario          = u.id_usuario
+      LEFT JOIN funcionario f       ON u.id_funcionario      = f.id_funcionario
+      WHERE d.num_interno = @num OR d.id_documento = @num
+      ORDER BY d.fecha_sistema DESC
+    `);
+  return result.recordset;
+}
+
 // ── findById ─────────────────────────────────────────────────
 
 export async function findById(idDocumento: number): Promise<DocumentoRow | null> {

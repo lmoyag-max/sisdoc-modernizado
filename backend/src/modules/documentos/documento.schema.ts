@@ -62,6 +62,11 @@ export const terminarSchema = z.object({
   observaciones: z.string().max(500).optional(),
 });
 
+// ── Reabrir documento (Terminado → Recepcionado) ─────────────
+export const reabrirSchema = z.object({
+  observaciones: z.string().min(1, 'Debe indicar el motivo de reapertura').max(500),
+});
+
 // ── Filtros de listado ───────────────────────────────────────
 export const filtrosDocumentoSchema = z.object({
   q: z.string().optional(),
@@ -79,4 +84,5 @@ export type DespacharDto        = z.infer<typeof despacharSchema>;
 export type RecepcionarDto      = z.infer<typeof recepcionarSchema>;
 export type DerivarDto          = z.infer<typeof derivarSchema>;
 export type TerminarDto         = z.infer<typeof terminarSchema>;
+export type ReabrirDto          = z.infer<typeof reabrirSchema>;
 export type FiltrosDocumentoDto = z.infer<typeof filtrosDocumentoSchema>;

@@ -126,7 +126,7 @@ export function DocumentoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { canDespachar, canRedespachar, canRecepcionar, canDerivar, canTerminar, canDelete } = useRole();
+  const { canDespachar, canRedespachar, canRecepcionar, canDerivar, canTerminar, canReabrir, canDelete } = useRole();
   const idDocumento = Number(id);
 
   const { data: doc, isLoading, error } = useQuery({
@@ -149,8 +149,10 @@ export function DocumentoDetallePage() {
     enabled: !isNaN(idDocumento),
   });
 
-  const [previewFile,    setPreviewFile]    = useState<PreviewFile | null>(null);
-  const [despacharOpen,  setDespacharOpen]  = useState(false);
+  const [previewFile,       setPreviewFile]       = useState<PreviewFile | null>(null);
+  const [despacharOpen,     setDespacharOpen]     = useState(false);
+  const [reabrirOpen,       setReopenOpen]        = useState(false);
+  const [reabrirObs,        setReopenObs]         = useState('');
 
   const { data: archivos, isLoading: loadingArchivos } = useQuery({
     queryKey: ['archivos', idDocumento],
@@ -186,6 +188,17 @@ export function DocumentoDetallePage() {
   const recepcionarMut = accion('recepcionar', 'Recepcionado');
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const terminarMut    = accion('terminar',    'Terminado');
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const reabrirMut = useMutation({
+    mutationFn: () => apiClient.post(`/documentos/${idDocumento}/reabrir`, { observaciones: reabrirObs }),
+    onSuccess: () => {
+      toast.success('Documento reabierto — vuelve a estado Recepcionado');
+      setReopenOpen(false);
+      setReopenObs('');
+      invalidarTodo();
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al reabrir el documento'),
+  });
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const eliminarMut    = useMutation({
     mutationFn: () => apiClient.delete(`/documentos/${idDocumento}`),
@@ -441,7 +454,8 @@ export function DocumentoDetallePage() {
                 </Button>
               )}
 
-              {canTerminar && estadoId !== 4 && (
+              {/* Terminar: solo cuando está Recepcionado (3) */}
+              {canTerminar && estadoId === 3 && (
                 <Button
                   variant="outline" size="sm"
                   className="w-full justify-start gap-2"
@@ -449,6 +463,17 @@ export function DocumentoDetallePage() {
                   disabled={terminarMut.isPending}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5 text-slate-500" />Terminar
+                </Button>
+              )}
+
+              {/* Reabrir: solo cuando está Terminado (4) */}
+              {canReabrir && estadoId === 4 && (
+                <Button
+                  variant="outline" size="sm"
+                  className="w-full justify-start gap-2 text-amber-600 hover:bg-amber-50 border-amber-200 dark:hover:bg-amber-900/20"
+                  onClick={() => setReopenOpen(true)}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 text-amber-500" />Reabrir documento
                 </Button>
               )}
 
@@ -513,6 +538,59 @@ export function DocumentoDetallePage() {
         onClose={() => setPreviewFile(null)}
         file={previewFile}
       />
+
+      {/* Modal reabrir documento */}
+      {reabrirOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setReopenOpen(false)} />
+          <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl animate-fade-in">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
+                <RefreshCw className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">Reabrir documento</p>
+                <p className="text-xs text-muted-foreground truncate">{materia}</p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setReopenOpen(false)}>
+                <AlertCircle className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                El documento volverá a estado <strong>Recepcionado</strong>. La trazabilidad histórica se preserva íntegra y se registrará esta acción.
+              </p>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Motivo de reapertura <span className="text-destructive">*</span>
+                </label>
+                <textarea
+                  value={reabrirObs}
+                  onChange={(e) => setReopenObs(e.target.value)}
+                  placeholder="Indique el motivo por el cual se reabre este documento…"
+                  maxLength={490}
+                  rows={3}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <p className="text-right text-[11px] text-muted-foreground/60">{reabrirObs.length}/490</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
+              <Button variant="ghost" onClick={() => setReopenOpen(false)} disabled={reabrirMut.isPending}>Cancelar</Button>
+              <Button
+                onClick={() => reabrirMut.mutate()}
+                disabled={reabrirMut.isPending || reabrirObs.trim().length < 1}
+                className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {reabrirMut.isPending
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Reabriendo…</>
+                  : <><RefreshCw className="h-3.5 w-3.5" />Reabrir documento</>
+                }
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal despachar / redespachar */}
       <DespacharModal

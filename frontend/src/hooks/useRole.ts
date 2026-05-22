@@ -25,8 +25,13 @@ export function useRole() {
     canRedespachar:  isAdmin || isOfPartes || isSupervisor || isFuncionario,
     canRecepcionar:  isAdmin || isOfPartes || isFuncionario || isSupervisor,
     canDerivar:      isAdmin || isOfPartes || isSupervisor,
-    canTerminar:     isAdmin || isOfPartes || isSupervisor,
-    canDelete:       isAdmin || isOfPartes,
+    // Terminar: cualquier rol puede cerrar un doc que está Recepcionado (estado=3)
+    // El frontend valida además que estadoId === 3 antes de mostrar el botón
+    canTerminar:     isAdmin || isOfPartes || isSupervisor || isFuncionario,
+    // Reabrir (Terminado → Recepcionado): SOLO admin y supervisores; of.partes y funcionario NO
+    canReabrir:      isAdmin || isSupervisor,
+    // Eliminar: solo admin
+    canDelete:       isAdmin,
     canManageUsers:  isAdmin,
     canConfig:       isAdmin,
   };

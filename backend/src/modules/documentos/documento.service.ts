@@ -2,7 +2,7 @@ import * as repo from './documento.repository';
 import { getPool, sql } from '../../config/database';
 import {
   CrearDocumentoDto, DespacharDto, RecepcionarDto,
-  DerivarDto, TerminarDto, FiltrosDocumentoDto,
+  DerivarDto, TerminarDto, ReabrirDto, FiltrosDocumentoDto,
 } from './documento.schema';
 import { buildPaginationMeta } from '../../shared/utils/response';
 
@@ -42,6 +42,12 @@ export async function usuarioTieneAccesoDocumento(
         )
     `);
   return !!r.recordset[0];
+}
+
+// ── Buscar por número exacto ──────────────────────────────────
+export async function buscarDocumentosPorNumero(numero: number) {
+  const rows = await repo.findByNumero(numero);
+  return rows.map(mapDocumento);
 }
 
 // ── Obtener uno ───────────────────────────────────────────────
@@ -243,6 +249,7 @@ export async function terminarDocumento(idDocumento: number, dto: TerminarDto, i
   const doc = await repo.findById(idDocumento);
   if (!doc) throw { statusCode: 404, message: 'Documento no encontrado' };
   if (doc.id_estado_documento === 4) throw { statusCode: 400, message: 'El documento ya está terminado' };
+  if (doc.id_estado_documento !== 3) throw { statusCode: 400, message: 'Solo se puede terminar un documento en estado Recepcionado' };
 
   const ultimoTramite = await repo.getLastTramite(idDocumento);
   const idProc  = ultimoTramite?.id_destino ?? 1;
@@ -274,7 +281,46 @@ export async function terminarDocumento(idDocumento: number, dto: TerminarDto, i
   return obtenerDocumento(idDocumento);
 }
 
-// ── Eliminar (solo coordinador/admin) ─────────────────────────
+// ── Reabrir (Terminado → Recepcionado) ───────────────────────
+// Inserta un nuevo tramite (estado 3=Recepcionado) dejando intacta toda la
+// trazabilidad previa. El documento vuelve a estado Recepcionado.
+export async function reabrirDocumento(idDocumento: number, dto: ReabrirDto, idUsuario: number) {
+  const doc = await repo.findById(idDocumento);
+  if (!doc) throw { statusCode: 404, message: 'Documento no encontrado' };
+  if (doc.id_estado_documento !== 4) throw { statusCode: 400, message: 'Solo se puede reabrir un documento en estado Terminado' };
+
+  const ultimoTramite = await repo.getLastTramite(idDocumento);
+  const idProc  = ultimoTramite?.id_destino ?? 1;
+  const tipProc = ultimoTramite?.tipo_destinatario ?? 'D';
+  const obsTexto = `Reabierto desde estado Terminado: ${dto.observaciones}`.substring(0, 250);
+
+  const pool = await getPool();
+  await pool.request()
+    .input('idDoc',  sql.Int,          idDocumento)
+    .input('idUsr',  sql.Int,          idUsuario)
+    .input('idProc', sql.Int,          idProc)
+    .input('tipProc',sql.Char(1),      tipProc)
+    .input('obs',    sql.VarChar(250), obsTexto)
+    .query(`
+      INSERT INTO tramite
+        (id_documento, id_usuario, id_procedencia, id_destino,
+         tipo_procedencia, tipo_destinatario,
+         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+         id_estado_tramite, dias_compromiso, observaciones,
+         fecha_sistema, fecha_update, fecha_recepcion, usuario_recepcion)
+      VALUES
+        (@idDoc, @idUsr, @idProc, @idProc,
+         @tipProc, @tipProc,
+         5, 1, 2,
+         3, 0, @obs,
+         GETDATE(), GETDATE(), GETDATE(), @idUsr)
+    `);
+
+  await repo.updateEstado(idDocumento, 3); // Vuelve a Recepcionado
+  return obtenerDocumento(idDocumento);
+}
+
+// ── Eliminar (solo admin) ──────────────────────────────────────
 
 export async function eliminarDocumento(idDocumento: number, idUsuario: number) {
   const doc = await repo.findById(idDocumento);

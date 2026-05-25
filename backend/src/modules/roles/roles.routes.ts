@@ -10,7 +10,7 @@ router.use(requireRole('admin')); // Solo administradores
 const TODOS_MODULOS = [
   'dashboard','documentos','bandeja','enviados','tramites',
   'trazabilidad','busqueda','archivos',
-  'expedientes','usuarios','reportes','roles','configuracion',
+  'usuarios','reportes','roles','configuracion',
 ];
 
 // ── GET /roles — listar roles con sus módulos ─────────────────
@@ -165,7 +165,6 @@ router.get('/meta/modulos', (_req: Request, res: Response) => {
     trazabilidad:  { label: 'Trazabilidad',      grupo: 'operativo' },
     busqueda:      { label: 'Búsqueda',          grupo: 'operativo' },
     archivos:      { label: 'Archivos',           grupo: 'operativo' },
-    expedientes:   { label: 'Expedientes',        grupo: 'admin' },
     usuarios:      { label: 'Usuarios',           grupo: 'admin' },
     reportes:      { label: 'Reportes',           grupo: 'admin' },
     roles:         { label: 'Roles',              grupo: 'admin' },

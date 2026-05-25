@@ -92,11 +92,10 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
       `),
     ]);
 
-    let extras = { expedientes: 0, archivos: 0, usuarios: 0 };
+    let extras = { archivos: 0, usuarios: 0 };
     if (full) {
-      const extRes = await pool.request().query<{ expedientes: number; archivos: number; usuarios: number }>(`
+      const extRes = await pool.request().query<{ archivos: number; usuarios: number }>(`
         SELECT
-          (SELECT COUNT(*) FROM expediente) AS expedientes,
           (SELECT COUNT(*) FROM archivo_digital) AS archivos,
           (SELECT COUNT(*) FROM usuario) AS usuarios
       `);

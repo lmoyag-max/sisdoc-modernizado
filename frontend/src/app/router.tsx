@@ -19,7 +19,6 @@ import { ArchivosPage } from '@/pages/archivos/ArchivosPage';
 import { ConfiguracionPage } from '@/pages/configuracion/ConfiguracionPage';
 import { UsuariosPage } from '@/pages/admin/UsuariosPage';
 import { RolesPage } from '@/pages/admin/RolesPage';
-import { ExpedientesPage } from '@/pages/expedientes/ExpedientesPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ReportesPage } from '@/pages/reportes/ReportesPage';
 
@@ -55,7 +54,6 @@ export const router = createBrowserRouter([
           { path: '/archivos',            element: <M m="archivos"><ArchivosPage /></M>,            errorElement: <RouteError /> },
 
           // ── Administración ──────────────────────────────────
-          { path: '/expedientes',         element: <M m="expedientes"><ExpedientesPage /></M>,     errorElement: <RouteError /> },
           { path: '/admin/usuarios',      element: <M m="usuarios"><UsuariosPage /></M>,            errorElement: <RouteError /> },
           { path: '/admin/roles',         element: <M m="roles"><RolesPage /></M>,                  errorElement: <RouteError /> },
           { path: '/admin/configuracion', element: <M m="configuracion"><ConfiguracionPage /></M>, errorElement: <RouteError /> },

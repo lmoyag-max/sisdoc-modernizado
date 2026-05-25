@@ -94,7 +94,6 @@ export async function crearDocumento(
     idEstadoDocumento:  2,          // Siempre DESPACHADO al crear
     idUsuario,
     fechaDocumento:     dto.fechaDocumento ? new Date(dto.fechaDocumento) : undefined,
-    idExpediente:       dto.idExpediente,
     original:           dto.original ?? 'S',
     medio:              dto.medio,
     tipoProcedencia:    'D',        // Origen siempre interno (dependencia del usuario)
@@ -347,7 +346,6 @@ function mapDocumento(row: repo.DocumentoRow) {
       id: row.id_usuario, usuario: row.usuario,
       nombre: [row.nombres, row.apellidos].filter(Boolean).join(' '),
     },
-    idExpediente:   row.id_expediente,
     fechaDocumento: row.fecha_documento,
     fechaIngreso:   row.fecha_sistema,
     fechaCierre:    null,

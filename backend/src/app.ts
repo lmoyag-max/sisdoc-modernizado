@@ -22,7 +22,6 @@ import archivosRoutes from './modules/archivos/archivos.routes';
 import busquedaRoutes from './modules/busqueda/busqueda.routes';
 import configuracionRoutes from './modules/configuracion/configuracion.routes';
 import usuariosRoutes from './modules/usuarios/usuarios.routes';
-import expedientesRoutes from './modules/expedientes/expedientes.routes';
 import rolesRoutes       from './modules/roles/roles.routes';
 
 const app = express();
@@ -122,7 +121,6 @@ app.use(`${API}/archivos`, archivosRoutes);
 app.use(`${API}/busqueda`, busquedaRoutes);
 app.use(`${API}/configuracion`, configuracionRoutes);
 app.use(`${API}/usuarios`, usuariosRoutes);
-app.use(`${API}/expedientes`, expedientesRoutes);
 app.use(`${API}/roles`,       rolesRoutes);
 
 app.get(`${API}`, (_req, res) => {

@@ -31,7 +31,6 @@ const schema = z.object({
   idTipoCompromiso:   z.string().default('1'),
   idEstadoCompromiso: z.string().default('2'),
   diasCompromiso:     z.string().default('0'),
-  idExpediente:       z.string().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -69,6 +68,10 @@ export function NuevoDocumentoPage() {
     },
   });
 
+  // Solo admin y of.partes pueden crear documentos con destino externo.
+  // Los demás roles solo ven y pueden usar "Interno".
+  const puedeExterno = user?.roles?.includes('admin') || user?.roles?.includes('of.partes');
+
   const tipoDestinatario = watch('tipoDestinatario');
   const idTipoCompromiso = watch('idTipoCompromiso');
   const materia          = watch('materia');
@@ -88,7 +91,6 @@ export function NuevoDocumentoPage() {
         idTipoCompromiso:   Number(data.idTipoCompromiso),
         idEstadoCompromiso: Number(data.idEstadoCompromiso),
         diasCompromiso:     Number(data.diasCompromiso),
-        idExpediente:       data.idExpediente ? Number(data.idExpediente) : undefined,
       };
       const res = await apiClient.post<{ ok: boolean; data: { idDocumento: number } }>('/documentos', payload);
       const idDocumento = res.data.data?.idDocumento;
@@ -200,12 +202,6 @@ export function NuevoDocumentoPage() {
                   <Input type="date" {...register('fechaDocumento')} />
                 </div>
 
-                {/* Expediente */}
-                <div className="space-y-1.5">
-                  <Label className="text-sm">N° Expediente (opcional)</Label>
-                  <Input type="number" {...register('idExpediente')} placeholder="Dejar vacío si no aplica" />
-                </div>
-
                 {/* Observaciones */}
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-sm">Observaciones</Label>
@@ -254,12 +250,16 @@ export function NuevoDocumentoPage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Tipo de destinatario</Label>
                   <div className="flex gap-6">
-                    {[{ v: 'D', l: 'Interno (Dependencia)' }, { v: 'E', l: 'Externo' }].map(({ v, l }) => (
-                      <label key={v} className="flex items-center gap-2 cursor-pointer text-sm">
-                        <input type="radio" {...register('tipoDestinatario')} value={v} className="h-4 w-4" />
-                        {l}
+                    <label className="flex items-center gap-2 cursor-pointer text-sm">
+                      <input type="radio" {...register('tipoDestinatario')} value="D" className="h-4 w-4" />
+                      Interno (Dependencia)
+                    </label>
+                    {puedeExterno && (
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input type="radio" {...register('tipoDestinatario')} value="E" className="h-4 w-4" />
+                        Externo
                       </label>
-                    ))}
+                    )}
                   </div>
                 </div>
                 <div className="space-y-1.5">

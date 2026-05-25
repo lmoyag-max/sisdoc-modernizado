@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  FileText, FolderOpen, HardDrive, Users, GitBranch,
+  FileText, HardDrive, Users, GitBranch,
   Download, RefreshCw, TrendingUp, Clock,
 } from 'lucide-react';
 import {
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 interface DashboardData {
   totales: {
     total: number; pendientes: number; cerradosHoy: number; urgentes: number;
-    expedientes: number; archivos: number; usuarios: number; tramites: number;
+    archivos: number; usuarios: number; tramites: number;
   };
   porEstado: { id_estado_documento: number; desc_estado_documento: string; cantidad: number }[];
   porMes: { mes: string; cantidad: number }[];
@@ -90,7 +90,6 @@ export function ReportesPage() {
 
   const metrics = data ? [
     { icon: FileText,   label: 'Documentos',   value: data.totales.total,       sub: `${data.totales.pendientes} activos`,   color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
-    { icon: FolderOpen, label: 'Expedientes',   value: data.totales.expedientes, sub: 'en el sistema',                       color: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400' },
     { icon: HardDrive,  label: 'Archivos',      value: data.totales.archivos,    sub: 'digitales subidos',                   color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400' },
     { icon: GitBranch,  label: 'Trámites',      value: data.totales.tramites,    sub: 'movimientos',                         color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
     { icon: Users,      label: 'Usuarios',      value: data.totales.usuarios,    sub: 'activos',                             color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' },
@@ -123,9 +122,9 @@ export function ReportesPage() {
       </div>
 
       {/* Métricas principales */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
         {isLoading
-          ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
+          ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
           : metrics.map((m) => <MetricBox key={m.label} {...m} />)
         }
       </div>

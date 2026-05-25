@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Inbox, Send, ClipboardList,
-  Network, FolderOpen, Search, Upload, Users, BarChart3,
+  Network, Search, Upload, Users, BarChart3,
   Settings, LogOut, ChevronLeft, ChevronRight, X,
   Building2, Shield,
 } from 'lucide-react';
@@ -35,7 +35,6 @@ const NAV_PRINCIPAL: NavItem[] = [
 ];
 
 const NAV_ADMIN: NavItem[] = [
-  { label: 'Expedientes',   to: '/expedientes',         icon: FolderOpen, modulo: 'expedientes'  },
   { label: 'Usuarios',      to: '/admin/usuarios',      icon: Users,      modulo: 'usuarios'     },
   { label: 'Reportes',      to: '/reportes',            icon: BarChart3,  modulo: 'reportes'     },
   { label: 'Roles',         to: '/admin/roles',         icon: Shield,     modulo: 'roles'        },

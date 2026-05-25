@@ -101,7 +101,16 @@ export async function buscarPorNumero(req: Request, res: Response, next: NextFun
 
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const u   = user(req);
+    const u = user(req);
+
+    // Solo admin y of.partes pueden crear documentos con destino externo.
+    // Esta validación se aplica independientemente del frontend — bloquea también
+    // intentos directos por API, Postman o manipulación del payload.
+    if (req.body.tipoDestinatario === 'E' && !canSeeExternals(u)) {
+      sendForbidden(res, 'No tienes permisos para crear documentos con destino externo');
+      return;
+    }
+
     const doc = await service.crearDocumento(req.body, u.idUsuario, u.idDependencia);
     sendCreated(res, doc, 'Documento creado exitosamente');
   } catch (e) { next(e); }

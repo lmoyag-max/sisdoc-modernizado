@@ -11,8 +11,6 @@ export const crearDocumentoSchema = z.object({
   observaciones: z.string().max(500).optional(),
   medio: z.string().max(1).optional(),
   original: z.string().max(1).default('S'),
-  idExpediente: z.number().int().positive().optional(),
-
   // Trámite — Destino (único campo que elige el usuario)
   tipoDestinatario: z.enum(['D', 'E']).default('D'),
   idDestino: z.number().int().positive().optional(),

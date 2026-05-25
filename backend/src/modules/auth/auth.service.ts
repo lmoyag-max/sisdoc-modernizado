@@ -109,7 +109,7 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
 
 export async function refreshAccessToken(
   refreshToken: string,
-): Promise<{ accessToken: string; expiresIn: number }> {
+): Promise<{ accessToken: string; expiresIn: number; roles: string[]; modulos: string[] }> {
   let payload: JwtPayload;
   try {
     payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as unknown as JwtPayload;
@@ -132,6 +132,11 @@ export async function refreshAccessToken(
 
   if (!result.recordset[0]) throw createAuthError('Refresh token revocado o expirado', 401);
 
+  // Re-consultar roles y módulos desde BD para reflejar cambios de configuración
+  // sin requerir que el usuario cierre y vuelva a abrir sesión.
+  const freshRoles   = await getUserRoles(pool, payload.sub);
+  const freshModulos = await getUserModulos(pool, freshRoles);
+
   const accessToken = jwt.sign(
     {
       sub:            payload.sub,
@@ -139,14 +144,14 @@ export async function refreshAccessToken(
       idFuncionario:  payload.idFuncionario,
       idDependencia:  payload.idDependencia,
       todosServicios: payload.todosServicios,
-      roles:          payload.roles,
-      modulos:        payload.modulos,
+      roles:          freshRoles,
+      modulos:        freshModulos,
     },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions,
   );
 
-  return { accessToken, expiresIn: 900 };
+  return { accessToken, expiresIn: 900, roles: freshRoles, modulos: freshModulos };
 }
 
 export async function logout(idUsuario: number, refreshToken: string): Promise<void> {
@@ -241,7 +246,7 @@ async function getUserModulos(pool: Awaited<ReturnType<typeof getPool>>, roles: 
     return [
       'dashboard','documentos','bandeja','enviados','tramites',
       'trazabilidad','busqueda','archivos',
-      'expedientes','usuarios','reportes','roles','configuracion',
+      'usuarios','reportes','roles','configuracion',
     ];
   }
   try {

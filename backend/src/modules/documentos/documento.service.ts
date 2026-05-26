@@ -77,38 +77,203 @@ export async function obtenerTrazabilidad(idDocumento: number) {
 // ── Crear ─────────────────────────────────────────────────────
 // Regla de negocio: el origen se asigna SIEMPRE desde la dependencia del
 // usuario autenticado. El estado inicial es siempre DESPACHADO (2).
-// El frontend no puede modificar estas reglas.
+// Soporta 1 o N destinos. Si destinos[] tiene >1 elemento, crea un tramite
+// y un documento_destino por cada servicio. Backward compat: si solo
+// llega idDestino, crea exactamente 1 destino (flujo previo intacto).
 export async function crearDocumento(
   dto: CrearDocumentoDto,
   idUsuario: number,
   idDependenciaUsuario: number | null,
 ) {
-  // Origen siempre = dependencia del usuario autenticado
   const idProcedencia = idDependenciaUsuario ?? 1;
-  // Destino desde el formulario (si no se provee, mismo origen como fallback)
-  const idDestino = dto.idDestino ?? idProcedencia;
 
+  // Resolver lista de destinos: prioriza destinos[] sobre idDestino
+  const listaDestinos: number[] = dto.destinos && dto.destinos.length > 0
+    ? dto.destinos
+    : [dto.idDestino ?? idProcedencia];
+
+  // Crear el documento principal (solo 1 vez)
   const { idDocumento, idSeguimiento } = await repo.insert({
     idTipoDocumento:    dto.idTipoDocumento,
     materia:            dto.materia,
-    idEstadoDocumento:  2,          // Siempre DESPACHADO al crear
+    idEstadoDocumento:  2,
     idUsuario,
     fechaDocumento:     dto.fechaDocumento ? new Date(dto.fechaDocumento) : undefined,
     original:           dto.original ?? 'S',
     medio:              dto.medio,
-    tipoProcedencia:    'D',        // Origen siempre interno (dependencia del usuario)
-    idProcedencia,                  // Dependencia del usuario autenticado
-    tipoDestinatario:   dto.tipoDestinatario,
-    idDestino,
+    tipoProcedencia:    'D',
+    idProcedencia,
+    tipoDestinatario:   listaDestinos.length === 1 ? dto.tipoDestinatario : 'D',
+    idDestino:          listaDestinos[0],
     idTipoDistribucion: dto.idTipoDistribucion,
     idTipoCompromiso:   dto.idTipoCompromiso,
     idEstadoCompromiso: dto.idEstadoCompromiso,
     diasCompromiso:     dto.diasCompromiso,
     observaciones:      dto.observaciones,
   });
-
-  // Siempre marcar el trámite inicial como despachado con fecha actual
   await repo.updateTramiteEstado(idSeguimiento, 2, { fechaDespacho: new Date() });
+
+  // Registrar el primer destino en documento_destino (primer elemento de la lista)
+  await repo.insertDocumentoDestino({
+    idDocumento,
+    idDestino:         listaDestinos[0],
+    tipoDestinatario:  listaDestinos.length === 1 ? dto.tipoDestinatario : 'D',
+    idTipoCompromiso:  dto.idTipoCompromiso,
+    diasCompromiso:    dto.diasCompromiso,
+    idUsuarioCreacion: idUsuario,
+  });
+
+  // Si hay destinos adicionales, crear un tramite + documento_destino por cada uno
+  if (listaDestinos.length > 1) {
+    const pool = await getPool();
+    for (const idDest of listaDestinos.slice(1)) {
+      const tramRes = await pool.request()
+        .input('idDoc',    sql.Int,          idDocumento)
+        .input('idUsr',    sql.Int,          idUsuario)
+        .input('idProc',   sql.Int,          idProcedencia)
+        .input('idDest',   sql.Int,          idDest)
+        .input('idTipDis', sql.Int,          dto.idTipoDistribucion)
+        .input('idTipCom', sql.Int,          dto.idTipoCompromiso)
+        .input('idEstCom', sql.Int,          dto.idEstadoCompromiso)
+        .input('dias',     sql.Int,          dto.diasCompromiso)
+        .input('obs',      sql.VarChar(250), (dto.observaciones ?? '').substring(0, 250))
+        .query<{ id_seguimiento: number }>(`
+          INSERT INTO tramite
+            (id_documento, id_usuario, id_procedencia, id_destino,
+             tipo_procedencia, tipo_destinatario,
+             id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+             id_estado_tramite, dias_compromiso, observaciones,
+             fecha_sistema, fecha_update, fecha_despacho)
+          OUTPUT INSERTED.id_seguimiento
+          VALUES
+            (@idDoc, @idUsr, @idProc, @idDest,
+             'D', 'D',
+             @idTipDis, @idTipCom, @idEstCom,
+             2, @dias, @obs,
+             GETDATE(), GETDATE(), GETDATE())
+        `);
+      void tramRes; // tramite adicional insertado
+
+      await repo.insertDocumentoDestino({
+        idDocumento,
+        idDestino:         idDest,
+        tipoDestinatario:  'D',
+        idTipoCompromiso:  dto.idTipoCompromiso,
+        diasCompromiso:    dto.diasCompromiso,
+        idUsuarioCreacion: idUsuario,
+      });
+    }
+  }
+
+  return obtenerDocumento(idDocumento);
+}
+
+// ── Obtener destinos de un documento ─────────────────────────
+export async function obtenerDestinos(idDocumento: number) {
+  const rows = await repo.findDestinosByDocumento(idDocumento);
+  return rows.map((r) => ({
+    id:               r.id,
+    idDocumento:      r.id_documento,
+    idDestino:        r.id_destino,
+    tipoDestinatario: r.tipo_destinatario,
+    estadoTramite:    { id: r.id_estado_tramite, descripcion: r.desc_estado_tramite },
+    tipoCompromiso:   { id: r.id_tipo_compromiso, descripcion: r.desc_tipo_compromiso },
+    diasCompromiso:   r.dias_compromiso,
+    servicio:         r.desc_dependencia,
+    fechaCreacion:    r.fecha_creacion,
+    fechaRecepcion:   r.fecha_recepcion,
+    fechaCierre:      r.fecha_cierre,
+    idUsuarioRecepcion: r.id_usuario_recepcion,
+    idUsuarioCierre:    r.id_usuario_cierre,
+    observaciones:    r.observaciones,
+  }));
+}
+
+// ── Recepcionar por destino específico (multi-destino) ────────
+export async function recepcionarDestino(
+  idDocumento: number,
+  idDocumentoDestino: number,
+  observaciones: string | undefined,
+  idUsuario: number,
+) {
+  const destinos = await repo.findDestinosByDocumento(idDocumento);
+  const dest     = destinos.find((d) => d.id === idDocumentoDestino);
+  if (!dest) throw { statusCode: 404, message: 'Destino no encontrado en este documento' };
+  if (dest.id_estado_tramite === 5) throw { statusCode: 400, message: 'Este destino ya está cerrado' };
+
+  await repo.updateDocumentoDestinoEstado(idDocumentoDestino, 3, {
+    idUsuarioRecepcion: idUsuario,
+    fechaRecepcion: new Date(),
+    observaciones,
+  });
+
+  // Insertar tramite de recepción para este destino
+  const pool = await getPool();
+  await pool.request()
+    .input('idDoc',  sql.Int, idDocumento)
+    .input('idUsr',  sql.Int, idUsuario)
+    .input('idProc', sql.Int, dest.id_destino)
+    .input('obs',    sql.VarChar(250), (observaciones ?? '').substring(0, 250))
+    .query(`
+      INSERT INTO tramite
+        (id_documento, id_usuario, id_procedencia, id_destino,
+         tipo_procedencia, tipo_destinatario,
+         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+         id_estado_tramite, dias_compromiso, observaciones,
+         fecha_sistema, fecha_update, fecha_recepcion, usuario_recepcion)
+      VALUES
+        (@idDoc, @idUsr, @idProc, @idProc,
+         'D', 'D', 5, 1, 2,
+         3, 0, @obs,
+         GETDATE(), GETDATE(), GETDATE(), @idUsr)
+    `);
+
+  // Si al menos 1 destino está recepcionado, marcar documento en estado 3
+  await repo.updateEstado(idDocumento, 3);
+  return obtenerDocumento(idDocumento);
+}
+
+// ── Terminar por destino específico (multi-destino) ───────────
+export async function terminarDestino(
+  idDocumento: number,
+  idDocumentoDestino: number,
+  observaciones: string | undefined,
+  idUsuario: number,
+) {
+  const destinos = await repo.findDestinosByDocumento(idDocumento);
+  const dest     = destinos.find((d) => d.id === idDocumentoDestino);
+  if (!dest) throw { statusCode: 404, message: 'Destino no encontrado en este documento' };
+  if (dest.id_estado_tramite === 5) throw { statusCode: 400, message: 'Este destino ya está cerrado' };
+
+  await repo.updateDocumentoDestinoEstado(idDocumentoDestino, 5, {
+    idUsuarioCierre: idUsuario,
+    fechaCierre: new Date(),
+    observaciones,
+  });
+
+  const pool = await getPool();
+  await pool.request()
+    .input('idDoc',  sql.Int, idDocumento)
+    .input('idUsr',  sql.Int, idUsuario)
+    .input('idProc', sql.Int, dest.id_destino)
+    .input('obs',    sql.VarChar(250), (observaciones ?? '').substring(0, 250))
+    .query(`
+      INSERT INTO tramite
+        (id_documento, id_usuario, id_procedencia, id_destino,
+         tipo_procedencia, tipo_destinatario,
+         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+         id_estado_tramite, dias_compromiso, observaciones,
+         fecha_sistema, fecha_update)
+      VALUES
+        (@idDoc, @idUsr, @idProc, @idProc,
+         'D', 'D', 5, 1, 2,
+         5, 0, @obs,
+         GETDATE(), GETDATE())
+    `);
+
+  // Cierre global: solo si TODOS los destinos están cerrados
+  const todosCerrados = await repo.allDestinosCerrados(idDocumento);
+  if (todosCerrados) await repo.updateEstado(idDocumento, 4);
 
   return obtenerDocumento(idDocumento);
 }

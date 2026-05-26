@@ -338,6 +338,104 @@ export async function getLastTramite(idDocumento: number): Promise<{
   return r.recordset[0] ?? null;
 }
 
+// ── documento_destino — CRUD ──────────────────────────────────
+
+export interface DocumentoDestinoRow {
+  id:                   number;
+  id_documento:         number;
+  id_destino:           number;
+  tipo_destinatario:    string;
+  id_estado_tramite:    number;
+  id_tipo_compromiso:   number;
+  dias_compromiso:      number;
+  id_usuario_creacion:  number;
+  id_usuario_recepcion: number | null;
+  id_usuario_cierre:    number | null;
+  observaciones:        string | null;
+  fecha_creacion:       Date;
+  fecha_recepcion:      Date | null;
+  fecha_cierre:         Date | null;
+  activo:               boolean;
+  desc_dependencia:     string | null;
+  desc_estado_tramite:  string | null;
+  desc_tipo_compromiso: string | null;
+}
+
+export async function insertDocumentoDestino(data: {
+  idDocumento:       number;
+  idDestino:         number;
+  tipoDestinatario:  string;
+  idTipoCompromiso:  number;
+  diasCompromiso:    number;
+  idUsuarioCreacion: number;
+}): Promise<number> {
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('idDoc',    sql.Int,    data.idDocumento)
+    .input('idDest',   sql.Int,    data.idDestino)
+    .input('tipDest',  sql.Char(1), data.tipoDestinatario)
+    .input('idTipCom', sql.Int,    data.idTipoCompromiso)
+    .input('dias',     sql.Int,    data.diasCompromiso)
+    .input('idUsr',    sql.Int,    data.idUsuarioCreacion)
+    .query<{ id: number }>(`
+      INSERT INTO documento_destino
+        (id_documento, id_destino, tipo_destinatario, id_tipo_compromiso, dias_compromiso, id_usuario_creacion)
+      OUTPUT INSERTED.id
+      VALUES (@idDoc, @idDest, @tipDest, @idTipCom, @dias, @idUsr)
+    `);
+  return r.recordset[0].id;
+}
+
+export async function findDestinosByDocumento(idDocumento: number): Promise<DocumentoDestinoRow[]> {
+  const pool = await getPool();
+  const r = await pool.request().input('idDoc', sql.Int, idDocumento).query<DocumentoDestinoRow>(`
+    SELECT
+      dd.*,
+      LTRIM(RTRIM(dep.desc_dependencia)) AS desc_dependencia,
+      et.desc_estado_tramite,
+      tc.desc_tipo_compromiso
+    FROM documento_destino dd
+    LEFT JOIN dependencia dep    ON dd.id_destino           = dep.id_dependencia
+    LEFT JOIN estado_tramite et  ON dd.id_estado_tramite    = et.id_estado_tramite
+    LEFT JOIN tipo_compromiso tc ON dd.id_tipo_compromiso   = tc.id_tipo_compromiso
+    WHERE dd.id_documento = @idDoc AND dd.activo = 1
+    ORDER BY dd.id_tipo_compromiso DESC, dd.fecha_creacion
+  `);
+  return r.recordset;
+}
+
+export async function updateDocumentoDestinoEstado(
+  idDocumentoDestino: number,
+  idEstadoTramite: number,
+  extra?: {
+    idUsuarioRecepcion?: number;
+    idUsuarioCierre?: number;
+    fechaRecepcion?: Date;
+    fechaCierre?: Date;
+    observaciones?: string;
+  },
+): Promise<void> {
+  const pool = await getPool();
+  let set    = 'id_estado_tramite = @est, fecha_creacion = fecha_creacion';
+  const req  = pool.request().input('est', sql.Int, idEstadoTramite).input('id', sql.Int, idDocumentoDestino);
+  if (extra?.idUsuarioRecepcion) { req.input('urec', sql.Int, extra.idUsuarioRecepcion); set += ', id_usuario_recepcion = @urec'; }
+  if (extra?.idUsuarioCierre)    { req.input('ucl',  sql.Int, extra.idUsuarioCierre);    set += ', id_usuario_cierre = @ucl'; }
+  if (extra?.fechaRecepcion)     { req.input('frec', sql.DateTime, extra.fechaRecepcion); set += ', fecha_recepcion = @frec'; }
+  if (extra?.fechaCierre)        { req.input('fcl',  sql.DateTime, extra.fechaCierre);    set += ', fecha_cierre = @fcl'; }
+  if (extra?.observaciones)      { req.input('obs',  sql.VarChar(500), extra.observaciones.substring(0, 500)); set += ', observaciones = @obs'; }
+  await req.query(`UPDATE documento_destino SET ${set} WHERE id = @id`);
+}
+
+export async function allDestinosCerrados(idDocumento: number): Promise<boolean> {
+  const pool = await getPool();
+  const r = await pool.request().input('idDoc', sql.Int, idDocumento).query<{ pendientes: number }>(`
+    SELECT COUNT(*) AS pendientes
+    FROM documento_destino
+    WHERE id_documento = @idDoc AND activo = 1 AND id_estado_tramite NOT IN (5, 6)
+  `);
+  return (r.recordset[0]?.pendientes ?? 1) === 0;
+}
+
 // ── softDelete ────────────────────────────────────────────────
 
 export async function softDelete(idDocumento: number, _idUsuario: number): Promise<void> {
@@ -373,11 +471,14 @@ export async function softDelete(idDocumento: number, _idUsuario: number): Promi
     `);
   } catch { /* si falla el backup, continuar igual */ }
 
-  // Eliminar en orden para respetar posibles FK
+  // Eliminar en orden para respetar FK
+  // documento_destino tiene FK_docdest_documento → debe borrarse antes que documento
   await pool.request().input('id', sql.Int, idDocumento)
     .query('DELETE FROM archivo_digital WHERE id_documento = @id');
   await pool.request().input('id', sql.Int, idDocumento)
     .query('DELETE FROM tramite WHERE id_documento = @id');
+  await pool.request().input('id', sql.Int, idDocumento)
+    .query('DELETE FROM documento_destino WHERE id_documento = @id');
   await pool.request().input('id', sql.Int, idDocumento)
     .query('DELETE FROM documento WHERE id_documento = @id');
 }

@@ -246,7 +246,7 @@ async function getUserModulos(pool: Awaited<ReturnType<typeof getPool>>, roles: 
     return [
       'dashboard','documentos','bandeja','enviados','tramites',
       'trazabilidad','busqueda','archivos',
-      'usuarios','reportes','roles','configuracion',
+      'usuarios','reportes','roles','configuracion','alertas',
     ];
   }
   try {

@@ -21,6 +21,7 @@ import { UsuariosPage } from '@/pages/admin/UsuariosPage';
 import { RolesPage } from '@/pages/admin/RolesPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ReportesPage } from '@/pages/reportes/ReportesPage';
+import { AlertasPage } from '@/pages/alertas/AlertasPage';
 
 // Envoltura helper: muestra ModuleGuard con el módulo indicado
 function M({ m, children }: { m: string; children: React.ReactNode }) {
@@ -58,6 +59,7 @@ export const router = createBrowserRouter([
           { path: '/admin/roles',         element: <M m="roles"><RolesPage /></M>,                  errorElement: <RouteError /> },
           { path: '/admin/configuracion', element: <M m="configuracion"><ConfiguracionPage /></M>, errorElement: <RouteError /> },
           { path: '/reportes',            element: <M m="reportes"><ReportesPage /></M>,            errorElement: <RouteError /> },
+          { path: '/admin/alertas',       element: <M m="alertas"><AlertasPage /></M>,               errorElement: <RouteError /> },
         ],
       },
     ],

@@ -8,7 +8,7 @@ import {
   ArrowLeft, FileText, Calendar, User, Tag, Clock,
   CheckCircle2, GitBranch, Paperclip, Download, RefreshCw,
   AlertCircle, Hash, Building2, Send, Loader2, Trash2,
-  Image as ImageIcon, FileSpreadsheet, File, Eye,
+  Image as ImageIcon, FileSpreadsheet, File, Eye, Users,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -82,6 +82,21 @@ interface TramiteEvento {
   usuario: { usuario: string | null; nombre: string | null };
 }
 
+interface DocumentoDestino {
+  id:               number;
+  idDocumento:      number;
+  idDestino:        number;
+  tipoDestinatario: string;
+  estadoTramite:    { id: number | null; descripcion: string | null };
+  tipoCompromiso:   { id: number | null; descripcion: string | null };
+  diasCompromiso:   number | null;
+  servicio:         string | null;
+  fechaCreacion:    string | null;
+  fechaRecepcion:   string | null;
+  fechaCierre:      string | null;
+  observaciones:    string | null;
+}
+
 interface ArchivoItem {
   id_archivo: number;
   nombre_archivo: string | null;
@@ -149,6 +164,16 @@ export function DocumentoDetallePage() {
     enabled: !isNaN(idDocumento),
   });
 
+  // Destinos por servicio (multi-destino)
+  const { data: destinos, isLoading: loadingDestinos } = useQuery({
+    queryKey: ['documento-destinos', idDocumento],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ ok: boolean; data: DocumentoDestino[] }>(`/documentos/${idDocumento}/destinos`);
+      return data.data;
+    },
+    enabled: !isNaN(idDocumento),
+  });
+
   const [previewFile,       setPreviewFile]       = useState<PreviewFile | null>(null);
   const [despacharOpen,     setDespacharOpen]     = useState(false);
   const [reabrirOpen,       setReopenOpen]        = useState(false);
@@ -167,10 +192,27 @@ export function DocumentoDetallePage() {
   const invalidarTodo = () => {
     qc.invalidateQueries({ queryKey: ['documento', idDocumento] });
     qc.invalidateQueries({ queryKey: ['documento-trazabilidad', idDocumento] });
+    qc.invalidateQueries({ queryKey: ['documento-destinos', idDocumento] });
     qc.invalidateQueries({ queryKey: ['documentos'] });
     qc.invalidateQueries({ queryKey: ['tramites'] });
     qc.invalidateQueries({ queryKey: ['bandeja'] });
   };
+
+  // Acciones por destino específico (multi-destino)
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const recepcionarDestMut = useMutation({
+    mutationFn: (idDocumentoDestino: number) =>
+      apiClient.post(`/documentos/${idDocumento}/recepcionar-destino`, { idDocumentoDestino }),
+    onSuccess: () => { toast.success('Destino recepcionado'); invalidarTodo(); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al recepcionar'),
+  });
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const terminarDestMut = useMutation({
+    mutationFn: (idDocumentoDestino: number) =>
+      apiClient.post(`/documentos/${idDocumento}/terminar-destino`, { idDocumentoDestino }),
+    onSuccess: () => { toast.success('Destino cerrado'); invalidarTodo(); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al cerrar destino'),
+  });
 
   // Acciones del flujo documental
   const accion = (endpoint: string, msg: string) => useMutation({
@@ -203,11 +245,18 @@ export function DocumentoDetallePage() {
   const eliminarMut    = useMutation({
     mutationFn: () => apiClient.delete(`/documentos/${idDocumento}`),
     onSuccess: () => {
-      toast.success('Documento eliminado');
+      toast.success('Documento eliminado correctamente');
       qc.invalidateQueries({ queryKey: ['documentos'] });
       navigate('/documentos');
     },
-    onError: () => toast.error('No se pudo eliminar el documento'),
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string; message?: string } } })
+        ?.response?.data?.error
+        ?? (e as { response?: { data?: { error?: string; message?: string } } })
+        ?.response?.data?.message
+        ?? 'No se pudo eliminar el documento';
+      toast.error(msg);
+    },
   });
 
   // ── Guardias ─────────────────────────────────────────────────────────────
@@ -311,6 +360,79 @@ export function DocumentoDetallePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Destinos del documento (multi-destino) */}
+          {((destinos && destinos.length > 0) || loadingDestinos) && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" />Servicios destinatarios
+                </CardTitle>
+                <CardDescription>
+                  {loadingDestinos ? 'Cargando...' : `${destinos?.length ?? 0} servicio(s) — gestión independiente por destino`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {loadingDestinos
+                  ? [1, 2].map((i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)
+                  : (destinos ?? []).map((dest) => {
+                    const estId    = dest.estadoTramite?.id ?? 0;
+                    const cerrado  = estId === 5 || estId === 6;
+                    const recep    = estId === 3;
+                    const desp     = estId === 2;
+                    const dotClass = cerrado ? 'bg-slate-400'
+                      : recep ? 'bg-emerald-500'
+                      : desp  ? 'bg-amber-500'
+                      : 'bg-indigo-500';
+                    return (
+                      <div key={dest.id} className={cn(
+                        'flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors',
+                        cerrado ? 'bg-muted/30 border-border opacity-70' : 'bg-background border-border hover:bg-muted/20'
+                      )}>
+                        <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', dotClass)} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{dest.servicio ?? `Servicio ${dest.idDestino}`}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {dest.estadoTramite?.descripcion ?? '—'}
+                            {dest.tipoCompromiso?.id && dest.tipoCompromiso.id > 1
+                              ? ` · ${dest.tipoCompromiso.descripcion}`
+                              : ''}
+                            {dest.fechaRecepcion ? ` · Rec. ${formatFechaHora(dest.fechaRecepcion)}` : ''}
+                            {dest.fechaCierre    ? ` · Cerrado ${formatFechaHora(dest.fechaCierre)}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          {desp && canRecepcionar && (
+                            <Button
+                              size="sm" variant="outline"
+                              className="h-7 px-2 gap-1 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                              onClick={() => recepcionarDestMut.mutate(dest.id)}
+                              disabled={recepcionarDestMut.isPending}
+                            >
+                              <CheckCircle2 className="h-3 w-3" />Recepcionar
+                            </Button>
+                          )}
+                          {recep && canTerminar && (
+                            <Button
+                              size="sm" variant="outline"
+                              className="h-7 px-2 gap-1 text-xs"
+                              onClick={() => terminarDestMut.mutate(dest.id)}
+                              disabled={terminarDestMut.isPending}
+                            >
+                              <CheckCircle2 className="h-3 w-3 text-slate-500" />Cerrar
+                            </Button>
+                          )}
+                          {cerrado && (
+                            <span className="text-xs text-muted-foreground px-2">Cerrado</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+              </CardContent>
+            </Card>
+          )}
 
           {/* Archivos adjuntos */}
           <Card>

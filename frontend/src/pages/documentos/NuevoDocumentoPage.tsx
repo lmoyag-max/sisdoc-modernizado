@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   FileText, ArrowLeft, Send, Paperclip, X, AlertCircle,
   Building2, Tag, MessageSquare, Calendar, Loader2, ChevronRight, Lock,
+  Search, CheckSquare, Square,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth.store';
@@ -19,14 +20,13 @@ import { cn } from '@/lib/utils';
 
 // ── Schema ───────────────────────────────────────────────────
 // Origen, estado y despacharAhora son asignados automáticamente por el backend.
-// El usuario solo elige el destino.
+// Destinos se gestiona con estado local (multi-select para interno, select para externo).
 const schema = z.object({
   materia:            z.string().min(5, 'Mínimo 5 caracteres').max(250),
   idTipoDocumento:    z.string().min(1, 'Selecciona el tipo de documento'),
   fechaDocumento:     z.string().optional(),
   observaciones:      z.string().max(500).optional(),
   tipoDestinatario:   z.enum(['D', 'E']).default('D'),
-  idDestino:          z.string().min(1, 'Selecciona el destino'),
   idTipoDistribucion: z.string().default('5'),
   idTipoCompromiso:   z.string().default('1'),
   idEstadoCompromiso: z.string().default('2'),
@@ -45,8 +45,20 @@ const sel = (hasErr?: boolean) => cn(
 export function NuevoDocumentoPage() {
   const navigate   = useNavigate();
   const user       = useAuthStore((s) => s.user);
-  const [archivo, setArchivo]   = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [archivo, setArchivo]     = useState<File | null>(null);
+  const [dragOver, setDragOver]   = useState(false);
+  // Multi-destino: lista de idDependencia seleccionados (interno) o idDestino externo (único)
+  const [destinosSeleccionados, setDestinosSeleccionados] = useState<number[]>([]);
+  const [destinoExterno, setDestinoExterno]               = useState('');
+  const [searchDep, setSearchDep]                         = useState('');
+  const [destinoError, setDestinoError]                   = useState('');
+
+  const toggleDestino = (id: number) => {
+    setDestinoError('');
+    setDestinosSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   // Catálogos
   const { data: tipos }        = useQuery({ queryKey: ['tipos-doc'],    queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/tipos-documento')).data.data });
@@ -55,6 +67,14 @@ export function NuevoDocumentoPage() {
   const { data: tiposDist }    = useQuery({ queryKey: ['tipos-dist'],   queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/tipos-distribucion')).data.data });
   const { data: tiposCom }     = useQuery({ queryKey: ['tipos-comp'],   queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/tipos-compromiso')).data.data });
   const { data: estadosCom }   = useQuery({ queryKey: ['estados-comp'], queryFn: async () => (await apiClient.get<{ data: CatItem[] }>('/catalogos/estados-compromiso')).data.data });
+
+  // Dependencias filtradas por búsqueda (para el multi-select)
+  const depsFiltradas = useMemo(() =>
+    (dependencias ?? []).filter((d) =>
+      d.descripcion.toLowerCase().includes(searchDep.toLowerCase())
+    ),
+    [dependencias, searchDep]
+  );
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -75,23 +95,34 @@ export function NuevoDocumentoPage() {
   const tipoDestinatario = watch('tipoDestinatario');
   const idTipoCompromiso = watch('idTipoCompromiso');
   const materia          = watch('materia');
-  const destOptions      = tipoDestinatario === 'D' ? (dependencias ?? []) : (depExternas ?? []);
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const payload = {
+      // Validación de destino (no corre dentro de RHF porque es estado local)
+      if (data.tipoDestinatario === 'D' && destinosSeleccionados.length === 0) {
+        setDestinoError('Selecciona al menos un servicio destino');
+        return null;
+      }
+      if (data.tipoDestinatario === 'E' && !destinoExterno) {
+        setDestinoError('Selecciona un destino externo');
+        return null;
+      }
+
+      const base = {
         materia:            data.materia,
         idTipoDocumento:    Number(data.idTipoDocumento),
         fechaDocumento:     data.fechaDocumento,
         observaciones:      data.observaciones,
-        // Origen y estado asignados automáticamente por el backend
-        tipoDestinatario:   data.tipoDestinatario,
-        idDestino:          Number(data.idDestino),
         idTipoDistribucion: Number(data.idTipoDistribucion),
         idTipoCompromiso:   Number(data.idTipoCompromiso),
         idEstadoCompromiso: Number(data.idEstadoCompromiso),
         diasCompromiso:     Number(data.diasCompromiso),
       };
+
+      const payload = data.tipoDestinatario === 'D'
+        ? { ...base, tipoDestinatario: 'D', destinos: destinosSeleccionados }
+        : { ...base, tipoDestinatario: 'E', idDestino: Number(destinoExterno) };
+
       const res = await apiClient.post<{ ok: boolean; data: { idDocumento: number } }>('/documentos', payload);
       const idDocumento = res.data.data?.idDocumento;
       if (archivo && idDocumento) {
@@ -103,6 +134,7 @@ export function NuevoDocumentoPage() {
       return res.data.data;
     },
     onSuccess: (data) => {
+      if (!data) return; // validación de destino falló — ya se mostró el error
       toast.success('Documento registrado y despachado correctamente');
       navigate(`/documentos/${data?.idDocumento}`);
     },
@@ -243,37 +275,112 @@ export function NuevoDocumentoPage() {
                 <ChevronRight className="h-4 w-4 text-primary" />
                 Destino del Trámite
               </CardTitle>
-              <CardDescription>¿A dónde se envía el documento?</CardDescription>
+              <CardDescription>
+                {tipoDestinatario === 'D'
+                  ? 'Selecciona uno o varios servicios internos destinatarios'
+                  : 'Selecciona la entidad externa destinataria'}
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Tipo de destinatario</Label>
-                  <div className="flex gap-6">
+            <CardContent className="space-y-4">
+              {/* Tipo de destinatario */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Tipo de destinatario</Label>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio" {...register('tipoDestinatario')} value="D" className="h-4 w-4"
+                      onChange={() => { setDestinosSeleccionados([]); setDestinoError(''); setSearchDep(''); }}
+                    />
+                    Interno (Dependencia)
+                  </label>
+                  {puedeExterno && (
                     <label className="flex items-center gap-2 cursor-pointer text-sm">
-                      <input type="radio" {...register('tipoDestinatario')} value="D" className="h-4 w-4" />
-                      Interno (Dependencia)
+                      <input
+                        type="radio" {...register('tipoDestinatario')} value="E" className="h-4 w-4"
+                        onChange={() => { setDestinosSeleccionados([]); setDestinoError(''); setDestinoExterno(''); }}
+                      />
+                      Externo
                     </label>
-                    {puedeExterno && (
-                      <label className="flex items-center gap-2 cursor-pointer text-sm">
-                        <input type="radio" {...register('tipoDestinatario')} value="E" className="h-4 w-4" />
-                        Externo
-                      </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Multi-select para destinos internos */}
+              {tipoDestinatario === 'D' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 text-sm">
+                      <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      Servicios destino <span className="text-destructive">*</span>
+                    </Label>
+                    {destinosSeleccionados.length > 0 && (
+                      <span className="text-xs text-primary font-medium">
+                        {destinosSeleccionados.length} seleccionado(s)
+                      </span>
                     )}
                   </div>
+                  {/* Buscador */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      className="pl-8 h-8 text-sm"
+                      placeholder="Buscar servicio..."
+                      value={searchDep}
+                      onChange={(e) => setSearchDep(e.target.value)}
+                    />
+                  </div>
+                  {/* Lista de checkboxes */}
+                  <div className={cn(
+                    'rounded-md border border-input overflow-y-auto max-h-48',
+                    destinoError && 'border-destructive'
+                  )}>
+                    {depsFiltradas.length === 0
+                      ? <p className="px-3 py-4 text-sm text-muted-foreground text-center">Sin resultados</p>
+                      : depsFiltradas.map((d) => {
+                        const checked = destinosSeleccionados.includes(d.id);
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => toggleDestino(d.id)}
+                            className={cn(
+                              'w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition-colors hover:bg-muted/50',
+                              checked && 'bg-primary/5'
+                            )}
+                          >
+                            {checked
+                              ? <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                              : <Square className="h-4 w-4 text-muted-foreground shrink-0" />}
+                            <span className={checked ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+                              {d.descripcion}
+                            </span>
+                          </button>
+                        );
+                      })
+                    }
+                  </div>
+                  {destinoError && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{destinoError}</p>}
                 </div>
+              )}
+
+              {/* Select único para destino externo */}
+              {tipoDestinatario === 'E' && (
                 <div className="space-y-1.5">
                   <Label className="flex items-center gap-1.5 text-sm">
                     <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    Destino <span className="text-destructive">*</span>
+                    Entidad externa <span className="text-destructive">*</span>
                   </Label>
-                  <select {...register('idDestino')} className={sel(!!errors.idDestino)}>
-                    <option value="">Seleccionar {tipoDestinatario === 'D' ? 'dependencia' : 'entidad'}...</option>
-                    {destOptions.map((d) => <option key={d.id} value={d.id}>{d.descripcion}</option>)}
+                  <select
+                    value={destinoExterno}
+                    onChange={(e) => { setDestinoExterno(e.target.value); setDestinoError(''); }}
+                    className={sel(!!destinoError)}
+                  >
+                    <option value="">Seleccionar entidad...</option>
+                    {(depExternas ?? []).map((d) => <option key={d.id} value={d.id}>{d.descripcion}</option>)}
                   </select>
-                  {errors.idDestino && <p className="text-xs text-destructive">{errors.idDestino.message}</p>}
+                  {destinoError && <p className="text-xs text-destructive">{destinoError}</p>}
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 

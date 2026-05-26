@@ -159,3 +159,33 @@ export async function eliminar(req: Request, res: Response, next: NextFunction):
     sendSuccess(res, null, 'Documento eliminado');
   } catch (e) { next(e); }
 }
+
+// ── Multi-destino ─────────────────────────────────────────────
+
+export async function listarDestinos(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    sendSuccess(res, await service.obtenerDestinos(Number(req.params.id)));
+  } catch (e) { next(e); }
+}
+
+export async function recepcionarDestino(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const idDocDestinoBody = Number(req.body.idDocumentoDestino);
+    if (!idDocDestinoBody) { sendError(res, 'idDocumentoDestino es requerido', 400); return; }
+    const doc = await service.recepcionarDestino(
+      Number(req.params.id), idDocDestinoBody, req.body.observaciones, user(req).idUsuario,
+    );
+    sendSuccess(res, doc, 'Destino recepcionado');
+  } catch (e) { next(e); }
+}
+
+export async function terminarDestino(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const idDocDestinoBody = Number(req.body.idDocumentoDestino);
+    if (!idDocDestinoBody) { sendError(res, 'idDocumentoDestino es requerido', 400); return; }
+    const doc = await service.terminarDestino(
+      Number(req.params.id), idDocDestinoBody, req.body.observaciones, user(req).idUsuario,
+    );
+    sendSuccess(res, doc, 'Destino cerrado');
+  } catch (e) { next(e); }
+}

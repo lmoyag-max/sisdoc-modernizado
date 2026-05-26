@@ -707,3 +707,343 @@ expediente (id_expediente PK)
 ---
 
 *Documento generado el 22 de mayo de 2026. Refleja el estado del proyecto en la rama `main`.*
+
+---
+
+---
+
+# REGISTRO DE CAMBIOS — SESIÓN 25 de mayo de 2026
+
+**Fecha:** 25 de mayo de 2026 | **Rama:** main | **Ejecutor:** Claude Code
+
+---
+
+## L. CAMBIOS IMPLEMENTADOS EN ESTA SESIÓN
+
+### L.1 Resumen ejecutivo de la sesión
+
+En esta sesión se implementaron cinco mejoras/correcciones sobre el sistema SISDOC en producción activa:
+
+| # | Área | Tipo | Estado |
+|---|------|------|--------|
+| 1 | Alertas por correo — módulo completo | Nueva funcionalidad | ✅ Completado |
+| 2 | Alertas — lógica pendientes por redespacho | Corrección de lógica | ✅ Completado |
+| 3 | SMTP — configuración de credenciales reales | Configuración | ✅ Completado |
+| 4 | Eliminación de documentos por Administrador | Corrección de bug | ✅ Completado |
+| 5 | Limpieza de documentos de prueba en BD | Mantenimiento de datos | ✅ Completado |
+
+---
+
+### L.2 Módulo de Alertas por Correo (Nueva Funcionalidad)
+
+#### Descripción
+
+Se implementó un módulo completo de alertas automáticas por correo electrónico para notificar a los servicios cuando tienen documentos pendientes de gestión.
+
+#### Archivos creados
+
+| Archivo | Descripción |
+|---------|-------------|
+| `backend/src/modules/alertas/alertas.service.ts` | Core del módulo: configuración, destinatarios dinámicos, envío, logging |
+| `backend/src/modules/alertas/alertas.routes.ts` | 7 endpoints REST para gestión de alertas |
+| `backend/src/shared/services/alertas.scheduler.ts` | Scheduler `setInterval` (60s) con deduplicación ±25 min |
+| `frontend/src/lib/api/alertas.api.ts` | Cliente API de alertas para el frontend |
+| `frontend/src/pages/alertas/AlertasPage.tsx` | Página completa de gestión de alertas |
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `backend/src/app.ts` | Registra ruta `/api/v1/alertas` |
+| `backend/src/server.ts` | Inicia/detiene `alertaScheduler` con el proceso |
+| `frontend/src/app/router.tsx` | Agrega ruta `/admin/alertas` |
+| `frontend/src/components/layout/Sidebar.tsx` | Agrega ítem "Alertas" en menú admin |
+
+#### Arquitectura del módulo
+
+```
+alertas.scheduler.ts
+  └── tick() c/60s
+        ├── getConfiguracion() — lee alerta_config (activo, horarios)
+        ├── Verifica ventana ±2 min de cada horario configurado
+        ├── yaEnviadoEnEsteSlot() — deduplicación ±25 min en alerta_log
+        └── enviarTodasLasAlertas('auto')
+
+alertas.service.ts
+  ├── getDocumentosPendientes(idDep?) — CTE tramite (ver L.3)
+  ├── getDestinatariosServicio(idDep) — usuario.email + funcionario
+  ├── getResumenDestinatarios(idDep?) — agrupado por servicio
+  ├── enviarAlertaServicio(idDep, tipo, idUsuario)
+  │     1. Verifica dependencia
+  │     2. getDocumentosPendientes → sin docs → log sin_docs
+  │     3. getDestinatariosServicio → sin email → log sin_correo
+  │     4. buildAlertaEmail() → sendMail() → log ok/error
+  └── enviarTodasLasAlertas(tipo) — itera servicios únicos con pendientes
+```
+
+#### Tablas de BD nuevas usadas
+
+| Tabla | Descripción |
+|-------|-------------|
+| `alerta_config` | Configuración global: `activo BIT`, `horarios VARCHAR(200)` (CSV de HH:MM) |
+| `alerta_log` | Historial de envíos: servicio, tipo, destinatarios, docs incluidos, estado |
+
+#### Endpoints creados
+
+| Endpoint | Método | Rol | Función |
+|----------|--------|-----|---------|
+| `/alertas/configuracion` | GET | admin | Lee configuración del scheduler |
+| `/alertas/configuracion` | PUT | admin | Actualiza activo + horarios |
+| `/alertas/pendientes` | GET | admin | Documentos pendientes por servicio |
+| `/alertas/destinatarios` | GET | admin | Usuarios con email por servicio |
+| `/alertas/logs` | GET | admin | Historial paginado de envíos |
+| `/alertas/enviar-manual` | POST | admin | Envío manual a un servicio |
+| `/alertas/enviar-todos` | POST | admin | Envío masivo a todos los servicios |
+| `/alertas/probar-servicio/:id` | POST | admin | Prueba con detalle de resultado |
+
+#### Decisiones de diseño
+
+- **Destinatarios dinámicos:** Los correos se obtienen de `usuario.email + funcionario.id_dependencia`, no de una tabla manual. Esto garantiza que siempre estén sincronizados con los usuarios reales del sistema.
+- `servicio_correos_alerta` (tabla legacy) se conserva en BD pero ya no se consulta.
+- La deduplicación del scheduler usa una ventana de ±25 minutos alrededor del horario configurado, con verificación contra `alerta_log`.
+- Email HTML responsive con tabla de documentos, badges de urgencia y links directos al detalle.
+
+---
+
+### L.3 Corrección de Lógica — Pendientes por Redespacho
+
+#### Problema detectado
+
+`getDocumentosPendientes` consultaba la tabla `documento_destino` para determinar qué servicio tenía un documento pendiente. Esta tabla **no se actualiza** cuando se ejecuta `despacharDocumento` (redespacho) o `derivarDocumento`. Como resultado, el servicio original seguía apareciendo como pendiente aunque el documento ya hubiera sido redespatcho a otro servicio.
+
+#### Causa raíz
+
+`despacharDocumento` y `derivarDocumento` en `documento.service.ts` insertan un nuevo `tramite` con el nuevo destino, pero **nunca tocan `documento_destino`**. La tabla `documento_destino` solo se actualiza en `recepcionarDestino` y `terminarDestino` (flujo multi-destino).
+
+#### Análisis del flujo antes del fix
+
+```
+Crear doc → servicio A
+  tramite T1 (id_destino=A, estado=2)    ← correcto
+  documento_destino DD1 (id_destino=A)   ← correcto
+
+Redespachar A → B (despacharDocumento)
+  tramite T2 (id_destino=B, estado=2)    ← nuevo tramite creado
+  documento_destino DD1 (id_destino=A)   ← NO ACTUALIZADO ← BUG
+
+getDocumentosPendientes (consulta documento_destino):
+  → DD1 sigue activo → muestra A como pendiente  ← INCORRECTO
+  → B no aparece como pendiente                  ← INCORRECTO
+```
+
+#### Solución implementada
+
+Se reemplazó la consulta de `documento_destino` por una basada en la tabla `tramite`, usando un CTE que extrae el **último tramite de tipo despacho** (estados 1, 2 o 4) por documento.
+
+```sql
+WITH ultimo_despacho AS (
+  SELECT t.id_documento, MAX(t.id_seguimiento) AS id_seg
+  FROM tramite t
+  WHERE t.id_estado_tramite IN (1, 2, 4)  -- Generado, Despachado, Derivado
+  GROUP BY t.id_documento
+)
+SELECT t.id_seguimiento AS id, t.id_destino, dep.desc_dependencia AS nombre_servicio, ...
+FROM ultimo_despacho ud
+JOIN tramite t ON t.id_seguimiento = ud.id_seg
+JOIN documento doc ON t.id_documento = doc.id_documento
+...
+WHERE t.tipo_destinatario = 'D'
+  AND doc.id_estado_documento NOT IN (4)  -- excluye terminados
+  [AND t.id_destino = @idDep]
+```
+
+#### Por qué este enfoque es correcto
+
+| Acción | Comportamiento antes (incorrecto) | Comportamiento ahora (correcto) |
+|--------|-----------------------------------|---------------------------------|
+| Crear doc → A | A pendiente ✓ | A pendiente ✓ |
+| Redespachar A → B | A sigue pendiente ✗ | B pendiente ✓ |
+| Derivar A → B | A sigue pendiente ✗ | B pendiente ✓ |
+| Recepcionar en B | B pendiente (rec. 3) ✓ | B pendiente (rec. 3) ✓ |
+| Terminar en B | excluido por estado doc=4 ✓ | excluido por estado doc=4 ✓ |
+
+#### Archivo modificado
+
+| Archivo | Función | Cambio |
+|---------|---------|--------|
+| `backend/src/modules/alertas/alertas.service.ts` | `getDocumentosPendientes()` | Reemplaza JOIN con `documento_destino` por CTE con `tramite` |
+
+#### Flujos no afectados
+
+El cambio es **exclusivamente interno** a `alertas.service.ts`. No modifica `documento.service.ts`, `documento.repository.ts`, ni ninguna otra función. La trazabilidad, bandeja, enviados, despacho, recepción y redespacho no se ven afectados.
+
+---
+
+### L.4 Configuración SMTP — Credenciales Reales
+
+#### Problema detectado
+
+`backend/.env` tenía `SMTP_PASS=REEMPLAZAR_CON_SMTP_PASSWORD_REAL` (placeholder). Al intentar enviar alertas, el servidor SMTP respondía `535 Incorrect authentication data`.
+
+#### Diagnóstico
+
+Tanto el flujo de recuperación de contraseña como el módulo de alertas usan el mismo `email.service.ts` → mismo `sendMail()` → mismas variables `env.SMTP_*`. La diferencia de comportamiento percibida era que el reset de contraseña **suprime el error silenciosamente** (devuelve HTTP 200 siempre), mientras alertas **muestra el error correctamente** al usuario.
+
+#### Solución
+
+- `backend/.env`: `SMTP_PASS` actualizado con la contraseña real del servidor `mail.huap.online`.
+- El singleton `nodemailer.Transporter` se recrea al reiniciar el backend (`tsx watch`).
+
+#### Nota de seguridad
+
+El archivo `.env` está en `.gitignore` y **no se incluye en el commit**. La contraseña SMTP no queda en el historial de git.
+
+---
+
+### L.5 Corrección de Bug — Eliminación de Documentos por Administrador
+
+#### Problema reportado
+
+El usuario con rol Administrador intentaba eliminar un documento desde el detalle y recibía el mensaje genérico "No se pudo eliminar el documento". El backend retornaba error 500.
+
+#### Investigación realizada
+
+| Aspecto | Resultado |
+|---------|-----------|
+| Rol `admin` en BD (`usuario_rol → rol.codigo`) | ✅ Correcto — `codigo = 'admin'`, `activo = 1` |
+| `requireRole('admin')` en `DELETE /documentos/:id` | ✅ Correcto |
+| `canDelete: isAdmin` en `useRole()` frontend | ✅ Correcto |
+| JWT incluye `roles: ['admin']` | ✅ Correcto |
+| `softDelete()` elimina `archivo_digital` | ✅ |
+| `softDelete()` elimina `tramite` | ✅ |
+| `softDelete()` elimina `documento_destino` | ❌ **AUSENTE — causa del error** |
+| `softDelete()` elimina `documento` | ❌ Falla por FK constraint |
+
+#### Causa raíz
+
+La función `softDelete` en `documento.repository.ts` no eliminaba los registros de `documento_destino` antes de intentar borrar el documento principal. La restricción de FK `FK_docdest_documento` (`documento_destino.id_documento → documento.id_documento`) bloqueaba el DELETE con:
+
+```
+Microsoft SQL Server: The DELETE statement conflicted with the REFERENCE constraint
+"FK_docdest_documento". The conflict occurred in table "dbo.documento_destino"
+```
+
+Este error no llegaba al frontend como mensaje útil porque el `onError` de `eliminarMut` usaba un mensaje hardcodeado genérico.
+
+#### Archivos modificados
+
+**1. `backend/src/modules/documentos/documento.repository.ts` — función `softDelete`**
+
+```typescript
+// ANTES (orden incompleto):
+DELETE FROM archivo_digital WHERE id_documento = @id
+DELETE FROM tramite          WHERE id_documento = @id
+DELETE FROM documento        WHERE id_documento = @id  ← FALLA por FK
+
+// DESPUÉS (orden correcto):
+DELETE FROM archivo_digital    WHERE id_documento = @id
+DELETE FROM tramite            WHERE id_documento = @id
+DELETE FROM documento_destino  WHERE id_documento = @id  ← AGREGADO
+DELETE FROM documento          WHERE id_documento = @id  ← ahora funciona
+```
+
+**2. `frontend/src/pages/documentos/DocumentoDetallePage.tsx` — `eliminarMut.onError`**
+
+```typescript
+// ANTES:
+onError: () => toast.error('No se pudo eliminar el documento'),
+
+// DESPUÉS:
+onError: (e) => {
+  const msg = e?.response?.data?.error ?? e?.response?.data?.message
+    ?? 'No se pudo eliminar el documento';
+  toast.error(msg);
+},
+```
+
+#### Validaciones post-fix
+
+- TypeScript backend: `npx tsc --noEmit` → **0 errores**
+- TypeScript frontend: `npx tsc --noEmit` → **0 errores**
+- FK mapeadas en BD: solo `FK_docdest_documento` referencia `documento` — ahora cubierta
+- El admin puede eliminar documentos con o sin `documento_destino`
+- Otros roles siguen bloqueados por `requireRole('admin')`
+- Trazabilidad, recepción, despacho, redespacho, bandeja, archivos — **sin cambios**
+
+---
+
+### L.6 Limpieza de Datos de Prueba
+
+Se eliminaron de la BD dos documentos de prueba creados durante la sesión:
+
+| id_documento | num_interno | materia | Tablas limpiadas |
+|-------------|------------|---------|-----------------|
+| 381233 | 1 | TEST TI | `documento_destino` (1 reg), `documento` (1 reg) |
+| 381234 | 1 | TES TI | `documento_destino` (1 reg), `documento` (1 reg) |
+
+Las eliminaciones se ejecutaron manualmente dentro de `BEGIN TRANSACTION` / `COMMIT` con verificación de conteos antes y después.
+
+---
+
+## M. ESTADO DEL SISTEMA AL CIERRE DE SESIÓN (25 mayo 2026)
+
+### Servicios activos
+
+| Servicio | Puerto | Estado |
+|---------|--------|--------|
+| SQL Server 2022 (Docker) | 1433 | ✅ Up |
+| Backend Node.js + Express | 3001 | ✅ Online — `/api/health` 200 |
+| Frontend React + Vite | 5173 | ✅ Online |
+| Scheduler de alertas | interno | ✅ Activo (intervalo 60s) |
+
+### Módulos funcionales al cierre
+
+| Módulo | Estado |
+|--------|--------|
+| Login / JWT / refresh | ✅ |
+| Dashboard + métricas | ✅ |
+| Documentos: listar, crear, detalle | ✅ |
+| Documentos: eliminar (admin) | ✅ Corregido en esta sesión |
+| Bandeja + recepción | ✅ |
+| Enviados | ✅ |
+| Trámites + despacho + redespacho | ✅ |
+| Trazabilidad | ✅ |
+| Búsqueda global | ✅ |
+| Archivos: upload + preview + descarga | ✅ |
+| Usuarios: CRUD + roles | ✅ |
+| Configuración del sistema | ✅ |
+| Reportes + exportar CSV | ✅ |
+| Recuperación de contraseña | ✅ |
+| **Alertas por correo** | ✅ Nuevo en esta sesión |
+
+### Riesgos abiertos (heredados del análisis previo, sin cambios)
+
+- Contraseña admin en texto plano hasta el primer login
+- BD sin backup automático configurado
+- `/uploads/` accesible sin autenticación
+- JWT secrets débiles en `.env` de desarrollo
+
+---
+
+## N. OBSERVACIONES TÉCNICAS
+
+1. **Tabla `documento_destino`** — Fue creada para el flujo multi-destino pero solo `crearDocumento` y `recepcionarDestino`/`terminarDestino` la actualizan. El flujo clásico de redespacho (`despacharDocumento`) no la toca. Este dualismo de fuentes de verdad puede generar inconsistencias en el futuro. Se recomienda evaluar si unificar ambos flujos en una sola fuente.
+
+2. **SMTP singleton** — `nodemailer.Transporter` se crea una sola vez (patrón singleton) al primer `sendMail()`. Si las credenciales cambian en `.env`, es necesario reiniciar el backend. Para producción, considerar recrear el transporter en cada envío o al detectar cambios de configuración.
+
+3. **Alertas y multi-destino** — La consulta `getDocumentosPendientes` usa `MAX(id_seguimiento)` para obtener el último despacho. En documentos con múltiples destinatarios simultáneos (multi-destino), solo mostrará el último destino insertado. Este es un caso edge que no impacta la operación actual (multi-destino apenas se usa), pero debe considerarse en una refactorización futura.
+
+4. **Error handling en frontend** — Se identificó un patrón de `onError: () => toast.error('mensaje genérico')` en varios `useMutation`. Esto oculta los mensajes reales del backend al usuario. Se recomienda una revisión global para mostrar los errores reales en todos los flujos.
+
+---
+
+## O. RECOMENDACIONES FUTURAS (actualizadas)
+
+Las recomendaciones de la sección I se mantienen vigentes. Se agregan:
+
+| Prioridad | Tarea |
+|-----------|-------|
+| 🟡 Media | Agregar `email` como campo obligatorio en la creación de usuarios para que el módulo de alertas pueda notificar desde el inicio |
+| 🟡 Media | Unificar `documento_destino` con el flujo de redespacho para que ambas rutas (multi-destino y single-destino) mantengan consistencia |
+| 🟢 Baja | Revisar todos los `onError` de mutaciones en el frontend para mostrar el error real del backend en lugar de mensajes genéricos |
+| 🟢 Baja | Agregar test de integración para el endpoint `DELETE /documentos/:id` que cubra el orden de eliminación de dependencias |

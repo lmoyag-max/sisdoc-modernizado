@@ -17,6 +17,8 @@ router.get('/buscar-por-numero', ctrl.buscarPorNumero);
 router.get('/:id',               ctrl.obtener);
 router.get('/:id/historial',     ctrl.historial);
 router.get('/:id/trazabilidad',  ctrl.trazabilidad);
+// Multi-destino: lista de servicios destino del documento
+router.get('/:id/destinos',      ctrl.listarDestinos);
 
 // Crear — cualquier usuario autenticado
 router.post('/', validate(crearDocumentoSchema), ctrl.crear);
@@ -31,6 +33,11 @@ router.post('/:id/derivar',     requireRole('admin', 'of.partes', 'supervisores'
 router.post('/:id/terminar',    requireRole('admin', 'of.partes', 'supervisores', 'funcionario'), validate(terminarSchema), ctrl.terminar);
 // Reabrir: admin y supervisores (of.partes NO puede reabrir)
 router.post('/:id/reabrir',     requireRole('admin', 'supervisores'),              validate(reabrirSchema),      ctrl.reabrir);
+
+// Multi-destino: operaciones por servicio específico
+// body: { idDocumentoDestino, observaciones? }
+router.post('/:id/recepcionar-destino', requireRole('admin','of.partes','supervisores','funcionario'), ctrl.recepcionarDestino);
+router.post('/:id/terminar-destino',    requireRole('admin','of.partes','supervisores','funcionario'), ctrl.terminarDestino);
 
 // Eliminar — solo admin
 router.delete('/:id', requireRole('admin'), ctrl.eliminar);

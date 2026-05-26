@@ -11,9 +11,11 @@ export const crearDocumentoSchema = z.object({
   observaciones: z.string().max(500).optional(),
   medio: z.string().max(1).optional(),
   original: z.string().max(1).default('S'),
-  // Trámite — Destino (único campo que elige el usuario)
+  // Trámite — Destino: uno o múltiples servicios
+  // destinos[] tiene prioridad. Si solo se envía idDestino, se convierte internamente.
   tipoDestinatario: z.enum(['D', 'E']).default('D'),
   idDestino: z.number().int().positive().optional(),
+  destinos:  z.array(z.number().int().positive()).min(1).max(20).optional(),
 
   // Trámite — Distribución / compromiso
   idTipoDistribucion: z.number().int().positive().default(5),

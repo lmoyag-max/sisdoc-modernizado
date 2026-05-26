@@ -3,6 +3,7 @@ import { env } from './config/env';
 import { logger } from './shared/utils/logger';
 import { getPool, closePool } from './config/database';
 import app from './app';
+import { startAlertaScheduler, stopAlertaScheduler } from './shared/services/alertas.scheduler';
 
 function getLocalIP(): string {
   const ifaces = os.networkInterfaces();
@@ -18,6 +19,8 @@ async function bootstrap(): Promise<void> {
   try {
     await getPool();
 
+    startAlertaScheduler();
+
     const server = app.listen(env.PORT, '0.0.0.0', () => {
       const ip = getLocalIP();
       logger.info('═══════════════════════════════════════════════════');
@@ -31,6 +34,7 @@ async function bootstrap(): Promise<void> {
 
     const shutdown = async (signal: string) => {
       logger.info(`${signal} — cerrando servidor...`);
+      stopAlertaScheduler();
       server.close(async () => {
         await closePool();
         process.exit(0);

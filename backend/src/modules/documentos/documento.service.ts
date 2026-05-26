@@ -74,23 +74,41 @@ export async function obtenerTrazabilidad(idDocumento: number) {
   return rows.map(mapTramite);
 }
 
+// ID de la dependencia "Dirección" (forzado cuando reservado=true)
+const ID_DIRECCION = 32;
+
 // ── Crear ─────────────────────────────────────────────────────
 // Regla de negocio: el origen se asigna SIEMPRE desde la dependencia del
 // usuario autenticado. El estado inicial es siempre DESPACHADO (2).
 // Soporta 1 o N destinos. Si destinos[] tiene >1 elemento, crea un tramite
 // y un documento_destino por cada servicio. Backward compat: si solo
 // llega idDestino, crea exactamente 1 destino (flujo previo intacto).
+// Extensión Oficina de Partes:
+//   tipoSoporte='F' → documento físico/papel (almacenado en medio='F')
+//   reservado=true  → destino forzado a Dirección (id=32), almacenado en resuelto='S'
 export async function crearDocumento(
   dto: CrearDocumentoDto,
   idUsuario: number,
   idDependenciaUsuario: number | null,
 ) {
   const idProcedencia = idDependenciaUsuario ?? 1;
+  const esReservado   = dto.reservado === true;
+  const esFisico      = dto.tipoSoporte === 'F';
 
-  // Resolver lista de destinos: prioriza destinos[] sobre idDestino
-  const listaDestinos: number[] = dto.destinos && dto.destinos.length > 0
-    ? dto.destinos
-    : [dto.idDestino ?? idProcedencia];
+  // Si es reservado, el destino siempre es Dirección — ignorar lo que envíe el frontend
+  const listaDestinos: number[] = esReservado
+    ? [ID_DIRECCION]
+    : dto.destinos && dto.destinos.length > 0
+      ? dto.destinos
+      : [dto.idDestino ?? idProcedencia];
+
+  // Prefijo de trazabilidad en observaciones del trámite inicial
+  const prefijos: string[] = [];
+  if (esFisico)    prefijos.push('[SOPORTE:FÍSICO]');
+  if (esReservado) prefijos.push('[RESERVADO→DIRECCIÓN]');
+  const obsConPrefijo = prefijos.length > 0
+    ? `${prefijos.join(' ')} ${dto.observaciones ?? ''}`.trim().substring(0, 250)
+    : dto.observaciones;
 
   // Crear el documento principal (solo 1 vez)
   const { idDocumento, idSeguimiento } = await repo.insert({
@@ -100,16 +118,17 @@ export async function crearDocumento(
     idUsuario,
     fechaDocumento:     dto.fechaDocumento ? new Date(dto.fechaDocumento) : undefined,
     original:           dto.original ?? 'S',
-    medio:              dto.medio,
+    medio:              esFisico ? 'F' : (dto.medio ?? null) ?? undefined,
+    resuelto:           esReservado ? 'S' : undefined,
     tipoProcedencia:    'D',
     idProcedencia,
-    tipoDestinatario:   listaDestinos.length === 1 ? dto.tipoDestinatario : 'D',
+    tipoDestinatario:   esReservado ? 'D' : (listaDestinos.length === 1 ? dto.tipoDestinatario : 'D'),
     idDestino:          listaDestinos[0],
     idTipoDistribucion: dto.idTipoDistribucion,
     idTipoCompromiso:   dto.idTipoCompromiso,
     idEstadoCompromiso: dto.idEstadoCompromiso,
     diasCompromiso:     dto.diasCompromiso,
-    observaciones:      dto.observaciones,
+    observaciones:      obsConPrefijo,
   });
   await repo.updateTramiteEstado(idSeguimiento, 2, { fechaDespacho: new Date() });
 
@@ -515,6 +534,9 @@ function mapDocumento(row: repo.DocumentoRow) {
     fechaIngreso:   row.fecha_sistema,
     fechaCierre:    null,
     observacion:    null,
+    // Campos Oficina de Partes (null-safe: docs legados no tienen estos campos)
+    tipoSoporte: row.medio === 'F' ? 'F' : 'D',
+    reservado:   row.resuelto === 'S',
   };
 }
 

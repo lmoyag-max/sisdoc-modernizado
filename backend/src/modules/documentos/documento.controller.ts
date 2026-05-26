@@ -99,15 +99,23 @@ export async function buscarPorNumero(req: Request, res: Response, next: NextFun
 
 // ── Crear ─────────────────────────────────────────────────────
 
+function esOficinaPartesOAdmin(u: AuthenticatedRequest['user']): boolean {
+  return u.roles.includes('admin') || u.roles.includes('of.partes');
+}
+
 export async function crear(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const u = user(req);
 
     // Solo admin y of.partes pueden crear documentos con destino externo.
-    // Esta validación se aplica independientemente del frontend — bloquea también
-    // intentos directos por API, Postman o manipulación del payload.
     if (req.body.tipoDestinatario === 'E' && !canSeeExternals(u)) {
       sendForbidden(res, 'No tienes permisos para crear documentos con destino externo');
+      return;
+    }
+
+    // Solo admin y of.partes pueden usar tipo soporte Físico o marcar como Reservado.
+    if ((req.body.tipoSoporte === 'F' || req.body.reservado === true) && !esOficinaPartesOAdmin(u)) {
+      sendForbidden(res, 'Solo Oficina de Partes puede crear documentos físicos o reservados');
       return;
     }
 

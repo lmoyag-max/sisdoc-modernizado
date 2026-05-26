@@ -18,6 +18,10 @@ export interface DocumentoRow {
   apellidos: string | null;
   fecha_documento: Date | null;
   fecha_sistema: Date | null;
+  // Campos Oficina de Partes: 'F'=Físico, null/'D'=Digital (columna medio legacy)
+  medio: string | null;
+  // Reservado: 'S'=sí (columna resuelto legacy reutilizada)
+  resuelto: string | null;
   total: number;
 }
 
@@ -98,6 +102,7 @@ export async function findMany(filtros: FiltrosDocumentoDto, filtroServicio?: Fi
       d.id_usuario, u.usuario,
       f.nombres, f.apellidos,
       d.fecha_documento, d.fecha_sistema,
+      d.medio, d.resuelto,
       COUNT(*) OVER() AS total
     FROM documento d
     LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
@@ -125,6 +130,7 @@ export async function findByNumero(numero: number): Promise<DocumentoRow[]> {
         d.id_usuario, u.usuario,
         f.nombres, f.apellidos,
         d.fecha_documento, d.fecha_sistema,
+        d.medio, d.resuelto,
         0 AS total
       FROM documento d
       LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
@@ -149,6 +155,7 @@ export async function findById(idDocumento: number): Promise<DocumentoRow | null
       d.id_usuario, u.usuario,
       f.nombres, f.apellidos,
       d.fecha_documento, d.fecha_sistema,
+      d.medio, d.resuelto,
       0 AS total
     FROM documento d
     LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
@@ -208,6 +215,7 @@ export async function insert(data: {
   fechaDocumento?: Date;
   medio?: string;
   original?: string;
+  resuelto?: string;
   // Trámite
   tipoProcedencia: string;
   idProcedencia: number;
@@ -241,15 +249,16 @@ export async function insert(data: {
     .input('fechaDoc',  sql.DateTime,   fechaDoc)
     .input('medio',     sql.VarChar(1), data.medio ?? null)
     .input('original',  sql.VarChar(1), data.original ?? 'S')
+    .input('resuelto',  sql.Char(1),    data.resuelto ?? null)
     .query<{ id_documento: number }>(`
       INSERT INTO documento
         (id_tipo_documento, id_estado_documento, id_usuario,
-         num_interno, num_oficial, num_externo, original, medio,
+         num_interno, num_oficial, num_externo, original, medio, resuelto,
          materia, fecha_documento, fecha_sistema, fecha_update)
       OUTPUT INSERTED.id_documento
       VALUES
         (@idTipo, @idEstado, @idUsr,
-         @numInt, @numOf, 0, @original, @medio,
+         @numInt, @numOf, 0, @original, @medio, @resuelto,
          @materia, @fechaDoc, GETDATE(), GETDATE())
     `);
   const idDocumento = docRes.recordset[0].id_documento;

@@ -23,6 +23,12 @@ export const crearDocumentoSchema = z.object({
   idEstadoCompromiso: z.number().int().positive().default(2),
   diasCompromiso: z.number().int().min(0).default(0),
 
+  // Campos Oficina de Partes (solo of.partes y admin pueden enviarlos)
+  // tipoSoporte: 'D'=Digital (flujo normal), 'F'=Físico/Papel (genera nómina)
+  tipoSoporte: z.enum(['D', 'F']).default('D').optional(),
+  // reservado: true → destino forzado a Dirección (id=32), sin nomina
+  reservado: z.boolean().default(false).optional(),
+
   // Campos ignorados desde frontend (mantenidos por retrocompatibilidad)
   idEstadoDocumento: z.number().int().optional(),
   tipoProcedencia: z.enum(['D', 'E']).optional(),

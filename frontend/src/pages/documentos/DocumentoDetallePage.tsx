@@ -9,7 +9,10 @@ import {
   CheckCircle2, GitBranch, Paperclip, Download, RefreshCw,
   AlertCircle, Hash, Building2, Send, Loader2, Trash2,
   Image as ImageIcon, FileSpreadsheet, File, Eye, Users, X,
+  FileStack, ShieldAlert, Printer,
 } from 'lucide-react';
+import { NominaModal } from '@/components/documentos/NominaModal';
+import { type NominaData } from '@/lib/utils/nomina.generator';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,6 +68,9 @@ interface Documento {
   fechaIngreso: string | null;
   observacion: string | null;
   tramiteActual?: TramiteEvento | null;
+  // Campos Oficina de Partes
+  tipoSoporte?: 'D' | 'F';
+  reservado?: boolean;
 }
 
 interface TramiteEvento {
@@ -179,6 +185,7 @@ export function DocumentoDetallePage() {
   const [reabrirOpen,       setReopenOpen]        = useState(false);
   const [reabrirObs,        setReopenObs]         = useState('');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [nominaOpen,        setNominaOpen]        = useState(false);
 
   const { data: archivos, isLoading: loadingArchivos } = useQuery({
     queryKey: ['archivos', idDocumento],
@@ -314,6 +321,16 @@ export function DocumentoDetallePage() {
                     <Badge variant="secondary">{safeStr(doc.estadoDocumento.descripcion)}</Badge>
                   )
                 }
+                {doc?.tipoSoporte === 'F' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    <FileStack className="h-3 w-3" aria-hidden="true" />Físico
+                  </span>
+                )}
+                {doc?.reservado && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+                    <ShieldAlert className="h-3 w-3" aria-hidden="true" />Reservado
+                  </span>
+                )}
               </div>
             </>
           )}
@@ -438,13 +455,25 @@ export function DocumentoDetallePage() {
           {/* Archivos adjuntos */}
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Paperclip className="h-4 w-4 text-primary" />Archivos adjuntos
                 </CardTitle>
-                <Link to="/archivos">
-                  <Button variant="ghost" size="sm" className="text-xs h-7">Gestionar</Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                  {doc?.tipoSoporte === 'F' && (
+                    <Button
+                      type="button" variant="outline" size="sm"
+                      className="gap-1.5 h-8 text-xs text-amber-700 dark:text-amber-400 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                      onClick={() => setNominaOpen(true)}
+                    >
+                      <Printer className="h-3.5 w-3.5" aria-hidden="true" />
+                      Nómina
+                    </Button>
+                  )}
+                  <Link to="/archivos">
+                    <Button variant="ghost" size="sm" className="text-xs h-7">Gestionar</Button>
+                  </Link>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -769,6 +798,26 @@ export function DocumentoDetallePage() {
           invalidarTodo();
         }}
       />
+
+      {/* Modal nómina PDF — solo para documentos físicos */}
+      {doc?.tipoSoporte === 'F' && (
+        <NominaModal
+          open={nominaOpen}
+          onClose={() => setNominaOpen(false)}
+          data={{
+            idDocumento,
+            numDocumento:   doc.numInterno ?? doc.numDocumento,
+            materia:        doc.materia,
+            tipoDocumento:  doc.tipoDocumento?.descripcion ?? null,
+            fechaDocumento: doc.fechaDocumento,
+            fechaIngreso:   doc.fechaIngreso,
+            ingresadoPor:   safeStr(doc.ingresadoPor),
+            origen:         doc.tramiteActual?.procedencia?.descripcion ?? null,
+            destinos:       (destinos ?? []).map((d) => d.servicio ?? '—'),
+            observaciones:  null,
+          } satisfies NominaData}
+        />
+      )}
     </div>
   );
 }

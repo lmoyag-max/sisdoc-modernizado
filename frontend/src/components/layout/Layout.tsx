@@ -18,7 +18,7 @@ export function Layout() {
             onClick={() => setMobileOpen(true)}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             aria-label="Abrir menú"
-            aria-expanded={false}
+            aria-expanded={mobileOpen}
           >
             <Menu className="h-5 w-5" />
           </button>

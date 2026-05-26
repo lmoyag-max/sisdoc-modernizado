@@ -14,11 +14,11 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const ESTADO_COLORES: Record<number, string> = {
-  1: '#3b82f6',
-  2: '#0ea5e9',
-  3: '#f59e0b',
-  4: '#8b5cf6',
-  5: '#10b981',
+  1: 'hsl(217, 91%, 60%)',
+  2: 'hsl(199, 89%, 48%)',
+  3: 'hsl(38, 92%, 50%)',
+  4: 'hsl(265, 89%, 62%)',
+  5: 'hsl(160, 84%, 39%)',
 };
 
 const ACCION_BADGE: Record<string, { label: string; variant: 'info' | 'warning' | 'success' | 'secondary' }> = {
@@ -118,7 +118,7 @@ export function DashboardPage() {
             {loadingDash ? (
               <div className="h-56 flex items-end gap-2 px-2">
                 {[40, 65, 50, 80, 55, 70].map((h, i) => (
-                  <div key={i} className="flex-1 animate-pulse rounded-t bg-muted" style={{ height: `${h}%` }} />
+                  <Skeleton key={i} className="flex-1 rounded-t rounded-b-none" style={{ height: `${h}%` }} />
                 ))}
               </div>
             ) : (

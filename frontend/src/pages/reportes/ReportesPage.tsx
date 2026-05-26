@@ -3,6 +3,7 @@ import {
   FileText, HardDrive, Users, GitBranch,
   Download, RefreshCw, TrendingUp, Clock,
 } from 'lucide-react';
+import { MetricCard } from '@/components/dashboard/MetricCard';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -31,7 +32,15 @@ interface ActividadItem {
   usuario: string | null; nombres_fun: string | null;
 }
 
-const ESTADO_COLORS = ['#6366f1', '#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#f97316'];
+const ESTADO_COLORS = [
+  'hsl(239, 84%, 60%)',
+  'hsl(199, 89%, 48%)',
+  'hsl(38, 92%, 50%)',
+  'hsl(160, 84%, 39%)',
+  'hsl(265, 89%, 62%)',
+  'hsl(0, 84%, 60%)',
+  'hsl(24, 95%, 53%)',
+];
 
 const ACCION_BADGE: Record<string, string> = {
   DERIVADO:    'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
@@ -40,27 +49,6 @@ const ACCION_BADGE: Record<string, string> = {
   MOVIMIENTO:  'bg-muted text-muted-foreground',
 };
 
-function MetricBox({ icon: Icon, label, value, sub, color }: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string; value: number | string; sub?: string; color: string;
-}) {
-  return (
-    <Card className="card-hover">
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-center gap-4">
-          <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', color)}>
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-foreground">{value}</p>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            {sub && <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 export function ReportesPage() {
   const { data, isLoading, refetch, isFetching } = useQuery({
@@ -89,11 +77,11 @@ export function ReportesPage() {
   };
 
   const metrics = data ? [
-    { icon: FileText,   label: 'Documentos',   value: data.totales.total,       sub: `${data.totales.pendientes} activos`,   color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
-    { icon: HardDrive,  label: 'Archivos',      value: data.totales.archivos,    sub: 'digitales subidos',                   color: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400' },
-    { icon: GitBranch,  label: 'Trámites',      value: data.totales.tramites,    sub: 'movimientos',                         color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
-    { icon: Users,      label: 'Usuarios',      value: data.totales.usuarios,    sub: 'activos',                             color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    { icon: Clock,      label: 'Creados hoy',   value: data.totales.cerradosHoy, sub: 'nuevos hoy',                         color: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
+    { icon: FileText,  title: 'Documentos',  value: data.totales.total,       description: `${data.totales.pendientes} activos`,  colorClass: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
+    { icon: HardDrive, title: 'Archivos',    value: data.totales.archivos,    description: 'digitales subidos',                   colorClass: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400' },
+    { icon: GitBranch, title: 'Trámites',   value: data.totales.tramites,    description: 'movimientos',                         colorClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
+    { icon: Users,     title: 'Usuarios',   value: data.totales.usuarios,    description: 'activos',                             colorClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' },
+    { icon: Clock,     title: 'Creados hoy', value: data.totales.cerradosHoy, description: 'nuevos hoy',                         colorClass: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
   ] : [];
 
   return (
@@ -124,8 +112,8 @@ export function ReportesPage() {
       {/* Métricas principales */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
         {isLoading
-          ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
-          : metrics.map((m) => <MetricBox key={m.label} {...m} />)
+          ? Array.from({ length: 5 }).map((_, i) => <MetricCard key={i} title="" value="" icon={FileText} variant="compact" loading />)
+          : metrics.map((m) => <MetricCard key={m.title} {...m} variant="compact" />)
         }
       </div>
 
@@ -260,7 +248,7 @@ export function ReportesPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground line-clamp-1">{item.asunto ?? 'Sin materia'}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', ACCION_BADGE[item.accion] ?? ACCION_BADGE.MOVIMIENTO)}>
+                      <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', ACCION_BADGE[item.accion] ?? ACCION_BADGE.MOVIMIENTO)}>
                         {item.accion}
                       </span>
                       {item.num_documento && <span className="text-xs text-muted-foreground font-mono">#{item.num_documento}</span>}

@@ -8,7 +8,7 @@ import {
   ArrowLeft, FileText, Calendar, User, Tag, Clock,
   CheckCircle2, GitBranch, Paperclip, Download, RefreshCw,
   AlertCircle, Hash, Building2, Send, Loader2, Trash2,
-  Image as ImageIcon, FileSpreadsheet, File, Eye, Users,
+  Image as ImageIcon, FileSpreadsheet, File, Eye, Users, X,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -178,6 +178,7 @@ export function DocumentoDetallePage() {
   const [despacharOpen,     setDespacharOpen]     = useState(false);
   const [reabrirOpen,       setReopenOpen]        = useState(false);
   const [reabrirObs,        setReopenObs]         = useState('');
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const { data: archivos, isLoading: loadingArchivos } = useQuery({
     queryKey: ['archivos', idDocumento],
@@ -405,21 +406,21 @@ export function DocumentoDetallePage() {
                           {desp && canRecepcionar && (
                             <Button
                               size="sm" variant="outline"
-                              className="h-7 px-2 gap-1 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                              className="h-9 px-3 gap-1.5 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                               onClick={() => recepcionarDestMut.mutate(dest.id)}
                               disabled={recepcionarDestMut.isPending}
                             >
-                              <CheckCircle2 className="h-3 w-3" />Recepcionar
+                              <CheckCircle2 className="h-3.5 w-3.5" />Recepcionar
                             </Button>
                           )}
                           {recep && canTerminar && (
                             <Button
                               size="sm" variant="outline"
-                              className="h-7 px-2 gap-1 text-xs"
+                              className="h-9 px-3 gap-1.5 text-xs"
                               onClick={() => terminarDestMut.mutate(dest.id)}
                               disabled={terminarDestMut.isPending}
                             >
-                              <CheckCircle2 className="h-3 w-3 text-slate-500" />Cerrar
+                              <CheckCircle2 className="h-3.5 w-3.5 text-slate-500" />Cerrar
                             </Button>
                           )}
                           {cerrado && (
@@ -495,7 +496,7 @@ export function DocumentoDetallePage() {
                         <div className="flex items-center gap-1 shrink-0">
                           {canPreview && (
                             <Button
-                              variant="ghost" size="icon" className="h-7 w-7" title="Vista previa"
+                              variant="ghost" size="icon" className="h-9 w-9" title="Vista previa" aria-label="Vista previa del archivo"
                               onClick={() => setPreviewFile({
                                 id: a.id_archivo,
                                 nombre,
@@ -508,7 +509,7 @@ export function DocumentoDetallePage() {
                           )}
                           {(a.download_url ?? a.url) && (
                             <a href={a.download_url ?? a.url ?? ''} download>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Descargar">
+                              <Button variant="ghost" size="icon" className="h-9 w-9" title="Descargar" aria-label="Descargar archivo">
                                 <Download className="h-3.5 w-3.5" />
                               </Button>
                             </a>
@@ -536,7 +537,7 @@ export function DocumentoDetallePage() {
               {canRecepcionar && estadoId === 2 && (
                 <Button
                   variant="outline" size="sm"
-                  className="w-full justify-start gap-2"
+                  className="w-full justify-start gap-2 h-9"
                   onClick={() => recepcionarMut.mutate()}
                   disabled={recepcionarMut.isPending}
                 >
@@ -547,7 +548,7 @@ export function DocumentoDetallePage() {
               {canRedespachar && estadoId === 2 && (
                 <Button
                   variant="outline" size="sm"
-                  className="w-full justify-start gap-2"
+                  className="w-full justify-start gap-2 h-9"
                   onClick={() => setDespacharOpen(true)}
                 >
                   <Send className="h-3.5 w-3.5 text-orange-500" />Redespachar a otro destino
@@ -558,7 +559,7 @@ export function DocumentoDetallePage() {
               {canDespachar && estadoId === 3 && (
                 <Button
                   variant="outline" size="sm"
-                  className="w-full justify-start gap-2"
+                  className="w-full justify-start gap-2 h-9"
                   onClick={() => setDespacharOpen(true)}
                 >
                   <Send className="h-3.5 w-3.5 text-amber-500" />Despachar
@@ -569,7 +570,7 @@ export function DocumentoDetallePage() {
               {canDespachar && estadoId === 1 && (
                 <Button
                   variant="outline" size="sm"
-                  className="w-full justify-start gap-2"
+                  className="w-full justify-start gap-2 h-9"
                   onClick={() => setDespacharOpen(true)}
                 >
                   <Send className="h-3.5 w-3.5 text-amber-500" />Despachar
@@ -580,7 +581,7 @@ export function DocumentoDetallePage() {
               {canTerminar && estadoId === 3 && (
                 <Button
                   variant="outline" size="sm"
-                  className="w-full justify-start gap-2"
+                  className="w-full justify-start gap-2 h-9"
                   onClick={() => terminarMut.mutate()}
                   disabled={terminarMut.isPending}
                 >
@@ -602,16 +603,16 @@ export function DocumentoDetallePage() {
               <Separator />
 
               <Link to="/trazabilidad" className="block">
-                <Button variant="ghost" size="sm" className="w-full justify-start gap-2">
+                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 h-9">
                   <GitBranch className="h-3.5 w-3.5" />Ver trazabilidad completa
                 </Button>
               </Link>
               <Link to="/archivos" className="block">
-                <Button variant="ghost" size="sm" className="w-full justify-start gap-2">
+                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 h-9">
                   <Paperclip className="h-3.5 w-3.5" />Adjuntar archivo
                 </Button>
               </Link>
-              <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => navigate('/documentos')}>
+              <Button variant="ghost" size="sm" className="w-full justify-start gap-2 h-9" onClick={() => navigate('/documentos')}>
                 <ArrowLeft className="h-3.5 w-3.5" />Volver al listado
               </Button>
 
@@ -620,8 +621,8 @@ export function DocumentoDetallePage() {
                   <Separator />
                   <Button
                     variant="ghost" size="sm"
-                    className="w-full justify-start gap-2 text-destructive hover:bg-destructive/10"
-                    onClick={() => { if (confirm('¿Eliminar este documento? Esta acción no se puede deshacer.')) eliminarMut.mutate(); }}
+                    className="w-full justify-start gap-2 h-9 text-destructive hover:bg-destructive/10"
+                    onClick={() => setConfirmDeleteOpen(true)}
                     disabled={eliminarMut.isPending}
                   >
                     {eliminarMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
@@ -661,6 +662,48 @@ export function DocumentoDetallePage() {
         file={previewFile}
       />
 
+      {/* Modal confirmar eliminación */}
+      {confirmDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteOpen(false)} />
+          <div className="relative w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl animate-scale-in">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-destructive/10">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">Eliminar documento</p>
+                <p className="text-xs text-muted-foreground truncate">{materia}</p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setConfirmDeleteOpen(false)} aria-label="Cerrar">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-muted-foreground">
+                Esta acción <strong className="text-foreground">no se puede deshacer</strong>. El documento y todos sus archivos adjuntos serán eliminados permanentemente.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
+              <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)} disabled={eliminarMut.isPending}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => { setConfirmDeleteOpen(false); eliminarMut.mutate(); }}
+                disabled={eliminarMut.isPending}
+                className="gap-2"
+              >
+                {eliminarMut.isPending
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Eliminando…</>
+                  : <><Trash2 className="h-3.5 w-3.5" />Eliminar documento</>
+                }
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal reabrir documento */}
       {reabrirOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -674,8 +717,8 @@ export function DocumentoDetallePage() {
                 <p className="text-sm font-semibold text-foreground">Reabrir documento</p>
                 <p className="text-xs text-muted-foreground truncate">{materia}</p>
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setReopenOpen(false)}>
-                <AlertCircle className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setReopenOpen(false)} aria-label="Cerrar">
+                <X className="h-4 w-4" />
               </Button>
             </div>
             <div className="p-5 space-y-4">

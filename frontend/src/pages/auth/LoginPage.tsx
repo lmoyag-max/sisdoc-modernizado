@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -177,7 +177,7 @@ export function LoginPage() {
 
           {/* Footer */}
           <div className="mt-8">
-            <p className="text-slate-600 text-xs">{textos.footer}</p>
+            <p className="text-slate-400 text-xs">{textos.footer}</p>
           </div>
         </div>
       </div>
@@ -271,9 +271,9 @@ export function LoginPage() {
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -283,14 +283,11 @@ export function LoginPage() {
               )}
             </div>
 
-            {/* Olvidaste tu contraseña */}
+            {/* Olvidaste tu contraseña — pendiente implementación */}
             <div className="flex justify-end -mt-1">
-              <Link
-                to="/forgot-password"
-                className="text-xs text-muted-foreground hover:text-primary transition-colors"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
+              <span className="text-xs text-muted-foreground/60 select-none cursor-default">
+                ¿Olvidaste tu contraseña? Contacta a TI
+              </span>
             </div>
 
             {/* Submit */}
@@ -305,9 +302,13 @@ export function LoginPage() {
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
             ¿Problemas para acceder?{' '}
-            <span className="text-primary cursor-pointer hover:underline">
+            <button
+              type="button"
+              className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+              onClick={() => toast.info('Contacta al área de Tecnología Informática del HUAP')}
+            >
               Contacta a soporte
-            </span>
+            </button>
           </p>
         </div>
       </div>

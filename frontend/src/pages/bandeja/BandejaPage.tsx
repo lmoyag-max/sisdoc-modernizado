@@ -159,29 +159,31 @@ export function BandejaPage() {
                       </p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-muted-foreground">
                         {t.num_interno && <span className="font-mono">N° {t.num_interno}</span>}
-                        {t.desc_tipo_documento && <span className="hidden sm:inline">{t.desc_tipo_documento}</span>}
-                        {(t.desc_procedencia || t.desc_destino) && (
-                          <span className="flex items-center gap-1">
-                            <span className="hidden sm:inline">{t.desc_procedencia ?? '—'} →</span>
-                            <span className="font-medium text-foreground">{t.desc_destino ?? '—'}</span>
-                          </span>
-                        )}
+                        {t.desc_tipo_documento && <span>{t.desc_tipo_documento}</span>}
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {formatRelativo(t.fecha_sistema)}
                         </span>
                       </div>
+                      {/* Procedencia → Destino: visible en todas las pantallas */}
+                      {(t.desc_procedencia || t.desc_destino) && (
+                        <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground">
+                          {t.desc_procedencia && <span className="truncate max-w-[120px]">{t.desc_procedencia}</span>}
+                          {t.desc_procedencia && t.desc_destino && <span>→</span>}
+                          {t.desc_destino && <span className="font-medium text-foreground truncate max-w-[140px]">{t.desc_destino}</span>}
+                        </div>
+                      )}
                       {/* Acción en mobile: debajo del contenido */}
                       {isPendiente && (
                         <div className="mt-2 sm:hidden">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-xs gap-1"
+                            className="h-9 text-xs gap-1.5 px-3"
                             loading={recibirMutation.isPending}
                             onClick={() => recibirMutation.mutate(t.id_seguimiento)}
                           >
-                            <CheckCircle className="h-3 w-3" />
+                            <CheckCircle className="h-3.5 w-3.5" />
                             Recibir
                           </Button>
                         </div>
@@ -189,24 +191,22 @@ export function BandejaPage() {
                     </div>
                     {/* Badge + botón — en desktop a la derecha */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {estadoConf && (
-                        <Badge variant={estadoConf.variant} className="hidden sm:inline-flex">{estadoConf.label}</Badge>
+                      {estadoConf && !isPendiente && (
+                        <Badge variant={estadoConf.variant}>{estadoConf.label}</Badge>
                       )}
                       {isPendiente && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs gap-1 hidden sm:flex"
+                          className="h-9 text-xs gap-1.5 px-3 hidden sm:flex shrink-0"
                           loading={recibirMutation.isPending}
                           onClick={() => recibirMutation.mutate(t.id_seguimiento)}
                         >
-                          <CheckCircle className="h-3 w-3" />
+                          <CheckCircle className="h-3.5 w-3.5" />
                           Recibir
                         </Button>
                       )}
-                      {!isPendiente && estadoConf && (
-                        <Badge variant={estadoConf.variant} className="sm:hidden">{estadoConf.label}</Badge>
-                      )}
+                      {/* Badge mobile de estado ya renderizado arriba de forma unificada */}
                     </div>
                   </div>
                 );
@@ -222,10 +222,10 @@ export function BandejaPage() {
               Página {meta.pagina} de {meta.totalPaginas} · {meta.total} documentos
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
+              <Button variant="outline" size="icon" className="h-9 w-9" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)}>
+              <Button variant="outline" size="icon" className="h-9 w-9" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

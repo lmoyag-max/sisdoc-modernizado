@@ -105,7 +105,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             {!collapsed && (
               <div className="animate-fade-in min-w-0">
                 <p className="text-sm font-semibold text-sidebar-foreground leading-tight">SISDOC</p>
-                <p className="text-[10px] text-sidebar-foreground/50 leading-tight">HUAP · Gestión Documental</p>
+                <p className="text-xs text-sidebar-foreground/50 leading-tight">HUAP · Gestión Documental</p>
               </div>
             )}
           </div>
@@ -114,8 +114,9 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
         {/* Botón colapsar */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-[72px] z-20 flex h-6 w-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-sm hover:bg-sidebar-accent transition-colors"
-          aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+          type="button"
+          className="absolute -right-3 top-[72px] z-20 flex h-7 w-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-sm hover:bg-sidebar-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary"
+          aria-label={collapsed ? 'Expandir menú de navegación' : 'Colapsar menú de navegación'}
         >
           {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
         </button>
@@ -123,7 +124,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5 scrollbar-thin">
           {!collapsed && itemsPrincipal.length > 0 && (
-            <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1">
+            <p className="px-3 py-1 text-xs font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1">
               Principal
             </p>
           )}
@@ -134,7 +135,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             <>
               <div className="py-2 px-1"><Separator className="bg-sidebar-border" /></div>
               {!collapsed && (
-                <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1">
+                <p className="px-3 py-1 text-xs font-semibold uppercase tracking-widest text-sidebar-foreground/40 mb-1">
                   Administración
                 </p>
               )}
@@ -154,7 +155,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             {!collapsed && (
               <div className="flex-1 min-w-0 animate-fade-in">
                 <p className="text-xs font-semibold truncate text-sidebar-foreground leading-tight">{nombre}</p>
-                <p className="text-[10px] text-sidebar-foreground/50 truncate leading-tight">{rolLabel}</p>
+                <p className="text-xs text-sidebar-foreground/50 truncate leading-tight">{rolLabel}</p>
               </div>
             )}
             {!collapsed && (
@@ -168,8 +169,10 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
           </div>
           {collapsed && (
             <Button variant="ghost" size="icon"
-              className="w-full h-8 mt-1 text-sidebar-foreground/40 hover:text-destructive hover:bg-sidebar-accent"
-              onClick={handleLogout} title="Cerrar sesión"
+              className="w-full h-10 mt-1 text-sidebar-foreground/40 hover:text-destructive hover:bg-sidebar-accent"
+              onClick={handleLogout}
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
             >
               <LogOut className="h-4 w-4" />
             </Button>
@@ -202,7 +205,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-sidebar-foreground leading-tight">SISDOC</p>
-                  <p className="text-[10px] text-sidebar-foreground/50 leading-tight">HUAP · Gestión Documental</p>
+                  <p className="text-xs text-sidebar-foreground/50 leading-tight">HUAP · Gestión Documental</p>
                 </div>
               </div>
               <button
@@ -245,7 +248,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold truncate text-sidebar-foreground leading-tight">{nombre}</p>
-                  <p className="text-[10px] text-sidebar-foreground/50 truncate leading-tight">{rolLabel}</p>
+                  <p className="text-xs text-sidebar-foreground/50 truncate leading-tight">{rolLabel}</p>
                 </div>
                 <Button variant="ghost" size="icon"
                   className="h-7 w-7 shrink-0 text-sidebar-foreground/50 hover:text-destructive hover:bg-sidebar-accent"

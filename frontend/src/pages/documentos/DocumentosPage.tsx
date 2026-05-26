@@ -85,8 +85,90 @@ export function DocumentosPage() {
         </CardContent>
       </Card>
 
-      {/* Tabla */}
-      <Card>
+      {/* Empty state compartido (mobile y desktop cuando sin resultados) */}
+      {!loading && documentos.length === 0 && (
+        <Card className="md:hidden">
+          <EmptyState
+            title="Sin documentos"
+            description="No se encontraron documentos con los filtros seleccionados."
+            action={search ? <Button variant="outline" onClick={() => setSearch('')}>Limpiar búsqueda</Button> : undefined}
+          />
+        </Card>
+      )}
+
+      {/* Vista mobile — cards apiladas (< md) */}
+      <div className={cn('md:hidden space-y-2', isFetching && 'opacity-60 transition-opacity')}>
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i} className="p-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <div className="flex gap-2 mt-2">
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+              </div>
+            </Card>
+          ))
+        ) : documentos.length === 0 ? null : (
+          documentos.map((doc) => {
+            const badge = ESTADO_BADGE[doc.estadoDocumento?.id ?? 0] ?? { label: 'Desconocido', variant: 'secondary' as const };
+            return (
+              <Link
+                key={doc.idDocumento}
+                to={`/documentos/${doc.idDocumento}`}
+                className="block"
+              >
+                <Card className="hover:border-primary/40 transition-colors group">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                          {doc.asunto ?? 'Sin asunto'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                          <span className="font-mono">{doc.numDocumento ?? `#${doc.idDocumento}`}</span>
+                          {doc.tipoDocumento?.descripcion && (
+                            <span>{doc.tipoDocumento.descripcion}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant={badge.variant} className="shrink-0 mt-0.5">{badge.label}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                      <span>{doc.ingresadoPor.nombre || doc.ingresadoPor.usuario || '—'}</span>
+                      <span>{doc.fechaIngreso ? formatFechaHora(doc.fechaIngreso).split(' ')[0] : '—'}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })
+        )}
+      </div>
+
+      {/* Paginación mobile */}
+      {meta && meta.totalPaginas > 1 && (
+        <div className="flex items-center justify-between md:hidden">
+          <p className="text-xs text-muted-foreground">
+            {meta.pagina} / {meta.totalPaginas} · {meta.total} docs
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-9 w-9"
+              disabled={meta.pagina <= 1} onClick={() => setPage(meta.pagina - 1)} aria-label="Página anterior">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-9 w-9"
+              disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPage(meta.pagina + 1)} aria-label="Página siguiente">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabla desktop — visible en md+ */}
+      <Card className="hidden md:block">
         <div className="overflow-x-auto">
           <div className="min-w-[640px]">
             <CardHeader className="px-6 py-4 border-b">
@@ -166,10 +248,12 @@ export function DocumentosPage() {
                           {doc.prioridad?.descripcion && (
                             <span
                               className="inline-flex h-2 w-2 rounded-full"
-                              style={{ backgroundColor: doc.prioridad?.color ?? '#94a3b8' }}
-                              title={doc.prioridad.descripcion}
+                              style={{ backgroundColor: doc.prioridad?.color ?? 'hsl(var(--muted-foreground))' }}
+                              aria-hidden="true"
                             />
                           )}
+                          {/* Texto accesible para lectores de pantalla */}
+                          <span className="sr-only">{doc.prioridad?.descripcion ?? 'Sin prioridad'}</span>
                         </div>
                         <div className="col-span-1">
                           <Badge variant={badge.variant}>{badge.label}</Badge>
@@ -198,9 +282,10 @@ export function DocumentosPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8"
+                className="h-9 w-9"
                 disabled={meta.pagina <= 1}
                 onClick={() => setPage(meta.pagina - 1)}
+                aria-label="Página anterior"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -210,9 +295,10 @@ export function DocumentosPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8"
+                className="h-9 w-9"
                 disabled={meta.pagina >= meta.totalPaginas}
                 onClick={() => setPage(meta.pagina + 1)}
+                aria-label="Página siguiente"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

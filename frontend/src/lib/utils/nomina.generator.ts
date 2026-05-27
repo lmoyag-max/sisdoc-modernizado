@@ -35,6 +35,22 @@ function fmtFecha(val: string | null | undefined): string {
   }
 }
 
+/** Dibuja el logo como sello de agua centrado en la página con opacidad baja. */
+function renderWatermarkLogo(doc: jsPDF, dataUrl: string, pW: number, pH: number): void {
+  try {
+    const wmW = 80;
+    const wmH = 80;
+    const wmX = (pW - wmW) / 2;
+    const wmY = (pH - wmH) / 2;
+    doc.saveGraphicsState();
+    doc.setGState(new GState({ opacity: 0.07 }));
+    doc.addImage(dataUrl, wmX, wmY, wmW, wmH);
+    doc.restoreGraphicsState();
+  } catch (err) {
+    console.warn('[nominaPDF] renderWatermarkLogo falló:', err);
+  }
+}
+
 export function generarNominaPDF(data: NominaData): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pW  = 210;
@@ -69,8 +85,8 @@ export function generarNominaPDF(data: NominaData): jsPDF {
   if (data.logoBase64) {
     try {
       doc.addImage(data.logoBase64, logoX, logoY, logoSz, logoSz);
-    } catch {
-      // Fallo silencioso — header continúa con texto solamente
+    } catch (err) {
+      console.warn('[nominaPDF] addImage logo header falló:', err);
     }
   }
 
@@ -208,24 +224,9 @@ export function generarNominaPDF(data: NominaData): jsPDF {
   });
   doc.text(`Generado el ${ahora} — ${BRANDING.piePagina}`, mg + cW / 2, y, { align: 'center' });
 
-  // ── Sello de agua institucional ────────────────────────────
-  // Dibujado AL FINAL con GState opacity 0.07:
-  //   final_pixel = 7% logo + 93% contenido existente
-  // El logo queda como marca institucional apenas perceptible.
+  // Sello de agua al final para quedar detrás del texto (opacity 7 %)
   if (data.watermarkBase64) {
-    try {
-      const wmW = 80;
-      const wmH = 80;
-      const wmX = (pW - wmW) / 2;  // centrado horizontal en página
-      const wmY = (pH - wmH) / 2;  // centrado vertical en página
-
-      doc.saveGraphicsState();
-      doc.setGState(new GState({ opacity: 0.07 }));
-      doc.addImage(data.watermarkBase64, wmX, wmY, wmW, wmH);
-      doc.restoreGraphicsState();
-    } catch {
-      // Sello de agua falla silenciosamente
-    }
+    renderWatermarkLogo(doc, data.watermarkBase64, pW, pH);
   }
 
   return doc;

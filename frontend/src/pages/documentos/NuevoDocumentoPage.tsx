@@ -45,13 +45,26 @@ const sel = (hasErr?: boolean) => cn(
   hasErr && 'border-destructive'
 );
 
+const MAX_FILE_MB       = 20;
+const MAX_FILE_BYTES    = MAX_FILE_MB * 1024 * 1024;
+const CUOTA_TOTAL_MB    = 60;
+const CUOTA_TOTAL_BYTES = CUOTA_TOTAL_MB * 1024 * 1024;
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024)        return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function NuevoDocumentoPage() {
   const navigate   = useNavigate();
   const user       = useAuthStore((s) => s.user);
 
   // ── Estado de campos generales ────────────────────────────
-  const [archivo, setArchivo]     = useState<File | null>(null);
+  const [archivos, setArchivos]   = useState<File[]>([]);
   const [dragOver, setDragOver]   = useState(false);
+  const totalBytes    = archivos.reduce((sum, f) => sum + f.size, 0);
+  const excuotaTotal  = totalBytes > CUOTA_TOTAL_BYTES;
   const [destinosSeleccionados, setDestinosSeleccionados] = useState<number[]>([]);
   const [destinoExterno, setDestinoExterno]               = useState('');
   const [searchDep, setSearchDep]                         = useState('');
@@ -88,6 +101,34 @@ export function NuevoDocumentoPage() {
     setDestinosSeleccionados((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+  };
+
+  const agregarArchivos = (lista: FileList | File[]) => {
+    const nuevos = Array.from(lista);
+    const rechazados: string[] = [];
+    const validos:    File[]   = [];
+
+    for (const f of nuevos) {
+      if (f.size > MAX_FILE_BYTES) {
+        rechazados.push(f.name);
+      } else {
+        validos.push(f);
+      }
+    }
+    if (rechazados.length > 0) {
+      toast.error(
+        `${rechazados.length} archivo${rechazados.length > 1 ? 's superan' : ' supera'} el límite de ${MAX_FILE_MB} MB: ` +
+        `${rechazados.slice(0, 3).join(', ')}${rechazados.length > 3 ? '…' : ''}`
+      );
+    }
+    if (validos.length > 0) {
+      setArchivos((prev) => {
+        const sinDuplicados = validos.filter(
+          (n) => !prev.some((p) => p.name === n.name && p.size === n.size)
+        );
+        return [...prev, ...sinDuplicados];
+      });
+    }
   };
 
   // ── Catálogos ──────────────────────────────────────────────
@@ -140,6 +181,11 @@ export function NuevoDocumentoPage() {
         return null;
       }
 
+      if (excuotaTotal) {
+        toast.error(`La suma total de los archivos supera el máximo permitido (${CUOTA_TOTAL_MB} MB)`);
+        return null;
+      }
+
       const base = {
         materia:            data.materia,
         idTipoDocumento:    Number(data.idTipoDocumento),
@@ -161,11 +207,24 @@ export function NuevoDocumentoPage() {
       const docData = res.data.data;
       const idDocumento = docData?.idDocumento as number | undefined;
 
-      if (archivo && idDocumento) {
-        const form = new FormData();
-        form.append('archivo', archivo);
-        form.append('idDocumento', String(idDocumento));
-        await apiClient.post('/archivos/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      if (archivos.length > 0 && idDocumento) {
+        const errores: string[] = [];
+        for (const file of archivos) {
+          try {
+            const form = new FormData();
+            form.append('archivo', file);
+            form.append('idDocumento', String(idDocumento));
+            await apiClient.post('/archivos/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+          } catch {
+            errores.push(file.name);
+          }
+        }
+        if (errores.length > 0) {
+          toast.warning(
+            `Documento registrado, pero ${errores.length} archivo${errores.length > 1 ? 's' : ''} no se pudo${errores.length > 1 ? 'ron' : ''} adjuntar: ` +
+            `${errores.slice(0, 3).join(', ')}${errores.length > 3 ? '…' : ''}`
+          );
+        }
       }
       return docData;
     },
@@ -599,48 +658,89 @@ export function NuevoDocumentoPage() {
               </CardContent>
             </Card>
 
-            {/* SECCIÓN 5: ARCHIVO */}
+            {/* SECCIÓN 5: ARCHIVOS ADJUNTOS */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Paperclip className="h-4 w-4 text-primary" />
-                  Archivo Adjunto
+                  Archivos Adjuntos
                   <span className="text-xs text-muted-foreground font-normal">
-                    {tipoSoporte === 'F' ? '(no requerido para documentos físicos)' : '(opcional)'}
+                    {tipoSoporte === 'F' ? '(no requeridos para documentos físicos)' : '(opcionales)'}
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {archivo ? (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                    <FileText className="h-8 w-8 text-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{archivo.name}</p>
-                      <p className="text-xs text-muted-foreground">{(archivo.size / 1024).toFixed(1)} KB</p>
-                    </div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => setArchivo(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
+              <CardContent className="space-y-3">
+                {/* Zona de arrastrar / clic — siempre visible para agregar más */}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => { e.preventDefault(); setDragOver(false); agregarArchivos(e.dataTransfer.files); }}
+                  onClick={() => document.getElementById('file-input')?.click()}
+                  className={cn(
+                    'flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed cursor-pointer transition-all',
+                    dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                  )}
+                >
+                  <Paperclip className={cn('h-7 w-7', dragOver ? 'text-primary' : 'text-muted-foreground')} />
+                  <div className="text-center">
+                    <p className="text-sm font-medium">
+                      {dragOver ? 'Suelta los archivos' : 'Arrastra o haz clic para seleccionar'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      PDF, DOC, DOCX, XLS, PNG, JPG, imágenes — máx. {MAX_FILE_MB} MB por archivo · cuota total {CUOTA_TOTAL_MB} MB
+                    </p>
                   </div>
-                ) : (
-                  <div
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setArchivo(f); }}
-                    onClick={() => document.getElementById('file-input')?.click()}
-                    className={cn(
-                      'flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed cursor-pointer transition-all',
-                      dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'
-                    )}
-                  >
-                    <Paperclip className={cn('h-8 w-8', dragOver ? 'text-primary' : 'text-muted-foreground')} />
-                    <div className="text-center">
-                      <p className="text-sm font-medium">{dragOver ? 'Suelta el archivo' : 'Arrastra o haz clic para subir'}</p>
-                      <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX, XLS, PNG, JPG — máx. 20 MB</p>
+                  <input
+                    id="file-input"
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.txt"
+                    onChange={(e) => {
+                      if (e.target.files) { agregarArchivos(e.target.files); e.target.value = ''; }
+                    }}
+                  />
+                </div>
+
+                {/* Lista de archivos seleccionados */}
+                {archivos.length > 0 && (
+                  <div className="space-y-1.5">
+                    {archivos.map((f, idx) => (
+                      <div key={idx} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-muted/40">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{f.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatSize(f.size)}</p>
+                        </div>
+                        <Button
+                          type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                          onClick={() => setArchivos((prev) => prev.filter((_, i) => i !== idx))}
+                          aria-label={`Quitar ${f.name}`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    {/* Resumen de peso total */}
+                    <div className={cn(
+                      'flex items-center justify-between px-3 py-2 rounded-lg text-xs',
+                      excuotaTotal
+                        ? 'bg-destructive/10 border border-destructive/20 text-destructive'
+                        : 'bg-muted/30 text-muted-foreground'
+                    )}>
+                      <span>
+                        {archivos.length} archivo{archivos.length !== 1 ? 's' : ''} seleccionado{archivos.length !== 1 ? 's' : ''}
+                      </span>
+                      <span className="font-medium">{formatSize(totalBytes)} / {CUOTA_TOTAL_MB} MB total</span>
                     </div>
-                    <input id="file-input" type="file" className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) setArchivo(f); }} />
+
+                    {excuotaTotal && (
+                      <p className="text-xs text-destructive flex items-center gap-1.5">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        La suma total de los archivos supera el máximo permitido ({CUOTA_TOTAL_MB} MB). Elimina archivos para continuar.
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -651,7 +751,7 @@ export function NuevoDocumentoPage() {
               <Button type="button" variant="outline" onClick={() => navigate('/documentos')}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isPending} className="gap-2 px-8">
+              <Button type="submit" disabled={isPending || excuotaTotal} className="gap-2 px-8">
                 {isPending
                   ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
                   : <><Send className="h-4 w-4" />Registrar y Despachar</>

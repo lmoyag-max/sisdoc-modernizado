@@ -1,6 +1,6 @@
 import {
   FileText, Send, CheckCircle2, GitBranch, XCircle,
-  Package, Clock, User, Building2, ChevronRight, MessageSquare,
+  Package, Clock, User, Building2, ChevronRight, MessageSquare, Paperclip,
 } from 'lucide-react';
 import { formatFechaHora, formatRelativo, cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +67,12 @@ const ESTADO_CFG: Record<number, EstadoCfg> = {
     icon:   Package,       dot:   'bg-teal-500',
     badge:  'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
     color:  'text-teal-600 dark:text-teal-400',
+  },
+  7: {
+    label: 'Archivo adjuntado', accion: 'Archivo adjuntado al documento',
+    icon:   Paperclip,          dot:   'bg-violet-500',
+    badge:  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+    color:  'text-violet-600 dark:text-violet-400',
   },
 };
 

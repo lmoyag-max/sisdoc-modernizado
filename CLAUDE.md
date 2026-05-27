@@ -465,3 +465,50 @@ cd frontend && npm run typecheck
 - Branding dinámico (logo en sidebar desde configuración)
 - Export a PDF en reportes
 - Tests automatizados (Jest/Vitest)
+
+---
+
+## Cambios técnicos — registro de modificaciones
+
+### [2026-05-27] Carga múltiple de archivos en creación de documento
+
+**Problema detectado:** El formulario "Nuevo documento" solo permitía adjuntar un archivo por creación. El `input[type=file]` carecía del atributo `multiple`, el estado era `File | null`, y el drag-and-drop tomaba solo el primer archivo (`files[0]`).
+
+**Causa raíz:** Implementación inicial conservadora con estado `File | null` y `upload.single`. No había validación de cuota total ni lista de archivos seleccionados.
+
+**Archivos modificados:**
+- `frontend/src/pages/documentos/NuevoDocumentoPage.tsx` — único archivo modificado
+
+**Cambios realizados:**
+
+| Elemento | Antes | Después |
+|----------|-------|---------|
+| Estado | `File \| null` | `File[]` |
+| Input | sin `multiple` | `multiple` |
+| Drag-drop | `files[0]` | `agregarArchivos(files)` |
+| Validación | ninguna | por archivo + cuota total |
+| Lista UI | archivo único o zona vacía | lista con remove por item + barra de progreso |
+| Upload | un `FormData` | loop secuencial, un `FormData` por archivo |
+| Error manejo | bloquea todo | por archivo: continúa y avisa con `toast.warning` |
+
+**Regla de cuota:**
+- Límite individual: `MAX_FILE_MB = 20` MB — rechaza al intentar agregar; no se añade a la lista.
+- Cuota total: `CUOTA_TOTAL_MB = 60` MB — se muestra inline en la lista; deshabilita el botón "Registrar y Despachar".
+- Constantes definidas fuera del componente para edición fácil.
+
+**Compatibilidad:**
+- El backend `/archivos/upload` no se modificó — sigue usando `upload.single('archivo')`. El campo enviado sigue siendo `'archivo'`, idéntico al flujo de `AdjuntarArchivoModal`.
+- Documentos creados anteriormente con un solo archivo no se ven afectados.
+- Si la creación del documento es exitosa pero algún archivo falla al subir, se muestra `toast.warning` y se navega al documento; los archivos pueden re-adjuntarse desde el detalle.
+
+**Pruebas funcionales a validar:**
+1. Crear documento sin archivo — flujo normal, sin cambios
+2. Crear documento con 1 archivo — comportamiento igual que antes
+3. Crear documento con 2+ archivos — todos quedan asociados
+4. Seleccionar PDF + Word + Excel + imagen — todos se suben
+5. Intentar agregar archivo > 20 MB — toast de error, no se agrega a la lista
+6. Agregar archivos hasta superar 60 MB total — barra roja + mensaje + botón deshabilitado
+7. Quitar archivo de la lista antes de registrar — se elimina de `archivos[]`, no se sube
+8. Verificar descarga posterior de cada adjunto desde el detalle
+9. Verificar trazabilidad: cada archivo genera un evento estado 7 ("Archivo adjuntado")
+10. Verificar que despachar / recepcionar / terminar siguen funcionando

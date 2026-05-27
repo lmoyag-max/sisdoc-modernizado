@@ -12,6 +12,7 @@ import {
   FileStack, ShieldAlert, Printer,
 } from 'lucide-react';
 import { NominaModal } from '@/components/documentos/NominaModal';
+import { AdjuntarArchivoModal } from '@/components/documentos/AdjuntarArchivoModal';
 import { type NominaData } from '@/lib/utils/nomina.generator';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -46,12 +47,13 @@ const DOC_ESTADO: Record<number, { label: string; className: string }> = {
 
 // ── Estados de trámite en el timeline ─────────────────────────────────────
 const TRAMITE_ESTADO: Record<number, { label: string; dot: string; color: string }> = {
-  1: { label: 'Generado',     dot: 'bg-indigo-500',  color: 'text-indigo-600 dark:text-indigo-400' },
-  2: { label: 'Despachado',   dot: 'bg-amber-500',   color: 'text-amber-600 dark:text-amber-400' },
-  3: { label: 'Recepcionado', dot: 'bg-emerald-500', color: 'text-emerald-600 dark:text-emerald-400' },
-  4: { label: 'Derivado',     dot: 'bg-blue-500',    color: 'text-blue-600 dark:text-blue-400' },
-  5: { label: 'Cerrado',      dot: 'bg-slate-400',   color: 'text-slate-500 dark:text-slate-400' },
-  6: { label: 'Entregado',    dot: 'bg-teal-500',    color: 'text-teal-600 dark:text-teal-400' },
+  1: { label: 'Generado',          dot: 'bg-indigo-500',  color: 'text-indigo-600 dark:text-indigo-400' },
+  2: { label: 'Despachado',        dot: 'bg-amber-500',   color: 'text-amber-600 dark:text-amber-400' },
+  3: { label: 'Recepcionado',      dot: 'bg-emerald-500', color: 'text-emerald-600 dark:text-emerald-400' },
+  4: { label: 'Derivado',          dot: 'bg-blue-500',    color: 'text-blue-600 dark:text-blue-400' },
+  5: { label: 'Cerrado',           dot: 'bg-slate-400',   color: 'text-slate-500 dark:text-slate-400' },
+  6: { label: 'Entregado',         dot: 'bg-teal-500',    color: 'text-teal-600 dark:text-teal-400' },
+  7: { label: 'Archivo adjuntado', dot: 'bg-violet-500',  color: 'text-violet-600 dark:text-violet-400' },
 };
 
 // ── Interfaces alineadas con el backend real ──────────────────────────────
@@ -111,6 +113,7 @@ interface ArchivoItem {
   url: string | null;
   preview_url: string | null;
   download_url: string | null;
+  subido_por?: string | null;
 }
 
 // ── Icono según extensión del archivo ────────────────────────
@@ -186,6 +189,7 @@ export function DocumentoDetallePage() {
   const [reabrirObs,        setReopenObs]         = useState('');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [nominaOpen,        setNominaOpen]        = useState(false);
+  const [adjuntarOpen,      setAdjuntarOpen]      = useState(false);
 
   const { data: archivos, isLoading: loadingArchivos } = useQuery({
     queryKey: ['archivos', idDocumento],
@@ -204,6 +208,12 @@ export function DocumentoDetallePage() {
     qc.invalidateQueries({ queryKey: ['documentos'] });
     qc.invalidateQueries({ queryKey: ['tramites'] });
     qc.invalidateQueries({ queryKey: ['bandeja'] });
+  };
+
+  // Invalida archivos + trazabilidad tras adjuntar un nuevo archivo
+  const invalidarArchivos = () => {
+    qc.invalidateQueries({ queryKey: ['archivos', idDocumento] });
+    qc.invalidateQueries({ queryKey: ['documento-trazabilidad', idDocumento] });
   };
 
   // Acciones por destino específico (multi-destino)
@@ -483,7 +493,7 @@ export function DocumentoDetallePage() {
                 <div className="py-8 text-center">
                   <Paperclip className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">Sin archivos adjuntos</p>
-                  <Link to="/archivos"><Button variant="outline" size="sm" className="gap-2 mt-2"><Paperclip className="h-3.5 w-3.5" />Subir archivo</Button></Link>
+                  <Button variant="outline" size="sm" className="gap-2 mt-2" onClick={() => setAdjuntarOpen(true)}><Paperclip className="h-3.5 w-3.5" />Adjuntar archivo</Button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -518,6 +528,7 @@ export function DocumentoDetallePage() {
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {a.fecha_subida ? formatRelativo(a.fecha_subida) : ''}
+                            {a.subido_por ? ` · ${a.subido_por}` : ''}
                           </p>
                         </button>
 
@@ -636,11 +647,13 @@ export function DocumentoDetallePage() {
                   <GitBranch className="h-3.5 w-3.5" />Ver trazabilidad completa
                 </Button>
               </Link>
-              <Link to="/archivos" className="block">
-                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 h-9">
-                  <Paperclip className="h-3.5 w-3.5" />Adjuntar archivo
-                </Button>
-              </Link>
+              <Button
+                variant="ghost" size="sm"
+                className="w-full justify-start gap-2 h-9"
+                onClick={() => setAdjuntarOpen(true)}
+              >
+                <Paperclip className="h-3.5 w-3.5" />Adjuntar archivo
+              </Button>
               <Button variant="ghost" size="sm" className="w-full justify-start gap-2 h-9" onClick={() => navigate('/documentos')}>
                 <ArrowLeft className="h-3.5 w-3.5" />Volver al listado
               </Button>
@@ -797,6 +810,15 @@ export function DocumentoDetallePage() {
           toast.success(estadoId === 2 ? 'Documento redespachado correctamente' : 'Documento despachado correctamente');
           invalidarTodo();
         }}
+      />
+
+      {/* Modal adjuntar archivo al documento */}
+      <AdjuntarArchivoModal
+        open={adjuntarOpen}
+        onClose={() => setAdjuntarOpen(false)}
+        idDocumento={idDocumento}
+        estadoDocumento={estadoId}
+        onSuccess={invalidarArchivos}
       />
 
       {/* Modal nómina PDF — solo para documentos físicos */}

@@ -10,11 +10,18 @@ export const apiClient = axios.create({
   timeout: 30_000,
 });
 
-// Adjuntar access token en cada request
+// Adjuntar access token en cada request.
+// Si el body es FormData, eliminar Content-Type para que Axios/browser
+// ponga automáticamente 'multipart/form-data; boundary=...' con el boundary correcto.
+// Sin esto, el default 'application/json' bloquea al browser de añadir el boundary
+// y multer recibe un request sin cuerpo multipart válido.
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
   }
   return config;
 });

@@ -89,6 +89,86 @@ async function cargarLogoDataUrl(url: string): Promise<string | null> {
   }
 }
 
+/**
+ * Carga cualquier imagen (JPEG o PNG) y la devuelve siempre como JPEG RGB
+ * limpio, sin metadatos Adobe/XMP, usando canvas como único camino.
+ *
+ * Problema que resuelve: jsPDF falla silenciosamente con JPEGs que tienen
+ * metadatos XMP pesados embebidos por Photoshop/Illustrator. Canvas garantiza
+ * un JPEG estándar RGB sin markers propietarios.
+ */
+async function cargarImagenComoJpegRgb(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob    = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    return new Promise<string | null>((resolve) => {
+      const img = new Image();
+
+      img.onload = () => {
+        if (!img.naturalWidth || !img.naturalHeight) {
+          URL.revokeObjectURL(blobUrl);
+          resolve(null);
+          return;
+        }
+        try {
+          const maxPx   = 300;
+          const scale   = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight));
+          const canvas  = document.createElement('canvas');
+          canvas.width  = Math.round(img.naturalWidth  * scale) || 1;
+          canvas.height = Math.round(img.naturalHeight * scale) || 1;
+          const ctx     = canvas.getContext('2d');
+          if (!ctx) { URL.revokeObjectURL(blobUrl); resolve(null); return; }
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const jpeg = canvas.toDataURL('image/jpeg', 0.92);
+          URL.revokeObjectURL(blobUrl);
+          resolve(jpeg);
+        } catch (err) {
+          console.warn('[NominaModal] canvas→JPEG falló para', url, err);
+          URL.revokeObjectURL(blobUrl);
+          resolve(null);
+        }
+      };
+
+      img.onerror = (err) => {
+        console.warn('[NominaModal] img.onerror para', url, err);
+        URL.revokeObjectURL(blobUrl);
+        resolve(null);
+      };
+
+      img.src = blobUrl;
+    });
+  } catch (err) {
+    console.warn('[NominaModal] fetch falló para', url, err);
+    return null;
+  }
+}
+
+/**
+ * Resuelve el logo institucional con cadena de fallback:
+ *   1. /uploads/config/logo.jpg  (siempre via canvas → JPEG RGB limpio)
+ *   2. /uploads/config/logo.png  (idem)
+ *   3. /logo-huap.png            (logo fijo en frontend/public)
+ *   4. null                      (PDF se genera sin logo)
+ */
+async function resolveNominaLogo(): Promise<string | null> {
+  const candidatos = [
+    '/uploads/config/logo.jpg',
+    '/uploads/config/logo.png',
+    '/logo-huap.png',
+  ];
+  for (const url of candidatos) {
+    const result = await cargarImagenComoJpegRgb(url);
+    if (result) return result;
+  }
+  console.warn('[NominaModal] No se encontró logo institucional — PDF sin logo');
+  return null;
+}
+
 export function NominaModal({ open, onClose, data, onNavigate }: NominaModalProps) {
   const [pdfUrl,    setPdfUrl]    = useState<string | null>(null);
   const [pdfBlob,   setPdfBlob]   = useState<Blob | null>(null);
@@ -104,10 +184,7 @@ export function NominaModal({ open, onClose, data, onNavigate }: NominaModalProp
 
     const timer = setTimeout(async () => {
       try {
-        // Intentar en orden: JPG primero (sin canvas), luego PNG (canvas)
-        const logoBase64 =
-          await cargarLogoDataUrl('/uploads/config/logo.jpg') ??
-          await cargarLogoDataUrl('/uploads/config/logo.png');
+        const logoBase64 = await resolveNominaLogo();
 
         if (cancelled) return;
 

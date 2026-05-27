@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { formatFechaHora } from '@/lib/utils';
+import { useUploadRules } from '@/hooks/useUploadRules';
 import { toast } from 'sonner';
 
 interface ArchivoDigital {
@@ -42,6 +43,7 @@ export function ArchivosPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const qc = useQueryClient();
+  const uploadRules = useUploadRules();
 
   const { data: archivos, isLoading } = useQuery({
     queryKey: ['archivos'],
@@ -116,7 +118,9 @@ export function ArchivosPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Subir archivo</CardTitle>
-          <CardDescription>Arrastra archivos o haz clic para seleccionar. Máx. 20 MB por archivo.</CardDescription>
+          <CardDescription>
+            Arrastra archivos o haz clic para seleccionar. Máx. {uploadRules.maxFileMB} MB por archivo.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div
@@ -138,7 +142,7 @@ export function ArchivosPage() {
                 {isDragOver ? 'Suelta el archivo aquí' : 'Arrastra archivos o haz clic'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                PDF, Word, Excel, imágenes — máximo 20 MB
+                {uploadRules.extensionesPermitidas.map((e) => e.toUpperCase()).join(', ')} — máx. {uploadRules.maxFileMB} MB
               </p>
             </div>
             {uploadMutation.isPending && (

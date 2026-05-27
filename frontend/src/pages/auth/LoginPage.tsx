@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -283,11 +283,13 @@ export function LoginPage() {
               )}
             </div>
 
-            {/* Olvidaste tu contraseña — pendiente implementación */}
             <div className="flex justify-end -mt-1">
-              <span className="text-xs text-muted-foreground/60 select-none cursor-default">
-                ¿Olvidaste tu contraseña? Contacta a TI
-              </span>
+              <Link
+                to="/forgot-password"
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
             </div>
 
             {/* Submit */}
@@ -302,13 +304,12 @@ export function LoginPage() {
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
             ¿Problemas para acceder?{' '}
-            <button
-              type="button"
-              className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-              onClick={() => toast.info('Contacta al área de Tecnología Informática del HUAP')}
+            <a
+              href="mailto:aca.operaciones@huap.online"
+              className="text-primary hover:underline"
             >
               Contacta a soporte
-            </button>
+            </a>
           </p>
         </div>
       </div>

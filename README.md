@@ -1,5 +1,5 @@
 # SISDOC v2 — Sistema de Gestión Documental Moderno
-### Hospital Universitario Asociado de Puebla (HUAP)
+### Hospital Asistencia Publica Alejandro Del Rio (HUAP)
 
 Sistema de gestión documental institucional modernizado. Migración gradual del sistema legacy SISDOC a arquitectura enterprise moderna, manteniendo compatibilidad con la base de datos original.
 

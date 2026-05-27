@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api/client';
+import { useUploadRules } from '@/hooks/useUploadRules';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +43,8 @@ export function AdjuntarArchivoModal({
 }: Props) {
   const [items,    setItems]    = useState<ItemArchivo[]>([]);
   const [subiendo, setSubiendo] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef    = useRef<HTMLInputElement>(null);
+  const uploadRules = useUploadRules();
 
   const mensajeBloqueado = ESTADOS_BLOQUEADOS[estadoDocumento];
   const todoOk     = items.length > 0 && items.every((a) => a.status === 'ok');
@@ -176,7 +178,9 @@ export function AdjuntarArchivoModal({
                   <p className="text-sm text-muted-foreground text-center">
                     Haz clic para seleccionar archivos
                     <br />
-                    <span className="text-xs">PDF, Word, Excel, imágenes · máx. 20 MB c/u</span>
+                    <span className="text-xs">
+                      {uploadRules.extensionesPermitidas.map((e) => e.toUpperCase()).join(', ')} · máx. {uploadRules.maxFileMB} MB c/u
+                    </span>
                   </p>
                 </label>
               </div>

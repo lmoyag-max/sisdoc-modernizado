@@ -46,6 +46,17 @@ const upload = multer({
   },
 });
 
+// ── Reglas de carga de archivos ────────────────────────────
+const UPLOAD_RULES_DEFAULTS = {
+  extensionesPermitidas: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'webp'],
+  maxFileMB:  20,
+  maxTotalMB: 60,
+};
+
+// Extensiones que el sistema físicamente puede aceptar (límite duro de multer en archivos.routes.ts).
+// La configuración solo puede restringir dentro de este conjunto, no ampliar.
+const EXTENSIONES_POSIBLES = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'webp', 'txt'];
+
 // Textos del login con sus valores por defecto
 const LOGIN_DEFAULTS = {
   loginNombreSistema:   'SISDOC',
@@ -85,6 +96,14 @@ router.get('/', (req, res) => {
       loginCard3:           cfg.loginCard3           ?? LOGIN_DEFAULTS.loginCard3,
       loginCard4:           cfg.loginCard4           ?? LOGIN_DEFAULTS.loginCard4,
       loginFooter:          cfg.loginFooter          ?? LOGIN_DEFAULTS.loginFooter,
+      // Reglas de carga configurables
+      uploadRules: {
+        extensionesPermitidas: Array.isArray(cfg.uploadExtensionesPermitidas)
+          ? (cfg.uploadExtensionesPermitidas as string[])
+          : UPLOAD_RULES_DEFAULTS.extensionesPermitidas,
+        maxFileMB:  typeof cfg.uploadMaxFileMB  === 'number' ? cfg.uploadMaxFileMB  : UPLOAD_RULES_DEFAULTS.maxFileMB,
+        maxTotalMB: typeof cfg.uploadMaxTotalMB === 'number' ? cfg.uploadMaxTotalMB : UPLOAD_RULES_DEFAULTS.maxTotalMB,
+      },
     },
   });
 });
@@ -110,6 +129,63 @@ router.patch('/', requireAuth, (req, res) => {
 
   writeConfig(cfg);
   res.json({ ok: true, data: cfg });
+});
+
+// ── PATCH /configuracion/upload-rules — actualizar reglas de carga ──
+router.patch('/upload-rules', requireAuth, (req, res) => {
+  const body = req.body as {
+    extensionesPermitidas?: unknown;
+    maxFileMB?:             unknown;
+    maxTotalMB?:            unknown;
+  };
+  const cfg = readConfig();
+
+  if (body.extensionesPermitidas !== undefined) {
+    if (!Array.isArray(body.extensionesPermitidas)) {
+      res.status(400).json({ ok: false, error: 'extensionesPermitidas debe ser un array' });
+      return;
+    }
+    const valid = (body.extensionesPermitidas as unknown[])
+      .filter((e): e is string => typeof e === 'string' && EXTENSIONES_POSIBLES.includes(e));
+    if (valid.length === 0) {
+      res.status(400).json({ ok: false, error: 'Debe permitirse al menos una extensión válida' });
+      return;
+    }
+    cfg.uploadExtensionesPermitidas = valid;
+  }
+
+  if (body.maxFileMB !== undefined) {
+    const v = Number(body.maxFileMB);
+    if (isNaN(v) || v < 1 || v > 100) {
+      res.status(400).json({ ok: false, error: 'maxFileMB debe estar entre 1 y 100 MB' });
+      return;
+    }
+    cfg.uploadMaxFileMB = v;
+  }
+
+  if (body.maxTotalMB !== undefined) {
+    const v    = Number(body.maxTotalMB);
+    const fMB  = typeof cfg.uploadMaxFileMB === 'number' ? cfg.uploadMaxFileMB : UPLOAD_RULES_DEFAULTS.maxFileMB;
+    if (isNaN(v) || v < fMB) {
+      res.status(400).json({ ok: false, error: `maxTotalMB debe ser mayor o igual a maxFileMB (${fMB} MB)` });
+      return;
+    }
+    cfg.uploadMaxTotalMB = v;
+  }
+
+  writeConfig(cfg);
+  res.json({
+    ok: true,
+    data: {
+      uploadRules: {
+        extensionesPermitidas: Array.isArray(cfg.uploadExtensionesPermitidas)
+          ? cfg.uploadExtensionesPermitidas
+          : UPLOAD_RULES_DEFAULTS.extensionesPermitidas,
+        maxFileMB:  typeof cfg.uploadMaxFileMB  === 'number' ? cfg.uploadMaxFileMB  : UPLOAD_RULES_DEFAULTS.maxFileMB,
+        maxTotalMB: typeof cfg.uploadMaxTotalMB === 'number' ? cfg.uploadMaxTotalMB : UPLOAD_RULES_DEFAULTS.maxTotalMB,
+      },
+    },
+  });
 });
 
 // ── POST /configuracion/logo — subir logo ──────────────────

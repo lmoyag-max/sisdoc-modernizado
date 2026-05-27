@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Settings, Upload, ImageIcon, Building2, Save,
-  CheckCircle2, RefreshCw, Palette, Monitor, X, Type,
+  CheckCircle2, RefreshCw, Palette, Monitor, X, Type, Paperclip,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,6 +13,12 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { cn, uploadUrl } from '@/lib/utils';
+
+interface UploadRulesConfig {
+  extensionesPermitidas: string[];
+  maxFileMB:  number;
+  maxTotalMB: number;
+}
 
 interface SistemaConfig {
   nombreSistema:        string;
@@ -30,7 +36,28 @@ interface SistemaConfig {
   loginCard3:           string;
   loginCard4:           string;
   loginFooter:          string;
+  // Reglas de carga
+  uploadRules?: UploadRulesConfig;
 }
+
+const TODAS_LAS_EXTENSIONES: { ext: string; label: string }[] = [
+  { ext: 'pdf',  label: 'PDF'  },
+  { ext: 'doc',  label: 'DOC'  },
+  { ext: 'docx', label: 'DOCX' },
+  { ext: 'xls',  label: 'XLS'  },
+  { ext: 'xlsx', label: 'XLSX' },
+  { ext: 'png',  label: 'PNG'  },
+  { ext: 'jpg',  label: 'JPG'  },
+  { ext: 'jpeg', label: 'JPEG' },
+  { ext: 'webp', label: 'WEBP' },
+  { ext: 'txt',  label: 'TXT'  },
+];
+
+const UPLOAD_RULES_DEFAULT: UploadRulesConfig = {
+  extensionesPermitidas: ['pdf','doc','docx','xls','xlsx','png','jpg','jpeg','webp'],
+  maxFileMB:  20,
+  maxTotalMB: 60,
+};
 
 async function fetchConfig(): Promise<SistemaConfig> {
   const res = await apiClient.get<{ ok: boolean; data: SistemaConfig }>('/configuracion');
@@ -146,6 +173,9 @@ export function ConfiguracionPage() {
   const [nombreSistema,     setNombreSistema]     = useState('');
   const [nombreInstitucion, setNombreInstitucion] = useState('');
 
+  // Reglas de carga de archivos
+  const [uploadRules, setUploadRules] = useState<UploadRulesConfig>(UPLOAD_RULES_DEFAULT);
+
   // Textos del login
   const [loginTextos, setLoginTextos] = useState({
     loginNombreSistema:   '',
@@ -179,6 +209,13 @@ export function ConfiguracionPage() {
         loginCard4:           config.loginCard4           ?? '',
         loginFooter:          config.loginFooter          ?? '',
       });
+      if (config.uploadRules) {
+        setUploadRules({
+          extensionesPermitidas: config.uploadRules.extensionesPermitidas ?? UPLOAD_RULES_DEFAULT.extensionesPermitidas,
+          maxFileMB:  config.uploadRules.maxFileMB  ?? UPLOAD_RULES_DEFAULT.maxFileMB,
+          maxTotalMB: config.uploadRules.maxTotalMB ?? UPLOAD_RULES_DEFAULT.maxTotalMB,
+        });
+      }
     }
   }, [config]);
 
@@ -239,6 +276,44 @@ export function ConfiguracionPage() {
     },
     onError: () => toast.error('Error al guardar los textos del login'),
   });
+
+  const saveUploadRules = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.patch('/configuracion/upload-rules', {
+        extensionesPermitidas: uploadRules.extensionesPermitidas,
+        maxFileMB:  uploadRules.maxFileMB,
+        maxTotalMB: uploadRules.maxTotalMB,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success('Reglas de carga actualizadas');
+      qc.invalidateQueries({ queryKey: ['configuracion'] });
+      qc.invalidateQueries({ queryKey: ['configuracion-upload-rules'] });
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al guardar las reglas de carga';
+      toast.error(msg);
+    },
+  });
+
+  const toggleExtension = (ext: string) => {
+    setUploadRules((prev) => {
+      const isSelected = prev.extensionesPermitidas.includes(ext);
+      if (isSelected && prev.extensionesPermitidas.length <= 1) return prev; // al menos 1 debe quedar
+      return {
+        ...prev,
+        extensionesPermitidas: isSelected
+          ? prev.extensionesPermitidas.filter((e) => e !== ext)
+          : [...prev.extensionesPermitidas, ext],
+      };
+    });
+  };
+
+  const uploadRulesValid =
+    uploadRules.maxFileMB >= 1 &&
+    uploadRules.maxFileMB <= 100 &&
+    uploadRules.maxTotalMB >= uploadRules.maxFileMB;
 
   const handleLogoFile = (file: File) => {
     setLogoPreview(URL.createObjectURL(file));
@@ -460,6 +535,123 @@ export function ConfiguracionPage() {
                 ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 : <Save className="h-3.5 w-3.5" />}
               Guardar textos del login
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reglas de carga de archivos */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Paperclip className="h-4 w-4 text-primary" />
+            Reglas de carga de archivos
+          </CardTitle>
+          <CardDescription>
+            Define qué tipos de archivos se pueden subir y los límites de tamaño. Estas reglas se aplican
+            en todos los flujos de carga del sistema (creación de documento, adjuntar archivo, etc.).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Extensiones permitidas */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-foreground">Extensiones permitidas</p>
+            <p className="text-xs text-muted-foreground">
+              Marca las extensiones que los usuarios podrán subir. Al menos una debe estar activa.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {TODAS_LAS_EXTENSIONES.map(({ ext, label }) => {
+                const activo = uploadRules.extensionesPermitidas.includes(ext);
+                return (
+                  <button
+                    key={ext}
+                    type="button"
+                    onClick={() => toggleExtension(ext)}
+                    disabled={isLoading}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all',
+                      activo
+                        ? 'bg-primary/10 border-primary/40 text-primary'
+                        : 'bg-muted/30 border-border text-muted-foreground hover:border-primary/30'
+                    )}
+                    aria-pressed={activo}
+                  >
+                    <span className={cn(
+                      'h-3 w-3 rounded-sm border flex items-center justify-center shrink-0',
+                      activo ? 'bg-primary border-primary' : 'border-muted-foreground/40'
+                    )}>
+                      {activo && <X className="h-2 w-2 text-primary-foreground" strokeWidth={3} />}
+                    </span>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {uploadRules.extensionesPermitidas.length === 0 && (
+              <p className="text-xs text-destructive">Debes permitir al menos una extensión.</p>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Límites de tamaño */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="maxFileMB">Peso máximo por archivo (MB)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="maxFileMB"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={uploadRules.maxFileMB}
+                  onChange={(e) => setUploadRules((p) => ({ ...p, maxFileMB: Number(e.target.value) }))}
+                  className="w-28"
+                  disabled={isLoading}
+                />
+                <span className="text-sm text-muted-foreground">MB por archivo</span>
+              </div>
+              {(uploadRules.maxFileMB < 1 || uploadRules.maxFileMB > 100) && (
+                <p className="text-xs text-destructive">Debe estar entre 1 y 100 MB.</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maxTotalMB">Peso máximo total por carga (MB)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="maxTotalMB"
+                  type="number"
+                  min={uploadRules.maxFileMB}
+                  value={uploadRules.maxTotalMB}
+                  onChange={(e) => setUploadRules((p) => ({ ...p, maxTotalMB: Number(e.target.value) }))}
+                  className="w-28"
+                  disabled={isLoading}
+                />
+                <span className="text-sm text-muted-foreground">MB suma total</span>
+              </div>
+              {uploadRules.maxTotalMB < uploadRules.maxFileMB && (
+                <p className="text-xs text-destructive">
+                  Debe ser mayor o igual al peso por archivo ({uploadRules.maxFileMB} MB).
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-xs text-muted-foreground">
+              {uploadRules.extensionesPermitidas.length} extensión{uploadRules.extensionesPermitidas.length !== 1 ? 'es' : ''} activa{uploadRules.extensionesPermitidas.length !== 1 ? 's' : ''}
+              {' · '}máx. {uploadRules.maxFileMB} MB/archivo · cuota total {uploadRules.maxTotalMB} MB
+            </p>
+            <Button
+              onClick={() => saveUploadRules.mutate()}
+              disabled={isLoading || saveUploadRules.isPending || !uploadRulesValid}
+              className="gap-2"
+              size="sm"
+            >
+              {saveUploadRules.isPending
+                ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                : <Save className="h-3.5 w-3.5" />}
+              Guardar reglas
             </Button>
           </div>
         </CardContent>

@@ -332,10 +332,20 @@ GET    /dependencias
 - `rol` — id_rol, codigo, nombre, activo
 - `usuario_rol` — id_usuario, id_rol (FK compuesta)
 - `refresh_token` — id, token, id_usuario, expires_at, revoked_at, created_at
+- `password_reset_tokens` — id, id_usuario, token_hash (SHA256, VARCHAR 64), fecha_creacion, fecha_expiracion, usado (BIT), fecha_uso, ip_solicitud, user_agent
+- `auditoria_reset` — id, evento, id_usuario, email, ip, user_agent, detalle, fecha
 
 ### Usuarios en BD
-- Solo 1 usuario activo: `admin` (id_usuario=532, id_funcionario=675)
+| Usuario | id_usuario | Email configurado |
+|---------|-----------|-------------------|
+| `admin` | 532 | arturo.moya@redsalud.gov.cl |
+| `ti` | 1535 | lmoyag@gmail.com |
+| `aba` | 1536 | operaciones@huap.online |
+| `ofparte` | 2535 | operaciones.huap@redsalud.gob.cl |
+| `contrato` | 1537 | (sin email — no puede usar recuperación) |
+
 - Los 477 usuarios legacy fueron eliminados (backup en `usuario_backup_2026`)
+- La columna `email` en `usuario` es `VARCHAR(100) NULL` — si está vacía, el flujo de recuperación no puede enviar correo a ese usuario
 
 ---
 
@@ -362,6 +372,8 @@ GET    /dependencias
 - Razón: `archivo_digital.ruta` y `archivo_digital.archivo` son VARCHAR(50) en BD legacy
 - Archivos servidos como estático: `GET /uploads/{filename}`
 - En producción: nginx sirve `/uploads` directamente desde volumen Docker
+- **Reglas configurables:** extensiones permitidas, `maxFileMB` y `maxTotalMB` se guardan en `uploads/config/sistema.json`; el hook `useUploadRules()` los expone al frontend con defaults seguros si faltan
+- **Hardcap absoluto:** `MAX_FILE_SIZE` en `.env` es el límite máximo de multer — la configuración de UI solo puede restringir por debajo de ese valor, nunca superarlo
 
 ---
 
@@ -456,7 +468,7 @@ cd frontend && npm run typecheck
 - Expedientes: listado (19,373 registros legacy) + crear + documentos del expediente
 - Usuarios: CRUD + asignación de roles
 - Reportes: métricas, gráficos, exportar CSV
-- Configuración: logo, fondo login, nombres del sistema
+- Configuración: logo, fondo login, nombres del sistema, reglas de carga configurables
 
 ### Pendiente / mejoras futuras
 - Módulo de derivación de documentos (formulario en detalle documento)
@@ -512,3 +524,61 @@ cd frontend && npm run typecheck
 8. Verificar descarga posterior de cada adjunto desde el detalle
 9. Verificar trazabilidad: cada archivo genera un evento estado 7 ("Archivo adjuntado")
 10. Verificar que despachar / recepcionar / terminar siguen funcionando
+
+---
+
+### [2026-05-27] Reglas de carga configurables desde módulo Configuración
+
+**Motivación:** Los límites de tamaño y extensiones de archivos estaban hardcodeados en múltiples componentes y en `MAX_FILE_SIZE` del `.env`. Se necesitaba un control centralizado desde la UI de administración sin modificar código ni reiniciar el servidor.
+
+**Almacenamiento:** Tres campos nuevos opcionales en `backend/uploads/config/sistema.json` (archivo JSON plano ya existente):
+- `uploadExtensionesPermitidas` — `string[]` — ej: `["pdf","doc","docx","png"]`
+- `uploadMaxFileMB` — `number` — máximo por archivo individual
+- `uploadMaxTotalMB` — `number` — cuota total por operación de carga múltiple
+
+Si los campos no existen (sistema nuevo o config sin actualizar) se aplican defaults seguros: `['pdf','doc','docx','xls','xlsx','png','jpg','jpeg','webp']`, 20 MB, 60 MB.
+
+**Nuevo endpoint:**
+```
+PATCH  /api/v1/configuracion/upload-rules   → requireAuth
+Body: { extensionesPermitidas: string[], maxFileMB: number, maxTotalMB: number }
+```
+Validaciones: array no vacío, `maxFileMB` entre 1–100, `maxTotalMB >= maxFileMB`, extensiones del conjunto permitido. Ruta registrada antes de `PATCH /` para evitar conflicto de rutas en Express.
+
+**Nuevo hook frontend:** `frontend/src/hooks/useUploadRules.ts`
+- `useUploadRules()` — retorna `UploadRules` con `extensionesPermitidas`, `maxFileMB`, `maxTotalMB`
+- `staleTime: 5 * 60 * 1000`, `retry: false` — tolerante a fallos; jamás bloquea la UI
+- En el primer render retorna `UPLOAD_RULES_DEFAULTS` síncronamente antes de que la query resuelva
+- Todos los componentes de upload lo consumen en lugar de constantes locales
+
+**Archivos modificados:**
+
+| Archivo | Cambio |
+|---------|--------|
+| `backend/src/modules/configuracion/configuracion.routes.ts` | GET `/` expone `uploadRules` en la respuesta; nuevo `PATCH /upload-rules` |
+| `backend/src/modules/archivos/archivos.routes.ts` | `getUploadRules()` helper + validación ADITIVA en `POST /upload` |
+| `frontend/src/hooks/useUploadRules.ts` | **NUEVO** — hook central |
+| `frontend/src/pages/configuracion/ConfiguracionPage.tsx` | Sección "Reglas de carga": toggles de extensiones + inputs MB |
+| `frontend/src/pages/documentos/NuevoDocumentoPage.tsx` | Constantes derivadas del hook; `agregarArchivos()` valida extensión |
+| `frontend/src/components/documentos/AdjuntarArchivoModal.tsx` | Hint text dinámico desde hook |
+| `frontend/src/pages/archivos/ArchivosPage.tsx` | Hint text dinámico desde hook |
+
+**Arquitectura de validación (por capas, aditiva):**
+1. **multer `fileFilter`** — extensiones permitidas por defecto del servidor (primera barrera, siempre activa)
+2. **multer `limits.fileSize`** — `MAX_FILE_SIZE` del `.env` (hardcap absoluto, no configurable desde UI)
+3. **`getUploadRules()` en `POST /upload`** — restricciones adicionales desde `sistema.json` (pueden ser más estrictas que el paso 1, nunca más permisivas que él)
+4. **`useUploadRules()` en el frontend** — validación client-side; evita round-trips innecesarios; no reemplaza la validación server-side
+
+**Compatibilidad garantizada:**
+- Todos los flows de upload preexistentes (crear documento, adjuntar desde detalle, subir desde módulo Archivos) siguen funcionando sin cambios en su lógica de negocio.
+- Si `sistema.json` no tiene los campos de upload, el comportamiento es idéntico al anterior.
+- El admin puede restringir pero nunca ampliar más allá del hardcap del `.env`.
+
+**Pruebas funcionales a validar:**
+1. Acceder a Configuración → sección "Reglas de carga" aparece con valores por defecto
+2. Desactivar extensión `.xlsx` → guardar → intentar subir `.xlsx` → debe ser rechazado en todos los puntos de upload
+3. Reducir `maxFileMB` a 5 → guardar → intentar subir archivo de 10 MB → rechazado
+4. `maxTotalMB` no puede ser menor que `maxFileMB` — botón Guardar deshabilitado si inválido
+5. Con todas las extensiones activas y defaults, el comportamiento es igual al pre-feature
+6. Corromper `sistema.json` manualmente → el sistema usa defaults y no rompe
+7. Verificar que los hint texts en los tres puntos de upload muestran la configuración activa

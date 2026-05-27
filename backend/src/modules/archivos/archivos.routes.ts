@@ -14,6 +14,33 @@ router.use(requireAuth);
 
 const UPLOAD_DIR = path.resolve(env.UPLOAD_DIR);
 
+// ── Reglas de carga configurables ──────────────────────────
+// Defaults seguros usados si el archivo de configuración no existe o no es válido.
+const _UPLOAD_CFG_DEFAULTS = {
+  extensionesPermitidas: ['pdf','doc','docx','xls','xlsx','png','jpg','jpeg','webp','txt'],
+  maxFileMB: 20,
+};
+
+// Lee las reglas de carga desde sistema.json de forma síncrona.
+// Tolerante a fallos: si el archivo no existe o está corrupto devuelve los defaults.
+function getUploadRules(): typeof _UPLOAD_CFG_DEFAULTS {
+  try {
+    const cfgFile = path.resolve(env.UPLOAD_DIR, 'config', 'sistema.json');
+    if (!fs.existsSync(cfgFile)) return _UPLOAD_CFG_DEFAULTS;
+    const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf-8')) as Record<string, unknown>;
+    return {
+      extensionesPermitidas: Array.isArray(cfg.uploadExtensionesPermitidas)
+        ? (cfg.uploadExtensionesPermitidas as string[])
+        : _UPLOAD_CFG_DEFAULTS.extensionesPermitidas,
+      maxFileMB: typeof cfg.uploadMaxFileMB === 'number'
+        ? cfg.uploadMaxFileMB
+        : _UPLOAD_CFG_DEFAULTS.maxFileMB,
+    };
+  } catch {
+    return _UPLOAD_CFG_DEFAULTS;
+  }
+}
+
 // ── MIME types conocidos ──────────────────────────────────────
 const MIME_MAP: Record<string, string> = {
   '.pdf':  'application/pdf',
@@ -117,6 +144,24 @@ router.get('/:id/download', async (req: Request, res: Response, next: NextFuncti
 router.post('/upload', upload.single('archivo'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (!req.file) { sendError(res, 'No se recibió ningún archivo', 400); return; }
+
+    // ── Validación adicional contra reglas configurables (ADDITIVE sobre multer) ──
+    // multer ya bloqueó extensiones no permitidas y archivos > MAX_FILE_SIZE.
+    // Aquí se aplican las restricciones configuradas desde el módulo Configuración.
+    const uploadCfg = getUploadRules();
+    const fileExt   = path.extname(req.file.originalname).toLowerCase().slice(1);
+    if (!uploadCfg.extensionesPermitidas.includes(fileExt)) {
+      fs.unlinkSync(req.file.path);
+      sendError(res, `Tipo de archivo no permitido por la configuración del sistema: .${fileExt}`, 400);
+      return;
+    }
+    const cfgMaxBytes = uploadCfg.maxFileMB * 1024 * 1024;
+    if (req.file.size > cfgMaxBytes) {
+      fs.unlinkSync(req.file.path);
+      sendError(res, `El archivo supera el tamaño máximo configurado (${uploadCfg.maxFileMB} MB)`, 400);
+      return;
+    }
+
     const user = (req as unknown as AuthenticatedRequest).user;
     const { idDocumento, observaciones } = req.body;
     const rutaCorta    = req.file.filename;

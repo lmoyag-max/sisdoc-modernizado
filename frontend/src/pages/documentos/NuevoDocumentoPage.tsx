@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useUploadRules } from '@/hooks/useUploadRules';
 import { NominaModal } from '@/components/documentos/NominaModal';
 import { type NominaData } from '@/lib/utils/nomina.generator';
 
@@ -45,11 +46,6 @@ const sel = (hasErr?: boolean) => cn(
   hasErr && 'border-destructive'
 );
 
-const MAX_FILE_MB       = 20;
-const MAX_FILE_BYTES    = MAX_FILE_MB * 1024 * 1024;
-const CUOTA_TOTAL_MB    = 60;
-const CUOTA_TOTAL_BYTES = CUOTA_TOTAL_MB * 1024 * 1024;
-
 function formatSize(bytes: number): string {
   if (bytes < 1024)        return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -59,6 +55,13 @@ function formatSize(bytes: number): string {
 export function NuevoDocumentoPage() {
   const navigate   = useNavigate();
   const user       = useAuthStore((s) => s.user);
+
+  // Reglas de carga configurables (lee desde /configuracion, defaults seguros si falla)
+  const uploadRules       = useUploadRules();
+  const MAX_FILE_MB       = uploadRules.maxFileMB;
+  const MAX_FILE_BYTES    = MAX_FILE_MB * 1024 * 1024;
+  const CUOTA_TOTAL_MB    = uploadRules.maxTotalMB;
+  const CUOTA_TOTAL_BYTES = CUOTA_TOTAL_MB * 1024 * 1024;
 
   // ── Estado de campos generales ────────────────────────────
   const [archivos, setArchivos]   = useState<File[]>([]);
@@ -109,15 +112,18 @@ export function NuevoDocumentoPage() {
     const validos:    File[]   = [];
 
     for (const f of nuevos) {
-      if (f.size > MAX_FILE_BYTES) {
-        rechazados.push(f.name);
+      const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
+      if (!uploadRules.extensionesPermitidas.includes(ext)) {
+        rechazados.push(`${f.name} (tipo .${ext} no permitido)`);
+      } else if (f.size > MAX_FILE_BYTES) {
+        rechazados.push(`${f.name} (supera ${MAX_FILE_MB} MB)`);
       } else {
         validos.push(f);
       }
     }
     if (rechazados.length > 0) {
       toast.error(
-        `${rechazados.length} archivo${rechazados.length > 1 ? 's superan' : ' supera'} el límite de ${MAX_FILE_MB} MB: ` +
+        `${rechazados.length} archivo${rechazados.length > 1 ? 's' : ''} rechazado${rechazados.length > 1 ? 's' : ''}: ` +
         `${rechazados.slice(0, 3).join(', ')}${rechazados.length > 3 ? '…' : ''}`
       );
     }

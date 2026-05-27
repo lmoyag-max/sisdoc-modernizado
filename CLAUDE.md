@@ -69,11 +69,15 @@ npm run dev        # Vite — hot reload en puerto 5173
 - API Docs (Swagger): http://localhost:3001/api-docs
 - Health check: http://localhost:3001/api/health
 
-**Usuario de prueba:**
-- Usuario: `admin`
-- Contraseña: `admin`
-- Rol: `admin` (Administrador del sistema)
-- id_usuario: 532
+**Usuarios del sistema (contraseña actualizada 2026-05-22):**
+
+| Usuario | Contraseña | Rol | id_usuario |
+|---------|-----------|-----|-----------|
+| `admin` | `Huap.2025` | Administrador | 532 |
+| `ti` | `Huap.2025` | Funcionario | 1535 |
+| `aba` | `Huap.2025` | Funcionario | 1536 |
+| `contrato` | `Huap.2025` | Funcionario | 1537 |
+| `ofparte` | `Huap.2025` | Of. de Partes | 2535 |
 
 ---
 
@@ -369,7 +373,7 @@ PORT=3001
 DB_USER=sa
 DB_PASSWORD=<DB_PASSWORD>
 DB_SERVER=localhost
-DB_PORT=1433
+DB_PORT=11433   # Puerto 1433 reservado por Windows/Hyper-V — se mapea como 127.0.0.1:11433:1433 en docker-compose
 DB_DATABASE=SISDOC
 DB_TRUST_CERT=true
 DB_ENCRYPT=false
@@ -414,7 +418,8 @@ cd frontend && npm run typecheck
 
 | Error | Causa | Solución |
 |-------|-------|---------|
-| `ESOCKET` al conectar BD | Docker no corriendo o BD iniciando | `docker compose up -d sqlserver` + esperar 15s |
+| `ESOCKET` al conectar BD | Docker no corriendo, BD iniciando, o puerto no expuesto al host | `docker compose up -d sqlserver` + esperar 15s. **Nota:** el puerto del host es `11433` (no 1433 — reservado por Windows) |
+| Login falla con "Error al iniciar sesión" sin detalle | Backend no corriendo — el frontend no distingue `ECONNREFUSED` de `401` | Verificar que backend está up: `curl http://localhost:3001/api/health` |
 | `"datos inválidos"` al crear doc | Schema backend esperaba campos distintos | Ya corregido: schema usa `materia` + `idEstadoDocumento` |
 | `Cannot read properties of undefined (reading 'descripcion')` | `mapDocumento` no retornaba `destino`/`prioridad` | Ya corregido: incluir esos campos con `null` |
 | Archivos subidos no aparecen en BD | `ruta` varchar(50) overflow con filename largo | Ya corregido: filenames cortos de 12 chars |

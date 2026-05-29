@@ -231,14 +231,16 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
 
       // ── Insertar registro de archivo ───────────────────────
       const result = await pool.request()
-        .input('idDocumento', sql.Int,     docId)
-        .input('idUsuario',   sql.Int,     user.idUsuario)
-        .input('archivo',     sql.VarChar(50), archivoCorto)
-        .input('ruta',        sql.VarChar(50), rutaCorta)
+        .input('idDocumento', sql.Int,          docId)
+        .input('idUsuario',   sql.Int,          user.idUsuario)
+        .input('archivo',     sql.VarChar(50),  archivoCorto)
+        .input('ruta',        sql.VarChar(50),  rutaCorta)
+        .input('tamano',      sql.Int,          req.file.size)
+        .input('tipoMime',    sql.VarChar(100), getMime(req.file.originalname))
         .query<{ id_archivo_digital: number }>(`
-          INSERT INTO archivo_digital (id_documento, id_usuario, archivo, ruta, fecha_sistema, fecha_update)
+          INSERT INTO archivo_digital (id_documento, id_usuario, archivo, ruta, tamano, tipo_mime, fecha_sistema, fecha_update)
           OUTPUT INSERTED.id_archivo_digital
-          VALUES (@idDocumento, @idUsuario, @archivo, @ruta, GETDATE(), GETDATE())
+          VALUES (@idDocumento, @idUsuario, @archivo, @ruta, @tamano, @tipoMime, GETDATE(), GETDATE())
         `);
       idArchivo = result.recordset[0]?.id_archivo_digital ?? null;
 
@@ -296,12 +298,14 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
       // Sin idDocumento: comportamiento legacy — almacena sin asociar a documento
       const pool = await getPool();
       const result = await pool.request()
-        .input('archivo', sql.VarChar(50), archivoCorto)
-        .input('ruta',    sql.VarChar(50), rutaCorta)
+        .input('archivo',  sql.VarChar(50),  archivoCorto)
+        .input('ruta',     sql.VarChar(50),  rutaCorta)
+        .input('tamano',   sql.Int,          req.file.size)
+        .input('tipoMime', sql.VarChar(100), getMime(req.file.originalname))
         .query<{ id_archivo_digital: number }>(`
-          INSERT INTO archivo_digital (archivo, ruta, fecha_sistema, fecha_update)
+          INSERT INTO archivo_digital (archivo, ruta, tamano, tipo_mime, fecha_sistema, fecha_update)
           OUTPUT INSERTED.id_archivo_digital
-          VALUES (@archivo, @ruta, GETDATE(), GETDATE())
+          VALUES (@archivo, @ruta, @tamano, @tipoMime, GETDATE(), GETDATE())
         `);
       idArchivo = result.recordset[0]?.id_archivo_digital ?? null;
     }
@@ -331,10 +335,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
     const result = await request.query<{
       id_archivo_digital: number; id_documento: number | null;
       archivo: string | null; ruta: string | null;
+      tamano: number | null; tipo_mime: string | null;
       fecha_sistema: Date | null; materia: string | null;
       usuario_upload: string | null; nombre_upload: string | null;
     }>(`
       SELECT a.id_archivo_digital, a.id_documento, a.archivo, a.ruta,
+             a.tamano, a.tipo_mime,
              a.fecha_sistema, d.materia,
              u.usuario AS usuario_upload,
              LTRIM(RTRIM(ISNULL(f.nombres, '') + ' ' + ISNULL(f.apellidos, ''))) AS nombre_upload
@@ -351,6 +357,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
       id_documento:   r.id_documento,
       nombre_archivo: r.archivo,
       ruta_archivo:   r.ruta,
+      tamano:         r.tamano,
+      tipo_mime:      r.tipo_mime,
       fecha_subida:   r.fecha_sistema,
       materia:        r.materia,
       subido_por:     r.nombre_upload?.trim() || r.usuario_upload || null,

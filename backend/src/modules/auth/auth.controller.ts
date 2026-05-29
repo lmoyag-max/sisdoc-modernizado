@@ -47,7 +47,12 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
     if (token && user) {
       await authService.logout(user.idUsuario, token);
     }
-    res.clearCookie('refreshToken', { path: '/' });
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      path: '/',
+    });
     sendSuccess(res, null, 'Sesión cerrada');
   } catch (error) {
     next(error);

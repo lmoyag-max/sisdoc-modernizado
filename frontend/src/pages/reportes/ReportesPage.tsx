@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   FileText, HardDrive, Users, GitBranch,
-  Download, RefreshCw, TrendingUp, Clock,
+  Download, RefreshCw, TrendingUp, Clock, Lock,
 } from 'lucide-react';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import {
@@ -18,8 +18,8 @@ import { cn } from '@/lib/utils';
 
 interface DashboardData {
   totales: {
-    total: number; pendientes: number; cerradosHoy: number; urgentes: number;
-    archivos: number; usuarios: number; tramites: number;
+    total: number; pendientes: number; cerradosHoy: number; creadosHoy: number; urgentes: number;
+    archivos: number; usuarios: number; tramites: number; reservados: number;
   };
   porEstado: { id_estado_documento: number; desc_estado_documento: string; cantidad: number }[];
   porMes: { mes: string; cantidad: number }[];
@@ -79,9 +79,10 @@ export function ReportesPage() {
   const metrics = data ? [
     { icon: FileText,  title: 'Documentos',  value: data.totales.total,       description: `${data.totales.pendientes} activos`,  colorClass: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
     { icon: HardDrive, title: 'Archivos',    value: data.totales.archivos,    description: 'digitales subidos',                   colorClass: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400' },
-    { icon: GitBranch, title: 'Trámites',   value: data.totales.tramites,    description: 'movimientos',                         colorClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
+    { icon: GitBranch, title: 'Movimientos', value: data.totales.tramites,    description: 'en trazabilidad',                     colorClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
     { icon: Users,     title: 'Usuarios',   value: data.totales.usuarios,    description: 'activos',                             colorClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    { icon: Clock,     title: 'Creados hoy', value: data.totales.cerradosHoy, description: 'nuevos hoy',                         colorClass: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
+    { icon: Clock,     title: 'Creados hoy', value: data.totales.creadosHoy,  description: 'nuevos hoy',           colorClass: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
+    { icon: Lock,      title: 'Reservados',  value: data.totales.reservados,   description: 'documentos reservados', colorClass: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400' },
   ] : [];
 
   return (
@@ -110,9 +111,9 @@ export function ReportesPage() {
       </div>
 
       {/* Métricas principales */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
         {isLoading
-          ? Array.from({ length: 5 }).map((_, i) => <MetricCard key={i} title="" value="" icon={FileText} variant="compact" loading />)
+          ? Array.from({ length: 6 }).map((_, i) => <MetricCard key={i} title="" value="" icon={FileText} variant="compact" loading />)
           : metrics.map((m) => <MetricCard key={m.title} {...m} variant="compact" />)
         }
       </div>

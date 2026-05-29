@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,7 +23,6 @@ const FEATURE_ICONS = [FileText, GitBranch, Shield, Clock];
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [showPassword,   setShowPassword]   = useState(false);
   const [bgUrl,          setBgUrl]          = useState<string | null>(null);
@@ -75,8 +74,6 @@ export function LoginPage() {
       .catch(() => {/* usa valores por defecto */});
   }, []);
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
-
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
@@ -85,7 +82,7 @@ export function LoginPage() {
     try {
       const result = await authApi.login(data.usuario, data.clave);
       setAuth(result.user, result.accessToken);
-      navigate(from, { replace: true });
+      navigate('/dashboard', { replace: true });
       toast.success(`Bienvenido, ${result.user.nombres ?? result.user.usuario}`);
     } catch (error: unknown) {
       const msg =

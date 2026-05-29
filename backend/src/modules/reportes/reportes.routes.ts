@@ -56,13 +56,17 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
     };
 
     const [totales, porEstado, porMes, porTipo] = await Promise.all([
-      makeDepReq().query<{ total: number; pendientes: number; cerradosHoy: number; urgentes: number; tramites: number }>(`
+      makeDepReq().query<{ total: number; pendientes: number; cerradosHoy: number; creadosHoy: number; urgentes: number; tramites: number; reservados: number }>(`
         SELECT
           (SELECT COUNT(*) FROM documento d WHERE 1=1 ${docFilter}) AS total,
-          (SELECT COUNT(*) FROM documento d WHERE id_estado_documento NOT IN (4,5) ${docFilter}) AS pendientes,
-          (SELECT COUNT(*) FROM documento d WHERE CAST(d.fecha_sistema AS DATE) = CAST(GETDATE() AS DATE) ${docFilter}) AS cerradosHoy,
-          0 AS urgentes,
-          (SELECT COUNT(*) FROM tramite t WHERE 1=1 ${tramiteFilter}) AS tramites
+          (SELECT COUNT(*) FROM documento d WHERE id_estado_documento NOT IN (4) ${docFilter}) AS pendientes,
+          (SELECT COUNT(*) FROM documento d WHERE d.id_estado_documento = 4 AND CAST(d.fecha_update AS DATE) = CAST(GETDATE() AS DATE) ${docFilter}) AS cerradosHoy,
+          (SELECT COUNT(*) FROM documento d WHERE CAST(d.fecha_sistema AS DATE) = CAST(GETDATE() AS DATE) ${docFilter}) AS creadosHoy,
+          (SELECT COUNT(*) FROM documento d WHERE d.id_estado_documento NOT IN (4)
+           AND EXISTS (SELECT 1 FROM tramite t WHERE t.id_documento = d.id_documento AND t.id_tipo_compromiso = 3)
+           ${docFilter}) AS urgentes,
+          (SELECT COUNT(*) FROM tramite t WHERE 1=1 ${tramiteFilter}) AS tramites,
+          (SELECT COUNT(*) FROM documento d WHERE d.resuelto = 'S' ${docFilter}) AS reservados
       `),
 
       makeDepReq().query<{ id_estado_documento: number; desc_estado_documento: string; cantidad: number }>(`
@@ -104,7 +108,7 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
 
     sendSuccess(res, {
       totales: {
-        ...(totales.recordset[0] ?? { total: 0, pendientes: 0, cerradosHoy: 0, urgentes: 0, tramites: 0 }),
+        ...(totales.recordset[0] ?? { total: 0, pendientes: 0, cerradosHoy: 0, creadosHoy: 0, urgentes: 0, tramites: 0, reservados: 0 }),
         ...extras,
       },
       porEstado: porEstado.recordset,

@@ -172,6 +172,8 @@ router.get('/actividad-reciente', requireModule('dashboard'), async (req, res, n
 
 // ── GET /reportes/exportar — CSV filtrado por servicio ───────
 
+const MAX_EXPORT_ROWS = 50_000;
+
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 const exportQuerySchema = z.object({
   fechaDesde: z.string().regex(dateRegex, 'Formato inválido, se espera YYYY-MM-DD').optional(),
@@ -214,6 +216,7 @@ router.get('/exportar', requireModule('reportes'), async (req, res, next) => {
     if (!full && idDep) request.input('idDep', sql.Int, idDep);
     if (fechaDesde) request.input('fechaDesde', sql.Date, new Date(fechaDesde));
     if (fechaHasta) request.input('fechaHasta', sql.Date, new Date(fechaHasta));
+    request.input('maxRows', sql.Int, MAX_EXPORT_ROWS);
 
     const result = await request.query<{
       id_documento: number; materia: string | null;
@@ -221,7 +224,7 @@ router.get('/exportar', requireModule('reportes'), async (req, res, next) => {
       desc_tipo_documento: string | null; desc_estado_documento: string | null;
       usuario: string | null; fecha_sistema: Date | null;
     }>(`
-      SELECT d.id_documento, d.materia, d.num_interno, d.num_oficial,
+      SELECT TOP (@maxRows) d.id_documento, d.materia, d.num_interno, d.num_oficial,
              td.desc_tipo_documento, ed.desc_estado_documento,
              u.usuario, d.fecha_sistema
       FROM documento d
@@ -253,6 +256,10 @@ router.get('/exportar', requireModule('reportes'), async (req, res, next) => {
     });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="documentos_${Date.now()}.csv"`);
+    if (result.recordset.length >= MAX_EXPORT_ROWS) {
+      res.setHeader('X-Export-Truncated', 'true');
+      res.setHeader('X-Export-Limit', String(MAX_EXPORT_ROWS));
+    }
     res.send('﻿' + csv);
   } catch (e) { next(e); }
 });

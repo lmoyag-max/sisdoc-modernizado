@@ -227,73 +227,74 @@ export async function insert(data: {
   diasCompromiso: number;
   observaciones?: string;
 }): Promise<{ idDocumento: number; idSeguimiento: number }> {
-  const pool = await getPool();
+  const pool    = await getPool();
+  const fechaDoc = data.fechaDocumento ?? new Date();
 
-  // Correlativo siguiente
-  const maxRes = await pool.request().query<{ maxInterno: number; maxOficial: number }>(`
-    SELECT ISNULL(MAX(num_interno), 0) AS maxInterno, ISNULL(MAX(num_oficial), 0) AS maxOficial
-    FROM documento
-  `);
-  const nextInterno = (maxRes.recordset[0]?.maxInterno ?? 0) + 1;
-  const nextOficial = (maxRes.recordset[0]?.maxOficial ?? 0) + 1;
-  const fechaDoc    = data.fechaDocumento ?? new Date();
-
-  // INSERT documento
-  const docRes = await pool.request()
-    .input('idTipo',    sql.Int,        data.idTipoDocumento)
-    .input('idEstado',  sql.Int,        data.idEstadoDocumento)
-    .input('idUsr',     sql.Int,        data.idUsuario)
-    .input('numInt',    sql.Int,        nextInterno)
-    .input('numOf',     sql.Int,        nextOficial)
+  // Batch atómico: bloquea la tabla con UPDLOCK+HOLDLOCK para que dos requests
+  // concurrentes no lean el mismo MAX y generen num_interno duplicado.
+  // Los tres pasos (SELECT MAX, INSERT documento, INSERT tramite) se ejecutan
+  // en un único sp_executesql, eliminando la race condition.
+  const result = await pool.request()
+    .input('idTipo',    sql.Int,          data.idTipoDocumento)
+    .input('idEstado',  sql.Int,          data.idEstadoDocumento)
+    .input('idUsr',     sql.Int,          data.idUsuario)
     .input('materia',   sql.VarChar(250), data.materia.substring(0, 250))
-    .input('fechaDoc',  sql.DateTime,   fechaDoc)
-    .input('medio',     sql.VarChar(1), data.medio ?? null)
-    .input('original',  sql.VarChar(1), data.original ?? 'S')
-    .input('resuelto',  sql.Char(1),    data.resuelto ?? null)
-    .query<{ id_documento: number }>(`
+    .input('fechaDoc',  sql.DateTime,     fechaDoc)
+    .input('medio',     sql.VarChar(1),   data.medio ?? null)
+    .input('original',  sql.VarChar(1),   data.original ?? 'S')
+    .input('resuelto',  sql.Char(1),      data.resuelto ?? null)
+    .input('idProc',    sql.Int,          data.idProcedencia)
+    .input('idDest',    sql.Int,          data.idDestino)
+    .input('tipProc',   sql.Char(1),      data.tipoProcedencia)
+    .input('tipDest',   sql.Char(1),      data.tipoDestinatario)
+    .input('idTipDis',  sql.Int,          data.idTipoDistribucion)
+    .input('idTipCom',  sql.Int,          data.idTipoCompromiso)
+    .input('idEstCom',  sql.Int,          data.idEstadoCompromiso)
+    .input('dias',      sql.Int,          data.diasCompromiso)
+    .input('obs',       sql.VarChar(250), (data.observaciones ?? '').substring(0, 250))
+    .query<{ id_documento: number; id_seguimiento: number }>(`
+      DECLARE @nextInt INT, @nextOf  INT;
+      DECLARE @idDoc   INT, @idSeg   INT;
+      DECLARE @docOut  TABLE (id_documento   INT);
+      DECLARE @tramOut TABLE (id_seguimiento INT);
+
+      SELECT @nextInt = ISNULL(MAX(num_interno), 0) + 1,
+             @nextOf  = ISNULL(MAX(num_oficial), 0) + 1
+      FROM documento WITH (UPDLOCK, HOLDLOCK);
+
       INSERT INTO documento
         (id_tipo_documento, id_estado_documento, id_usuario,
          num_interno, num_oficial, num_externo, original, medio, resuelto,
          materia, fecha_documento, fecha_sistema, fecha_update)
-      OUTPUT INSERTED.id_documento
+      OUTPUT INSERTED.id_documento INTO @docOut
       VALUES
         (@idTipo, @idEstado, @idUsr,
-         @numInt, @numOf, 0, @original, @medio, @resuelto,
-         @materia, @fechaDoc, GETDATE(), GETDATE())
-    `);
-  const idDocumento = docRes.recordset[0].id_documento;
+         @nextInt, @nextOf, 0, @original, @medio, @resuelto,
+         @materia, @fechaDoc, GETDATE(), GETDATE());
 
-  // INSERT tramite inicial (estado 1 = Generado)
-  const tramRes = await pool.request()
-    .input('idDoc',    sql.Int,        idDocumento)
-    .input('idUsr',    sql.Int,        data.idUsuario)
-    .input('idProc',   sql.Int,        data.idProcedencia)
-    .input('idDest',   sql.Int,        data.idDestino)
-    .input('tipProc',  sql.Char(1),    data.tipoProcedencia)
-    .input('tipDest',  sql.Char(1),    data.tipoDestinatario)
-    .input('idTipDis', sql.Int,        data.idTipoDistribucion)
-    .input('idTipCom', sql.Int,        data.idTipoCompromiso)
-    .input('idEstCom', sql.Int,        data.idEstadoCompromiso)
-    .input('dias',     sql.Int,        data.diasCompromiso)
-    .input('obs',      sql.VarChar(250), (data.observaciones ?? '').substring(0, 250))
-    .query<{ id_seguimiento: number }>(`
+      SET @idDoc = (SELECT id_documento FROM @docOut);
+
       INSERT INTO tramite
         (id_documento, id_usuario, id_procedencia, id_destino,
          tipo_procedencia, tipo_destinatario,
          id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
          id_estado_tramite, dias_compromiso, observaciones,
          fecha_sistema, fecha_update)
-      OUTPUT INSERTED.id_seguimiento
+      OUTPUT INSERTED.id_seguimiento INTO @tramOut
       VALUES
         (@idDoc, @idUsr, @idProc, @idDest,
          @tipProc, @tipDest,
          @idTipDis, @idTipCom, @idEstCom,
          1, @dias, @obs,
-         GETDATE(), GETDATE())
-    `);
-  const idSeguimiento = tramRes.recordset[0].id_seguimiento;
+         GETDATE(), GETDATE());
 
-  return { idDocumento, idSeguimiento };
+      SET @idSeg = (SELECT id_seguimiento FROM @tramOut);
+
+      SELECT @idDoc AS id_documento, @idSeg AS id_seguimiento;
+    `);
+
+  const row = result.recordset[0];
+  return { idDocumento: row.id_documento, idSeguimiento: row.id_seguimiento };
 }
 
 // ── updateEstado ─────────────────────────────────────────────
@@ -443,6 +444,168 @@ export async function allDestinosCerrados(idDocumento: number): Promise<boolean>
     WHERE id_documento = @idDoc AND activo = 1 AND id_estado_tramite NOT IN (5, 6)
   `);
   return (r.recordset[0]?.pendientes ?? 1) === 0;
+}
+
+// ── Transiciones atómicas de estado ──────────────────────────
+// Cada función consolida UPDATE doc_destino + INSERT tramite + UPDATE documento
+// en un único batch T-SQL con BEGIN TRAN/COMMIT, eliminando ventanas de
+// inconsistencia entre las llamadas separadas previas.
+
+export async function recepcionarDestinoAtomic(params: {
+  idDocumentoDestino: number;
+  idDocumento:        number;
+  idDestino:          number;
+  idUsuario:          number;
+  observaciones:      string | undefined;
+}): Promise<void> {
+  const pool = await getPool();
+  await pool.request()
+    .input('idDocDest', sql.Int,          params.idDocumentoDestino)
+    .input('idDoc',     sql.Int,          params.idDocumento)
+    .input('idProc',    sql.Int,          params.idDestino)
+    .input('idUsr',     sql.Int,          params.idUsuario)
+    .input('obs',       sql.VarChar(500), (params.observaciones ?? '').substring(0, 500))
+    .query(`
+      BEGIN TRAN;
+        UPDATE documento_destino
+          SET id_estado_tramite    = 3,
+              fecha_recepcion      = GETDATE(),
+              id_usuario_recepcion = @idUsr,
+              observaciones        = @obs
+        WHERE id = @idDocDest;
+
+        INSERT INTO tramite
+          (id_documento, id_usuario, id_procedencia, id_destino,
+           tipo_procedencia, tipo_destinatario,
+           id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+           id_estado_tramite, dias_compromiso, observaciones,
+           fecha_sistema, fecha_update, fecha_recepcion, usuario_recepcion)
+        VALUES
+          (@idDoc, @idUsr, @idProc, @idProc,
+           'D', 'D', 5, 1, 2,
+           3, 0, @obs,
+           GETDATE(), GETDATE(), GETDATE(), @idUsr);
+
+        UPDATE documento
+          SET id_estado_documento = 3, fecha_update = GETDATE()
+        WHERE id_documento = @idDoc;
+      COMMIT;
+    `);
+}
+
+export async function terminarDestinoAtomic(params: {
+  idDocumentoDestino: number;
+  idDocumento:        number;
+  idDestino:          number;
+  idUsuario:          number;
+  observaciones:      string | undefined;
+}): Promise<void> {
+  const pool = await getPool();
+  await pool.request()
+    .input('idDocDest', sql.Int,          params.idDocumentoDestino)
+    .input('idDoc',     sql.Int,          params.idDocumento)
+    .input('idProc',    sql.Int,          params.idDestino)
+    .input('idUsr',     sql.Int,          params.idUsuario)
+    .input('obs',       sql.VarChar(500), (params.observaciones ?? '').substring(0, 500))
+    .query(`
+      BEGIN TRAN;
+        UPDATE documento_destino
+          SET id_estado_tramite = 5,
+              fecha_cierre      = GETDATE(),
+              id_usuario_cierre = @idUsr,
+              observaciones     = @obs
+        WHERE id = @idDocDest;
+
+        INSERT INTO tramite
+          (id_documento, id_usuario, id_procedencia, id_destino,
+           tipo_procedencia, tipo_destinatario,
+           id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+           id_estado_tramite, dias_compromiso, observaciones,
+           fecha_sistema, fecha_update)
+        VALUES
+          (@idDoc, @idUsr, @idProc, @idProc,
+           'D', 'D', 5, 1, 2,
+           5, 0, @obs,
+           GETDATE(), GETDATE());
+
+        IF NOT EXISTS (
+          SELECT 1 FROM documento_destino
+          WHERE id_documento = @idDoc AND activo = 1 AND id_estado_tramite NOT IN (5, 6)
+        )
+          UPDATE documento SET id_estado_documento = 4, fecha_update = GETDATE()
+          WHERE id_documento = @idDoc;
+      COMMIT;
+    `);
+}
+
+export async function recepcionarDocumentoAtomic(params: {
+  idDocumento:   number;
+  idProc:        number;
+  tipProc:       string;
+  idUsuario:     number;
+  observaciones: string | undefined;
+}): Promise<void> {
+  const pool = await getPool();
+  await pool.request()
+    .input('idDoc',  sql.Int,          params.idDocumento)
+    .input('idUsr',  sql.Int,          params.idUsuario)
+    .input('idProc', sql.Int,          params.idProc)
+    .input('tipProc',sql.Char(1),      params.tipProc)
+    .input('obs',    sql.VarChar(250), (params.observaciones ?? '').substring(0, 250))
+    .query(`
+      BEGIN TRAN;
+        INSERT INTO tramite
+          (id_documento, id_usuario, id_procedencia, id_destino,
+           tipo_procedencia, tipo_destinatario,
+           id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+           id_estado_tramite, dias_compromiso, observaciones,
+           fecha_sistema, fecha_update, fecha_recepcion, usuario_recepcion)
+        VALUES
+          (@idDoc, @idUsr, @idProc, @idProc,
+           @tipProc, @tipProc,
+           5, 1, 2,
+           3, 0, @obs,
+           GETDATE(), GETDATE(), GETDATE(), @idUsr);
+
+        UPDATE documento SET id_estado_documento = 3, fecha_update = GETDATE()
+        WHERE id_documento = @idDoc;
+      COMMIT;
+    `);
+}
+
+export async function terminarDocumentoAtomic(params: {
+  idDocumento:   number;
+  idProc:        number;
+  tipProc:       string;
+  idUsuario:     number;
+  observaciones: string | undefined;
+}): Promise<void> {
+  const pool = await getPool();
+  await pool.request()
+    .input('idDoc',  sql.Int,          params.idDocumento)
+    .input('idUsr',  sql.Int,          params.idUsuario)
+    .input('idProc', sql.Int,          params.idProc)
+    .input('tipProc',sql.Char(1),      params.tipProc)
+    .input('obs',    sql.VarChar(250), (params.observaciones ?? '').substring(0, 250))
+    .query(`
+      BEGIN TRAN;
+        INSERT INTO tramite
+          (id_documento, id_usuario, id_procedencia, id_destino,
+           tipo_procedencia, tipo_destinatario,
+           id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+           id_estado_tramite, dias_compromiso, observaciones,
+           fecha_sistema, fecha_update)
+        VALUES
+          (@idDoc, @idUsr, @idProc, @idProc,
+           @tipProc, @tipProc,
+           5, 1, 2,
+           5, 0, @obs,
+           GETDATE(), GETDATE());
+
+        UPDATE documento SET id_estado_documento = 4, fecha_update = GETDATE()
+        WHERE id_documento = @idDoc;
+      COMMIT;
+    `);
 }
 
 // ── softDelete ────────────────────────────────────────────────

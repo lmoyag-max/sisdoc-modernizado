@@ -1,7 +1,7 @@
 import os from 'os';
 import { env } from './config/env';
 import { logger } from './shared/utils/logger';
-import { getPool, closePool } from './config/database';
+import { getPool, closePool, ensureIndexes } from './config/database';
 import app from './app';
 import { startAlertaScheduler, stopAlertaScheduler } from './shared/services/alertas.scheduler';
 
@@ -18,6 +18,7 @@ function getLocalIP(): string {
 async function bootstrap(): Promise<void> {
   try {
     await getPool();
+    ensureIndexes(); // non-blocking — crea índices si no existen
 
     startAlertaScheduler();
 

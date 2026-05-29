@@ -46,4 +46,33 @@ export async function closePool(): Promise<void> {
   }
 }
 
+export async function ensureIndexes(): Promise<void> {
+  try {
+    const p = await getPool();
+    await p.request().query(`
+      IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_tramite_doc_dest' AND object_id = OBJECT_ID('tramite'))
+        CREATE INDEX IX_tramite_doc_dest
+          ON tramite (id_documento, id_destino, tipo_destinatario)
+          INCLUDE (id_procedencia, tipo_procedencia);
+
+      IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_tramite_doc_comp' AND object_id = OBJECT_ID('tramite'))
+        CREATE INDEX IX_tramite_doc_comp
+          ON tramite (id_documento, id_tipo_compromiso);
+
+      IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_tramite_fecha' AND object_id = OBJECT_ID('tramite'))
+        CREATE INDEX IX_tramite_fecha
+          ON tramite (fecha_sistema DESC)
+          INCLUDE (id_documento, id_estado_tramite, id_usuario);
+
+      IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_documento_estado_fecha' AND object_id = OBJECT_ID('documento'))
+        CREATE INDEX IX_documento_estado_fecha
+          ON documento (id_estado_documento, fecha_sistema, fecha_update)
+          INCLUDE (resuelto, id_tipo_documento);
+    `);
+    logger.info('Índices de rendimiento verificados');
+  } catch (err) {
+    logger.warn('ensureIndexes: error no fatal —', err);
+  }
+}
+
 export { sql };

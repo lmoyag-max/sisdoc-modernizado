@@ -220,35 +220,13 @@ export async function recepcionarDestino(
   if (!dest) throw { statusCode: 404, message: 'Destino no encontrado en este documento' };
   if (dest.id_estado_tramite === 5) throw { statusCode: 400, message: 'Este destino ya está cerrado' };
 
-  await repo.updateDocumentoDestinoEstado(idDocumentoDestino, 3, {
-    idUsuarioRecepcion: idUsuario,
-    fechaRecepcion: new Date(),
+  await repo.recepcionarDestinoAtomic({
+    idDocumentoDestino,
+    idDocumento,
+    idDestino: dest.id_destino,
+    idUsuario,
     observaciones,
   });
-
-  // Insertar tramite de recepción para este destino
-  const pool = await getPool();
-  await pool.request()
-    .input('idDoc',  sql.Int, idDocumento)
-    .input('idUsr',  sql.Int, idUsuario)
-    .input('idProc', sql.Int, dest.id_destino)
-    .input('obs',    sql.VarChar(250), (observaciones ?? '').substring(0, 250))
-    .query(`
-      INSERT INTO tramite
-        (id_documento, id_usuario, id_procedencia, id_destino,
-         tipo_procedencia, tipo_destinatario,
-         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
-         id_estado_tramite, dias_compromiso, observaciones,
-         fecha_sistema, fecha_update, fecha_recepcion, usuario_recepcion)
-      VALUES
-        (@idDoc, @idUsr, @idProc, @idProc,
-         'D', 'D', 5, 1, 2,
-         3, 0, @obs,
-         GETDATE(), GETDATE(), GETDATE(), @idUsr)
-    `);
-
-  // Si al menos 1 destino está recepcionado, marcar documento en estado 3
-  await repo.updateEstado(idDocumento, 3);
   return obtenerDocumento(idDocumento);
 }
 
@@ -264,36 +242,13 @@ export async function terminarDestino(
   if (!dest) throw { statusCode: 404, message: 'Destino no encontrado en este documento' };
   if (dest.id_estado_tramite === 5) throw { statusCode: 400, message: 'Este destino ya está cerrado' };
 
-  await repo.updateDocumentoDestinoEstado(idDocumentoDestino, 5, {
-    idUsuarioCierre: idUsuario,
-    fechaCierre: new Date(),
+  await repo.terminarDestinoAtomic({
+    idDocumentoDestino,
+    idDocumento,
+    idDestino: dest.id_destino,
+    idUsuario,
     observaciones,
   });
-
-  const pool = await getPool();
-  await pool.request()
-    .input('idDoc',  sql.Int, idDocumento)
-    .input('idUsr',  sql.Int, idUsuario)
-    .input('idProc', sql.Int, dest.id_destino)
-    .input('obs',    sql.VarChar(250), (observaciones ?? '').substring(0, 250))
-    .query(`
-      INSERT INTO tramite
-        (id_documento, id_usuario, id_procedencia, id_destino,
-         tipo_procedencia, tipo_destinatario,
-         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
-         id_estado_tramite, dias_compromiso, observaciones,
-         fecha_sistema, fecha_update)
-      VALUES
-        (@idDoc, @idUsr, @idProc, @idProc,
-         'D', 'D', 5, 1, 2,
-         5, 0, @obs,
-         GETDATE(), GETDATE())
-    `);
-
-  // Cierre global: solo si TODOS los destinos están cerrados
-  const todosCerrados = await repo.allDestinosCerrados(idDocumento);
-  if (todosCerrados) await repo.updateEstado(idDocumento, 4);
-
   return obtenerDocumento(idDocumento);
 }
 
@@ -358,29 +313,7 @@ export async function recepcionarDocumento(idDocumento: number, dto: Recepcionar
   const idProc   = ultimoTramite?.id_destino ?? 1;
   const tipProc  = ultimoTramite?.tipo_destinatario ?? 'D';
 
-  const pool = await getPool();
-  await pool.request()
-    .input('idDoc',  sql.Int,          idDocumento)
-    .input('idUsr',  sql.Int,          idUsuario)
-    .input('idProc', sql.Int,          idProc)
-    .input('tipProc',sql.Char(1),      tipProc)
-    .input('obs',    sql.VarChar(250), (dto.observaciones ?? '').substring(0, 250))
-    .query(`
-      INSERT INTO tramite
-        (id_documento, id_usuario, id_procedencia, id_destino,
-         tipo_procedencia, tipo_destinatario,
-         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
-         id_estado_tramite, dias_compromiso, observaciones,
-         fecha_sistema, fecha_update, fecha_recepcion, usuario_recepcion)
-      VALUES
-        (@idDoc, @idUsr, @idProc, @idProc,
-         @tipProc, @tipProc,
-         5, 1, 2,
-         3, 0, @obs,
-         GETDATE(), GETDATE(), GETDATE(), @idUsr)
-    `);
-
-  await repo.updateEstado(idDocumento, 3);
+  await repo.recepcionarDocumentoAtomic({ idDocumento, idProc, tipProc, idUsuario, observaciones: dto.observaciones });
   return obtenerDocumento(idDocumento);
 }
 
@@ -438,29 +371,7 @@ export async function terminarDocumento(idDocumento: number, dto: TerminarDto, i
   const idProc  = ultimoTramite?.id_destino ?? 1;
   const tipProc = ultimoTramite?.tipo_destinatario ?? 'D';
 
-  const pool = await getPool();
-  await pool.request()
-    .input('idDoc',  sql.Int,          idDocumento)
-    .input('idUsr',  sql.Int,          idUsuario)
-    .input('idProc', sql.Int,          idProc)
-    .input('tipProc',sql.Char(1),      tipProc)
-    .input('obs',    sql.VarChar(250), (dto.observaciones ?? '').substring(0, 250))
-    .query(`
-      INSERT INTO tramite
-        (id_documento, id_usuario, id_procedencia, id_destino,
-         tipo_procedencia, tipo_destinatario,
-         id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
-         id_estado_tramite, dias_compromiso, observaciones,
-         fecha_sistema, fecha_update)
-      VALUES
-        (@idDoc, @idUsr, @idProc, @idProc,
-         @tipProc, @tipProc,
-         5, 1, 2,
-         5, 0, @obs,
-         GETDATE(), GETDATE())
-    `);
-
-  await repo.updateEstado(idDocumento, 4); // 4=Terminado
+  await repo.terminarDocumentoAtomic({ idDocumento, idProc, tipProc, idUsuario, observaciones: dto.observaciones });
   return obtenerDocumento(idDocumento);
 }
 

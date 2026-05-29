@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   FileText, HardDrive, Users, GitBranch,
   Download, RefreshCw, TrendingUp, Clock, Lock,
@@ -71,9 +73,26 @@ export function ReportesPage() {
     refetchInterval: 30_000,
   });
 
-  const handleExportar = () => {
-    const token = localStorage.getItem('sisdoc_token') ?? '';
-    window.open(`/api/v1/reportes/exportar`, '_blank');
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleExportar = async () => {
+    try {
+      setIsDownloading(true);
+      const response = await apiClient.get('/reportes/exportar', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `documentos_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Error al exportar CSV');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const metrics = data ? [
@@ -103,9 +122,9 @@ export function ReportesPage() {
             <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />
             Actualizar
           </Button>
-          <Button size="sm" onClick={handleExportar} className="gap-2">
-            <Download className="h-3.5 w-3.5" />
-            Exportar CSV
+          <Button size="sm" onClick={handleExportar} disabled={isDownloading} className="gap-2">
+            <Download className={cn('h-3.5 w-3.5', isDownloading && 'animate-bounce')} />
+            {isDownloading ? 'Exportando...' : 'Exportar CSV'}
           </Button>
         </div>
       </div>

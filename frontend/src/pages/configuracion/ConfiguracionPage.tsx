@@ -663,16 +663,16 @@ export function ConfiguracionPage() {
           <CardTitle className="text-base text-muted-foreground">Información del sistema</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             {[
-              { label: 'Versión API', value: config?.version ?? '—' },
-              { label: 'Backend', value: 'Node.js + Express' },
-              { label: 'Frontend', value: 'React 18 + Vite 6' },
-              { label: 'Base de datos', value: 'SQL Server 2022' },
+              { label: 'Versión API',    value: config?.version ?? '—' },
+              { label: 'Backend',        value: 'Node.js + Express' },
+              { label: 'Frontend',       value: 'React 18 + Vite 6' },
+              { label: 'Base de datos',  value: 'SQL Server 2022' },
             ].map(({ label, value }) => (
-              <div key={label} className="space-y-1">
+              <div key={label} className="rounded-xl border bg-muted/20 px-4 py-3 card-executive">
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
-                <p className="text-foreground font-medium">{value}</p>
+                <p className="text-foreground font-semibold mt-0.5">{value}</p>
               </div>
             ))}
           </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, FileText, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, FileText, Lock, Paperclip, ArrowUpDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -13,44 +13,42 @@ import { formatFechaHora, cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 
 const ESTADO_BADGE: Record<number, { label: string; variant: 'info' | 'warning' | 'success' | 'secondary' | 'purple' }> = {
-  1: { label: 'Nuevo', variant: 'info' },
+  1: { label: 'Nuevo',        variant: 'info' },
   2: { label: 'Recepcionado', variant: 'secondary' },
-  3: { label: 'Derivado', variant: 'warning' },
-  4: { label: 'En proceso', variant: 'purple' },
-  5: { label: 'Cerrado', variant: 'success' },
+  3: { label: 'Derivado',     variant: 'warning' },
+  4: { label: 'En proceso',   variant: 'purple' },
+  5: { label: 'Cerrado',      variant: 'success' },
 };
 
 export function DocumentosPage() {
   const [filtros, setFiltros] = useState<FiltrosDocumento>({ pagina: 1, porPagina: 20 });
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 300);
+  const [search, setSearch]   = useState('');
+  const debouncedSearch       = useDebounce(search, 300);
 
-  const queryFiltros: FiltrosDocumento = {
-    ...filtros,
-    q: debouncedSearch || undefined,
-  };
+  const queryFiltros: FiltrosDocumento = { ...filtros, q: debouncedSearch || undefined };
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['documentos', queryFiltros],
-    queryFn: () => documentosApi.listar(queryFiltros),
+    queryFn:  () => documentosApi.listar(queryFiltros),
     placeholderData: keepPreviousData,
     staleTime: 15_000,
   });
 
   const documentos = data?.data ?? [];
-  const meta = data?.meta;
-  const loading = isLoading;
+  const meta       = data?.meta;
+  const loading    = isLoading;
 
   const setPage = (p: number) => setFiltros((f) => ({ ...f, pagina: p }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground">Documentos</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {meta ? `${meta.total} documento${meta.total !== 1 ? 's' : ''} en total` : 'Cargando...'}
+            {meta ? `${meta.total.toLocaleString('es-CL')} documento${meta.total !== 1 ? 's' : ''} en total` : 'Cargando...'}
           </p>
         </div>
         <Link to="/documentos/nuevo">
@@ -61,7 +59,7 @@ export function DocumentosPage() {
         </Link>
       </div>
 
-      {/* Filtros */}
+      {/* Barra de filtros */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -71,12 +69,14 @@ export function DocumentosPage() {
                 placeholder="Buscar por asunto, número de documento..."
                 className="pl-9"
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setFiltros((f) => ({ ...f, pagina: 1 }));
-                }}
+                onChange={(e) => { setSearch(e.target.value); setFiltros((f) => ({ ...f, pagina: 1 })); }}
               />
             </div>
+            {search && (
+              <Button variant="ghost" size="sm" onClick={() => setSearch('')} className="text-xs shrink-0">
+                Limpiar
+              </Button>
+            )}
             <Button variant="outline" size="default" className="gap-2 shrink-0">
               <Filter className="h-4 w-4" />
               Filtros
@@ -85,7 +85,7 @@ export function DocumentosPage() {
         </CardContent>
       </Card>
 
-      {/* Empty state compartido (mobile y desktop cuando sin resultados) */}
+      {/* Empty state mobile */}
       {!loading && documentos.length === 0 && (
         <Card className="md:hidden">
           <EmptyState
@@ -96,7 +96,7 @@ export function DocumentosPage() {
         </Card>
       )}
 
-      {/* Vista mobile — cards apiladas (< md) */}
+      {/* Vista mobile — cards */}
       <div className={cn('md:hidden space-y-2', isFetching && 'opacity-60 transition-opacity')}>
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
@@ -115,26 +115,30 @@ export function DocumentosPage() {
           documentos.map((doc) => {
             const badge = ESTADO_BADGE[doc.estadoDocumento?.id ?? 0] ?? { label: 'Desconocido', variant: 'secondary' as const };
             return (
-              <Link
-                key={doc.idDocumento}
-                to={`/documentos/${doc.idDocumento}`}
-                className="block"
-              >
-                <Card className="hover:border-primary/40 transition-colors group">
+              <Link key={doc.idDocumento} to={`/documentos/${doc.idDocumento}`} className="block">
+                <Card className={cn(
+                  'hover:border-primary/40 transition-colors group card-executive',
+                  doc.reservado && 'border-l-4 border-l-violet-400',
+                )}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          {doc.reservado && <Lock className="h-3 w-3 text-violet-500 shrink-0" />}
+                          {doc.tipoSoporte === 'F' && <Paperclip className="h-3 w-3 text-slate-500 shrink-0" />}
+                        </div>
                         <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2">
                           {doc.asunto ?? 'Sin asunto'}
                         </p>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                           <span className="font-mono">{doc.numDocumento ?? `#${doc.idDocumento}`}</span>
-                          {doc.tipoDocumento?.descripcion && (
-                            <span>{doc.tipoDocumento.descripcion}</span>
-                          )}
+                          {doc.tipoDocumento?.descripcion && <span>{doc.tipoDocumento.descripcion}</span>}
                         </div>
                       </div>
-                      <Badge variant={badge.variant} className="shrink-0 mt-0.5">{badge.label}</Badge>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <Badge variant={badge.variant}>{badge.label}</Badge>
+                        {doc.reservado && <span className="text-[10px] text-violet-600 dark:text-violet-400 font-medium">Reservado</span>}
+                      </div>
                     </div>
                     <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
                       <span>{doc.ingresadoPor.nombre || doc.ingresadoPor.usuario || '—'}</span>
@@ -151,36 +155,27 @@ export function DocumentosPage() {
       {/* Paginación mobile */}
       {meta && meta.totalPaginas > 1 && (
         <div className="flex items-center justify-between md:hidden">
-          <p className="text-xs text-muted-foreground">
-            {meta.pagina} / {meta.totalPaginas} · {meta.total} docs
-          </p>
+          <p className="text-xs text-muted-foreground">{meta.pagina} / {meta.totalPaginas} · {meta.total} docs</p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="h-9 w-9"
-              disabled={meta.pagina <= 1} onClick={() => setPage(meta.pagina - 1)} aria-label="Página anterior">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-9 w-9"
-              disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPage(meta.pagina + 1)} aria-label="Página siguiente">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <Button variant="outline" size="icon" className="h-9 w-9" disabled={meta.pagina <= 1} onClick={() => setPage(meta.pagina - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" className="h-9 w-9" disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPage(meta.pagina + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
       )}
 
-      {/* Tabla desktop — visible en md+ */}
+      {/* Tabla desktop */}
       <Card className="hidden md:block">
         <div className="overflow-x-auto">
-          <div className="min-w-[640px]">
-            <CardHeader className="px-6 py-4 border-b">
-              <div className="grid grid-cols-12 gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="min-w-[680px]">
+            <CardHeader className="px-6 py-4 border-b bg-muted/20">
+              <div className="grid grid-cols-12 gap-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-1">N°</div>
-                <div className="col-span-4 flex items-center gap-1 cursor-pointer hover:text-foreground">
+                <div className="col-span-4 flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors">
                   Asunto <ArrowUpDown className="h-3 w-3" />
                 </div>
                 <div className="col-span-2">Tipo</div>
-                <div className="col-span-2">Destino</div>
-                <div className="col-span-1">Prioridad</div>
-                <div className="col-span-1">Estado</div>
+                <div className="col-span-2">Ingresado por</div>
+                <div className="col-span-2">Estado</div>
                 <div className="col-span-1">Fecha</div>
               </div>
             </CardHeader>
@@ -193,9 +188,8 @@ export function DocumentosPage() {
                       <Skeleton className="col-span-4 h-4" />
                       <Skeleton className="col-span-2 h-4 w-20" />
                       <Skeleton className="col-span-2 h-4 w-24" />
-                      <Skeleton className="col-span-1 h-5 w-14 rounded-full" />
-                      <Skeleton className="col-span-1 h-5 w-16 rounded-full" />
-                      <Skeleton className="col-span-1 h-4 w-20" />
+                      <Skeleton className="col-span-2 h-5 w-20 rounded-full" />
+                      <Skeleton className="col-span-1 h-4 w-16" />
                     </div>
                   ))}
                 </div>
@@ -203,13 +197,7 @@ export function DocumentosPage() {
                 <EmptyState
                   title="Sin documentos"
                   description="No se encontraron documentos con los filtros seleccionados."
-                  action={
-                    search ? (
-                      <Button variant="outline" onClick={() => setSearch('')}>
-                        Limpiar búsqueda
-                      </Button>
-                    ) : undefined
-                  }
+                  action={search ? <Button variant="outline" onClick={() => setSearch('')}>Limpiar búsqueda</Button> : undefined}
                 />
               ) : (
                 <div className={cn('divide-y', isFetching && 'opacity-60 transition-opacity')}>
@@ -219,44 +207,42 @@ export function DocumentosPage() {
                       <Link
                         key={doc.idDocumento}
                         to={`/documentos/${doc.idDocumento}`}
-                        className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-muted/40 transition-colors cursor-pointer group"
+                        className={cn(
+                          'grid grid-cols-12 gap-4 px-6 py-3.5 items-center hover:bg-muted/30 transition-colors cursor-pointer group',
+                          doc.reservado && 'border-l-2 border-l-violet-400 pl-5',
+                        )}
                       >
                         <div className="col-span-1">
-                          <span className="text-xs font-mono text-muted-foreground">
+                          <span className="text-xs font-mono text-muted-foreground tabular-nums">
                             {doc.numDocumento ?? `#${doc.idDocumento}`}
                           </span>
                         </div>
-                        <div className="col-span-4">
+                        <div className="col-span-4 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            {doc.reservado && <Lock className="h-3 w-3 text-violet-500 shrink-0" aria-label="Reservado" />}
+                            {doc.tipoSoporte === 'F' && <Paperclip className="h-3 w-3 text-slate-400 shrink-0" aria-label="Documento físico" />}
+                          </div>
                           <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
                             {doc.asunto ?? 'Sin asunto'}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {doc.ingresadoPor.nombre || doc.ingresadoPor.usuario || '—'}
-                          </p>
                         </div>
                         <div className="col-span-2">
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground line-clamp-1">
                             {doc.tipoDocumento?.descripcion ?? '—'}
                           </span>
                         </div>
                         <div className="col-span-2">
                           <span className="text-xs text-muted-foreground line-clamp-1">
-                            {doc.destino?.descripcion ?? '—'}
+                            {doc.ingresadoPor.nombre || doc.ingresadoPor.usuario || '—'}
                           </span>
                         </div>
-                        <div className="col-span-1">
-                          {doc.prioridad?.descripcion && (
-                            <span
-                              className="inline-flex h-2 w-2 rounded-full"
-                              style={{ backgroundColor: doc.prioridad?.color ?? 'hsl(var(--muted-foreground))' }}
-                              aria-hidden="true"
-                            />
-                          )}
-                          {/* Texto accesible para lectores de pantalla */}
-                          <span className="sr-only">{doc.prioridad?.descripcion ?? 'Sin prioridad'}</span>
-                        </div>
-                        <div className="col-span-1">
+                        <div className="col-span-2 flex items-center gap-1.5">
                           <Badge variant={badge.variant}>{badge.label}</Badge>
+                          {doc.reservado && (
+                            <span className="hidden xl:inline text-[10px] font-medium text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-1.5 py-0.5 rounded-full">
+                              Reservado
+                            </span>
+                          )}
                         </div>
                         <div className="col-span-1">
                           <span className="text-xs text-muted-foreground">
@@ -272,36 +258,16 @@ export function DocumentosPage() {
           </div>
         </div>
 
-        {/* Paginación */}
+        {/* Paginación desktop */}
         {meta && meta.totalPaginas > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t">
+          <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/10">
             <p className="text-xs text-muted-foreground">
-              Mostrando {(meta.pagina - 1) * meta.porPagina + 1}–{Math.min(meta.pagina * meta.porPagina, meta.total)} de {meta.total}
+              Mostrando {(meta.pagina - 1) * meta.porPagina + 1}–{Math.min(meta.pagina * meta.porPagina, meta.total)} de {meta.total.toLocaleString('es-CL')}
             </p>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                disabled={meta.pagina <= 1}
-                onClick={() => setPage(meta.pagina - 1)}
-                aria-label="Página anterior"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-muted-foreground px-2">
-                {meta.pagina} / {meta.totalPaginas}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                disabled={meta.pagina >= meta.totalPaginas}
-                onClick={() => setPage(meta.pagina + 1)}
-                aria-label="Página siguiente"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={meta.pagina <= 1} onClick={() => setPage(meta.pagina - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="text-xs text-muted-foreground px-2 tabular-nums">{meta.pagina} / {meta.totalPaginas}</span>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPage(meta.pagina + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></Button>
             </div>
           </div>
         )}

@@ -11,6 +11,9 @@ export function useRole() {
   // Alias retrocompatible — of.partes hereda los permisos del antiguo coordinador
   const isCoordinador  = isOfPartes;
 
+  // Solo admin y of.partes pueden ver métricas/indicadores de documentos reservados
+  const puedeVerReservados = isAdmin || isOfPartes;
+
   return {
     roles,
     isAdmin,
@@ -18,6 +21,7 @@ export function useRole() {
     isCoordinador,
     isSupervisor,
     isFuncionario,
+    puedeVerReservados,
     canCreate:       true,
     // Despacho inicial (solo roles con capacidad de flujo documental completo)
     canDespachar:    isAdmin || isOfPartes || isSupervisor,

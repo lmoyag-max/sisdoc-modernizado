@@ -17,6 +17,10 @@ function hasFullAccess(user: AuthenticatedRequest['user']): boolean {
   return user.roles.includes('admin') || user.todosServicios === true;
 }
 
+function canSeeReservados(user: AuthenticatedRequest['user']): boolean {
+  return user.roles.includes('admin') || user.roles.includes('of.partes');
+}
+
 // ── GET /reportes/dashboard ───────────────────────────────────
 
 router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
@@ -106,10 +110,14 @@ router.get('/dashboard', requireModule('dashboard'), async (req, res, next) => {
       extras = extRes.recordset[0] ?? extras;
     }
 
+    const rawTotales = totales.recordset[0] ?? { total: 0, pendientes: 0, cerradosHoy: 0, creadosHoy: 0, urgentes: 0, tramites: 0, reservados: 0 };
+
     sendSuccess(res, {
       totales: {
-        ...(totales.recordset[0] ?? { total: 0, pendientes: 0, cerradosHoy: 0, creadosHoy: 0, urgentes: 0, tramites: 0, reservados: 0 }),
+        ...rawTotales,
         ...extras,
+        // Solo admin y of.partes reciben el conteo real; el resto recibe null
+        reservados: canSeeReservados(user) ? rawTotales.reservados : null,
       },
       porEstado: porEstado.recordset,
       porMes:    porMes.recordset,

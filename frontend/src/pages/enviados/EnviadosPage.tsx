@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Send, Clock, ChevronLeft, ChevronRight, FileText, CheckCircle2, Building2 } from 'lucide-react';
+import { Send, Clock, ChevronLeft, ChevronRight, FileText, CheckCircle2, Building2, RefreshCw } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth.store';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { formatFechaHora, formatRelativo, truncate } from '@/lib/utils';
+import { formatRelativo } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 interface TramiteEnviado {
   id_seguimiento:      number;
@@ -38,6 +40,7 @@ const ESTADO_BADGE: Record<number, { label: string; variant: 'info' | 'warning' 
 export function EnviadosPage() {
   const [pagina, setPagina] = useState(1);
   const user = useAuthStore((s) => s.user);
+  const qc   = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['enviados', pagina],
@@ -55,7 +58,7 @@ export function EnviadosPage() {
   const recepcionados = tramites.filter((t) => t.id_estado_tramite === 3 || t.id_estado_tramite === 5).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -71,27 +74,30 @@ export function EnviadosPage() {
               </span>
             )}
           </p>
-          {/* Indicador de servicio */}
           {user?.descDependencia && (
             <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
               <Building2 className="h-3 w-3" />
-              Enviados desde: <span className="font-medium text-foreground">{user.descDependencia}</span>
+              Desde: <span className="font-medium text-foreground">{user.descDependencia}</span>
             </div>
           )}
         </div>
+        <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['enviados'] })} className="gap-2 shrink-0">
+          <RefreshCw className="h-4 w-4" />
+          Actualizar
+        </Button>
       </div>
 
       {/* Estadísticas rápidas */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total enviados',  value: meta?.total ?? '—',                                              color: 'text-foreground' },
-          { label: 'Despachados',     value: tramites.filter((t) => t.id_estado_tramite === 2).length,         color: 'text-amber-600' },
-          { label: 'Recepcionados',   value: tramites.filter((t) => t.id_estado_tramite === 3).length,         color: 'text-blue-600' },
-          { label: 'Cerrados',        value: tramites.filter((t) => t.id_estado_tramite === 5).length,         color: 'text-emerald-600' },
+          { label: 'Total enviados', value: meta?.total ?? '—',                                           color: 'text-foreground' },
+          { label: 'Despachados',    value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 2).length, color: 'text-amber-600' },
+          { label: 'Recepcionados',  value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 3).length, color: 'text-sky-600' },
+          { label: 'Cerrados',       value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 5).length, color: 'text-emerald-600' },
         ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-xl border bg-card p-4">
+          <div key={label} className="rounded-xl border bg-card px-4 py-3 card-executive">
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+            <p className={cn('text-2xl font-bold mt-1 tabular-nums animate-number', color)}>{value}</p>
           </div>
         ))}
       </div>
@@ -129,19 +135,29 @@ export function EnviadosPage() {
                 const isCompleto = t.id_estado_tramite === 5 || t.id_estado_tramite === 3;
 
                 return (
-                  <div key={t.id_seguimiento} className="flex items-start gap-3 px-4 sm:px-6 py-4 sm:py-5 hover:bg-muted/30 transition-colors">
-                    <div className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl ${isCompleto ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-primary/10'}`}>
+                  <div
+                    key={t.id_seguimiento}
+                    className={cn(
+                      'flex items-start gap-3 px-4 sm:px-6 py-4 sm:py-5 hover:bg-muted/30 transition-colors',
+                      isCompleto && 'border-l-done',
+                      !isCompleto && t.id_estado_tramite === 2 && 'border-l-pending bg-amber-50/30 dark:bg-amber-950/10',
+                    )}
+                  >
+                    <div className={cn(
+                      'flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl',
+                      isCompleto ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-primary/10',
+                    )}>
                       {isCompleto
                         ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
                         : <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                       }
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground line-clamp-2">
+                      <p className="text-sm font-semibold text-foreground line-clamp-2">
                         {t.materia ?? 'Sin materia'}
                       </p>
                       <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
-                        {t.num_interno && <span className="font-mono">N° {t.num_interno}</span>}
+                        {t.num_interno && <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">N° {t.num_interno}</span>}
                         {t.desc_tipo_documento && <span className="hidden sm:inline">{t.desc_tipo_documento}</span>}
                         {(t.desc_procedencia || t.desc_destino) && (
                           <span className="flex items-center gap-1">
@@ -164,13 +180,13 @@ export function EnviadosPage() {
         </CardContent>
 
         {meta && meta.totalPaginas > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t">
-            <p className="text-xs text-muted-foreground">Página {meta.pagina} de {meta.totalPaginas}</p>
+          <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/10">
+            <p className="text-xs text-muted-foreground">Página {meta.pagina} de {meta.totalPaginas} · {meta.total} enviados</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)}>
+              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

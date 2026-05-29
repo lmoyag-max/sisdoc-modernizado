@@ -89,10 +89,10 @@ export function ArchivosPage() {
   const totalSize = (archivos ?? []).reduce((acc, a) => acc + (a.tamano ?? 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Upload className="h-6 w-6 text-primary" />
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+          <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           Gestión de Archivos
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
@@ -101,15 +101,15 @@ export function ArchivosPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { label: 'Total archivos', value: archivos?.length ?? '—' },
-          { label: 'Espacio usado',  value: formatBytes(totalSize) },
-          { label: 'Tipos admitidos', value: 'PDF, Word, Excel, PNG, JPG' },
-        ].map(({ label, value }) => (
-          <div key={label} className="rounded-xl border bg-card p-4">
+          { label: 'Total archivos',  value: archivos?.length ?? '—',         mono: false },
+          { label: 'Espacio usado',   value: formatBytes(totalSize),           mono: true  },
+          { label: 'Tipos admitidos', value: uploadRules.extensionesPermitidas.map((e) => e.toUpperCase()).join(', '), mono: false },
+        ].map(({ label, value, mono }) => (
+          <div key={label} className="rounded-xl border bg-card px-4 py-3 card-executive">
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-sm font-semibold text-foreground mt-1">{value}</p>
+            <p className={`text-sm font-semibold text-foreground mt-1 truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
           </div>
         ))}
       </div>

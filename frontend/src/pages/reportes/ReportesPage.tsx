@@ -7,21 +7,22 @@ import {
 } from 'lucide-react';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api/client';
+import { useRole } from '@/hooks/useRole';
 import { formatRelativo } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 interface DashboardData {
   totales: {
     total: number; pendientes: number; cerradosHoy: number; creadosHoy: number; urgentes: number;
-    archivos: number; usuarios: number; tramites: number; reservados: number;
+    archivos: number; usuarios: number; tramites: number; reservados: number | null;
   };
   porEstado: { id_estado_documento: number; desc_estado_documento: string; cantidad: number }[];
   porMes: { mes: string; cantidad: number }[];
@@ -53,6 +54,7 @@ const ACCION_BADGE: Record<string, string> = {
 
 
 export function ReportesPage() {
+  const { puedeVerReservados } = useRole();
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['reportes-dashboard'],
     queryFn: async () => {
@@ -95,29 +97,30 @@ export function ReportesPage() {
     }
   };
 
-  const metrics = data ? [
-    { icon: FileText,  title: 'Documentos',  value: data.totales.total,       description: `${data.totales.pendientes} activos`,  colorClass: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
-    { icon: HardDrive, title: 'Archivos',    value: data.totales.archivos,    description: 'digitales subidos',                   colorClass: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400' },
-    { icon: GitBranch, title: 'Movimientos', value: data.totales.tramites,    description: 'en trazabilidad',                     colorClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
-    { icon: Users,     title: 'Usuarios',   value: data.totales.usuarios,    description: 'activos',                             colorClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    { icon: Clock,     title: 'Creados hoy', value: data.totales.creadosHoy,  description: 'nuevos hoy',           colorClass: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
-    { icon: Lock,      title: 'Reservados',  value: data.totales.reservados,   description: 'documentos reservados', colorClass: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400' },
+  const allMetrics = data ? [
+    { icon: FileText,  title: 'Documentos',  value: data.totales.total,      description: `${data.totales.pendientes} activos`,  colorClass: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400', visible: true },
+    { icon: HardDrive, title: 'Archivos',    value: data.totales.archivos,   description: 'digitales subidos',                   colorClass: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400',     visible: true },
+    { icon: GitBranch, title: 'Movimientos', value: data.totales.tramites,   description: 'en trazabilidad',                     colorClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400', visible: true },
+    { icon: Users,     title: 'Usuarios',    value: data.totales.usuarios,   description: 'activos',                             colorClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400', visible: true },
+    { icon: Clock,     title: 'Creados hoy', value: data.totales.creadosHoy, description: 'nuevos hoy',                          colorClass: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400',  visible: true },
+    { icon: Lock,      title: 'Reservados',  value: data.totales.reservados ?? 0, description: 'documentos reservados',            colorClass: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400', visible: puedeVerReservados },
   ] : [];
+  const metrics = allMetrics.filter((m) => m.visible);
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
             <TrendingUp className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Reportes</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Reportes</h1>
             <p className="text-sm text-muted-foreground">Métricas y estadísticas del sistema</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-2">
             <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />
             Actualizar
@@ -130,9 +133,14 @@ export function ReportesPage() {
       </div>
 
       {/* Métricas principales */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className={cn(
+        'grid gap-4',
+        puedeVerReservados
+          ? 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-6'
+          : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-5',
+      )}>
         {isLoading
-          ? Array.from({ length: 6 }).map((_, i) => <MetricCard key={i} title="" value="" icon={FileText} variant="compact" loading />)
+          ? Array.from({ length: puedeVerReservados ? 6 : 5 }).map((_, i) => <MetricCard key={i} title="" value="" icon={FileText} variant="compact" loading />)
           : metrics.map((m) => <MetricCard key={m.title} {...m} variant="compact" />)
         }
       </div>
@@ -156,16 +164,22 @@ export function ReportesPage() {
               <div className="h-52 flex items-center justify-center text-muted-foreground text-sm">Sin datos de los últimos 6 meses</div>
             ) : (
               <ResponsiveContainer width="100%" height={210}>
-                <BarChart data={data?.porMes ?? []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
+                <AreaChart data={data?.porMes ?? []} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="reportGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="hsl(var(--primary))" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                    cursor={{ fill: 'hsl(var(--muted))' }}
+                    cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }}
                   />
-                  <Bar dataKey="cantidad" name="Documentos" radius={[4,4,0,0]} fill="hsl(var(--primary))" />
-                </BarChart>
+                  <Area dataKey="cantidad" name="Documentos" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#reportGrad)" dot={false} activeDot={{ r: 4, fill: 'hsl(var(--primary))' }} />
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </CardContent>
@@ -202,15 +216,24 @@ export function ReportesPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-2 mt-2">
-                  {(data?.porEstado ?? []).map((e, i) => (
-                    <div key={e.id_estado_documento} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ESTADO_COLORS[i % ESTADO_COLORS.length] }} />
-                        <span className="text-foreground">{e.desc_estado_documento ?? 'Sin estado'}</span>
+                  {(data?.porEstado ?? []).map((e, i) => {
+                    const total = (data?.porEstado ?? []).reduce((s, x) => s + x.cantidad, 0);
+                    const pct = total > 0 ? Math.round((e.cantidad / total) * 100) : 0;
+                    return (
+                      <div key={e.id_estado_documento} className="space-y-0.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: ESTADO_COLORS[i % ESTADO_COLORS.length] }} />
+                            <span className="text-foreground">{e.desc_estado_documento ?? 'Sin estado'}</span>
+                          </div>
+                          <span className="font-semibold text-foreground tabular-nums">{e.cantidad}</span>
+                        </div>
+                        <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: ESTADO_COLORS[i % ESTADO_COLORS.length] }} />
+                        </div>
                       </div>
-                      <span className="font-semibold text-foreground">{e.cantidad}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -261,19 +284,19 @@ export function ReportesPage() {
           ) : (
             <div className="space-y-3">
               {(actividad ?? []).map((item) => (
-                <div key={item.id_historial} className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                <div key={item.id_historial} className="flex items-start gap-3 group">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold transition-transform duration-200 group-hover:scale-105">
                     {(item.nombres_fun ?? item.usuario ?? '?')[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground line-clamp-1">{item.asunto ?? 'Sin materia'}</p>
+                    <p className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">{item.asunto ?? 'Sin materia'}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', ACCION_BADGE[item.accion] ?? ACCION_BADGE.MOVIMIENTO)}>
                         {item.accion}
                       </span>
-                      {item.num_documento && <span className="text-xs text-muted-foreground font-mono">#{item.num_documento}</span>}
+                      {item.num_documento && <span className="text-xs text-muted-foreground font-mono">N° {item.num_documento}</span>}
                       <span className="text-xs text-muted-foreground">
-                        por {item.nombres_fun ?? item.usuario ?? 'Sistema'}
+                        {item.nombres_fun ?? item.usuario ?? 'Sistema'}
                       </span>
                     </div>
                   </div>

@@ -1,7 +1,17 @@
 import { apiClient } from './client';
 
 export interface DashboardData {
-  totales: { total: number; pendientes: number; cerradosHoy: number; urgentes: number };
+  totales: {
+    total:       number;
+    pendientes:  number;
+    cerradosHoy: number;
+    creadosHoy:  number;
+    urgentes:    number;
+    tramites:    number;
+    reservados:  number | null;  // null para roles sin acceso a métricas reservadas
+    archivos?:   number;
+    usuarios?:   number;
+  };
   porEstado: Array<{ id_estado_documento: number; desc_estado_documento: string; cantidad: number }>;
   porMes: Array<{ mes: string; cantidad: number }>;
 }

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatFechaHora, truncate } from '@/lib/utils';
+import { truncate } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 
 type TipoBusqueda = 'todos' | 'documentos' | 'tramites' | 'funcionarios';
@@ -60,10 +60,10 @@ export function BusquedaPage() {
   const buscando = debouncedQuery.length >= 2;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Search className="h-6 w-6 text-primary" />
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+          <Search className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           Búsqueda Avanzada
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
@@ -73,7 +73,7 @@ export function BusquedaPage() {
 
       {/* Buscador principal */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <input
@@ -154,17 +154,16 @@ export function BusquedaPage() {
               <div className="space-y-2">
                 {data?.documentos.map((doc) => (
                   <Link key={doc.id_documento} to={`/documentos/${doc.id_documento}`}>
-                    <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                    <Card className="hover:border-primary/40 transition-all duration-200 cursor-pointer card-executive group">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground line-clamp-1">
-                              {truncate(doc.materia ?? 'Sin materia', 80)}
+                            <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                              {doc.materia ?? 'Sin materia'}
                             </p>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                              {doc.num_interno && <span className="font-mono">N° {doc.num_interno}</span>}
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                              {doc.num_interno && <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">N° {doc.num_interno}</span>}
                               {doc.desc_tipo_documento && <span>{doc.desc_tipo_documento}</span>}
-                              {doc.fecha_sistema && <span>{formatFechaHora(doc.fecha_sistema)}</span>}
                             </div>
                           </div>
                           <div className="shrink-0">
@@ -190,15 +189,14 @@ export function BusquedaPage() {
               </h2>
               <div className="space-y-2">
                 {data?.tramites.map((t) => (
-                  <Card key={t.id_seguimiento} className="hover:shadow-sm transition-shadow">
+                  <Card key={t.id_seguimiento} className="card-executive">
                     <CardContent className="p-4">
                       <p className="text-sm font-medium text-foreground line-clamp-1">
-                        {truncate(t.materia ?? 'Sin materia', 80)}
+                        {t.materia ?? 'Sin materia'}
                       </p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                        <span>Trámite #{t.id_seguimiento}</span>
-                        {t.observaciones && <span className="italic">"{truncate(t.observaciones, 40)}"</span>}
-                        {t.fecha_sistema && <span>{formatFechaHora(t.fecha_sistema)}</span>}
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                        <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">#{t.id_seguimiento}</span>
+                        {t.observaciones && <span className="italic truncate max-w-[200px]">"{t.observaciones}"</span>}
                       </div>
                     </CardContent>
                   </Card>
@@ -216,13 +214,13 @@ export function BusquedaPage() {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {data?.funcionarios.map((f) => (
-                  <Card key={f.id_funcionario} className="hover:shadow-sm transition-shadow">
+                  <Card key={f.id_funcionario} className="card-executive">
                     <CardContent className="p-4 flex items-center gap-3">
-                      <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
                         {(f.nombres ?? '?')[0]?.toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground">
+                        <p className="text-sm font-semibold text-foreground">
                           {[f.nombres, f.apellidos].filter(Boolean).join(' ') || '—'}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">

@@ -4,7 +4,9 @@ export async function getTiposDocumento() {
   const pool = await getPool();
   const r = await pool.request().query(`
     SELECT id_tipo_documento AS id, desc_tipo_documento AS descripcion
-    FROM tipo_documento ORDER BY desc_tipo_documento
+    FROM tipo_documento
+    WHERE ISNULL(vigencia, 'S') = 'S'
+    ORDER BY desc_tipo_documento
   `);
   return r.recordset;
 }

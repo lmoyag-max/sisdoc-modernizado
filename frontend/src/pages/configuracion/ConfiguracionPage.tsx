@@ -3,7 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Settings, Upload, ImageIcon, Building2, Save,
   CheckCircle2, RefreshCw, Palette, Monitor, X, Type, Paperclip,
+  Plus, Pencil, Search, Power, Database, ChevronDown,
 } from 'lucide-react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,6 +60,609 @@ const UPLOAD_RULES_DEFAULT: UploadRulesConfig = {
   maxFileMB:  20,
   maxTotalMB: 60,
 };
+
+// ─── helpers de módulo ───────────────────────────────────────────────────────
+const inputCls = 'w-full h-9 px-3 text-sm rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring';
+const apiErr   = (e) =>
+  e?.response?.data?.error ?? 'Error al guardar';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mantenedor de Tipos de Documento — búsqueda-primero + tarjeta de detalle
+// ═══════════════════════════════════════════════════════════════════════════
+
+function MantenedorTiposDocumento() {
+  const qc = useQueryClient();
+  const [busqueda,    setBusqueda]    = useState('');
+  const [selectedId,  setSelectedId]  = useState(null);
+  const [modalCrear,  setModalCrear]  = useState(false);
+  const [descNuevo,   setDescNuevo]   = useState('');
+  const [modalEditar, setModalEditar] = useState(null);
+  const [descEditar,  setDescEditar]  = useState('');
+  const [confirmVig,  setConfirmVig]  = useState(null);
+
+  const debouncedQ = useDebounce(busqueda, 300);
+
+  const { data: resultados = [], isFetching } = useQuery({
+    queryKey:  ['admin-tipos-documento', debouncedQ],
+    queryFn:   async () => {
+      const res = await apiClient.get(
+        `/configuracion/tipos-documento?q=${encodeURIComponent(debouncedQ)}`
+      );
+      return res.data.data;
+    },
+    enabled:         debouncedQ.length > 0,
+    staleTime:       30_000,
+    placeholderData: [],
+  });
+
+  useEffect(() => {
+    if (selectedId != null && resultados.length > 0 && !resultados.some((t) => t.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [resultados, selectedId]);
+
+  const createMut = useMutation({
+    mutationFn: (d) => apiClient.post('/configuracion/tipos-documento', { descripcion: d }),
+    onSuccess:  () => { toast.success('Tipo de documento creado'); qc.invalidateQueries({ queryKey: ['admin-tipos-documento'] }); setModalCrear(false); setDescNuevo(''); },
+    onError:    (e) => toast.error(apiErr(e)),
+  });
+
+  const editMut = useMutation({
+    mutationFn: ({ id, d }) =>
+      apiClient.put(`/configuracion/tipos-documento/${id}`, { descripcion: d }),
+    onSuccess: () => { toast.success('Tipo actualizado'); qc.invalidateQueries({ queryKey: ['admin-tipos-documento'] }); setModalEditar(null); },
+    onError:   (e) => toast.error(apiErr(e)),
+  });
+
+  const vigMut = useMutation({
+    mutationFn: ({ id, vigencia }) =>
+      apiClient.patch(`/configuracion/tipos-documento/${id}/vigencia`, { vigencia }),
+    onSuccess: (_d, vars) => {
+      toast.success(vars.vigencia === 'S' ? 'Tipo activado' : 'Tipo desactivado');
+      qc.invalidateQueries({ queryKey: ['admin-tipos-documento'] });
+      setConfirmVig(null); setSelectedId(null);
+    },
+    onError: () => toast.error('Error al cambiar estado'),
+  });
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-primary" />
+              <div>
+                <CardTitle className="text-base">Tipos de Documento</CardTitle>
+                <CardDescription>Busca y administra los tipos de documento del sistema</CardDescription>
+              </div>
+            </div>
+            <Button size="sm" className="gap-2 shrink-0" onClick={() => { setDescNuevo(''); setModalCrear(true); }}>
+              <Plus className="h-3.5 w-3.5" />Nuevo tipo
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            {isFetching && <RefreshCw className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground animate-spin pointer-events-none" />}
+            <input
+              type="text" placeholder="Escribe para buscar tipos de documento..."
+              value={busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setSelectedId(null); }}
+              className="w-full h-9 pl-9 pr-9 text-sm rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {!debouncedQ && (
+            <div className="flex flex-col items-center py-12 gap-2 text-muted-foreground select-none">
+              <Search className="h-8 w-8 opacity-20" />
+              <p className="text-sm font-medium">Escribe para buscar</p>
+              <p className="text-xs opacity-60">Busca por nombre o parte del nombre</p>
+            </div>
+          )}
+
+          {debouncedQ && !isFetching && resultados.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Sin resultados para "<span className="font-medium">{debouncedQ}</span>"
+            </p>
+          )}
+
+          {resultados.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground px-0.5">
+                {resultados.length} resultado{resultados.length !== 1 ? 's' : ''}
+                {' · '}{resultados.filter((t) => t.vigencia !== 'N').length} activo{resultados.filter((t) => t.vigencia !== 'N').length !== 1 ? 's' : ''}
+              </p>
+              <div className="divide-y divide-border rounded-xl border overflow-hidden">
+                {resultados.map((t) => {
+                  const activo     = t.vigencia !== 'N';
+                  const isSelected = selectedId === t.id;
+                  return (
+                    <div key={t.id}>
+                      <button
+                        type="button"
+                        className={cn(
+                          'w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/30',
+                          isSelected && 'bg-primary/5',
+                          !activo && 'opacity-55'
+                        )}
+                        onClick={() => setSelectedId(isSelected ? null : t.id)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={cn('h-2 w-2 rounded-full shrink-0', activo ? 'bg-emerald-500' : 'bg-muted-foreground/30')} />
+                          <span className="font-medium text-sm truncate">{t.descripcion}</span>
+                          <span className="text-xs text-muted-foreground font-mono shrink-0">#{t.id}</span>
+                        </div>
+                        <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ml-2', isSelected && 'rotate-180')} />
+                      </button>
+
+                      {isSelected && (
+                        <div className="px-5 py-4 bg-muted/20 border-t border-border/50 space-y-3">
+                          <div className="grid grid-cols-3 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">ID</p>
+                              <p className="font-mono font-semibold">{t.id}</p>
+                            </div>
+                            <div className="col-span-2">
+                              <p className="text-xs text-muted-foreground mb-0.5">Estado</p>
+                              <Badge variant="outline" className={cn('text-xs', activo ? 'border-emerald-300 text-emerald-600' : 'border-border text-muted-foreground')}>
+                                {activo ? 'Activo' : 'Inactivo'}
+                              </Badge>
+                            </div>
+                            <div className="col-span-3">
+                              <p className="text-xs text-muted-foreground mb-0.5">Descripción</p>
+                              <p className="font-medium text-sm">{t.descripcion}</p>
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-1 border-t border-border/40">
+                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5"
+                              onClick={() => { setDescEditar(t.descripcion); setModalEditar(t); }}>
+                              <Pencil className="h-3 w-3" />Editar
+                            </Button>
+                            <Button size="sm" variant="ghost"
+                              className={cn('h-7 text-xs gap-1.5', activo
+                                ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
+                                : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50')}
+                              onClick={() => setConfirmVig(t)}>
+                              <Power className="h-3 w-3" />{activo ? 'Desactivar' : 'Activar'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">Los tipos de documento no se eliminan — solo se desactivan para preservar la trazabilidad histórica.</p>
+        </CardContent>
+      </Card>
+
+      {modalCrear && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) { setModalCrear(false); setDescNuevo(''); } }}>
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h3 className="font-semibold text-sm">Nuevo tipo de documento</h3>
+              <button onClick={() => { setModalCrear(false); setDescNuevo(''); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="space-y-1.5">
+                <Label>Descripción <span className="text-muted-foreground font-normal text-xs">(máx. 60 caracteres)</span></Label>
+                <input type="text" maxLength={60} value={descNuevo}
+                  onChange={(e) => setDescNuevo(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && descNuevo.trim()) createMut.mutate(descNuevo.trim()); }}
+                  placeholder="Ej: Ordinario, Oficio, Carta..." className={inputCls} autoFocus />
+                <p className="text-xs text-muted-foreground text-right">{descNuevo.length}/60</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <Button variant="outline" size="sm" onClick={() => { setModalCrear(false); setDescNuevo(''); }} disabled={createMut.isPending}>Cancelar</Button>
+              <Button size="sm" onClick={() => createMut.mutate(descNuevo.trim())} disabled={createMut.isPending || !descNuevo.trim()} className="gap-2">
+                {createMut.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}Crear tipo
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalEditar && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setModalEditar(null); }}>
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h3 className="font-semibold text-sm">Editar tipo #{modalEditar.id}</h3>
+              <button onClick={() => setModalEditar(null)} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="space-y-1.5">
+                <Label>Descripción <span className="text-muted-foreground font-normal text-xs">(máx. 60 caracteres)</span></Label>
+                <input type="text" maxLength={60} value={descEditar}
+                  onChange={(e) => setDescEditar(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && descEditar.trim()) editMut.mutate({ id: modalEditar.id, d: descEditar.trim() }); }}
+                  className={inputCls} autoFocus />
+                <p className="text-xs text-muted-foreground text-right">{descEditar.length}/60</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <Button variant="outline" size="sm" onClick={() => setModalEditar(null)} disabled={editMut.isPending}>Cancelar</Button>
+              <Button size="sm" onClick={() => editMut.mutate({ id: modalEditar.id, d: descEditar.trim() })} disabled={editMut.isPending || !descEditar.trim()} className="gap-2">
+                {editMut.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}Guardar cambios
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmVig && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmVig(null); }}>
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-sm">
+            <div className="px-5 py-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl shrink-0',
+                  confirmVig.vigencia !== 'N' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600')}>
+                  <Power className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">{confirmVig.vigencia !== 'N' ? 'Desactivar tipo' : 'Activar tipo'}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{confirmVig.descripcion}</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {confirmVig.vigencia !== 'N'
+                  ? 'El tipo dejará de aparecer en el formulario de nuevo documento. Los documentos históricos no se verán afectados.'
+                  : 'El tipo volverá a estar disponible en los formularios del sistema.'}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <Button variant="outline" size="sm" onClick={() => setConfirmVig(null)} disabled={vigMut.isPending}>Cancelar</Button>
+              <Button size="sm" variant={confirmVig.vigencia !== 'N' ? 'destructive' : 'default'}
+                onClick={() => vigMut.mutate({ id: confirmVig.id, vigencia: confirmVig.vigencia !== 'N' ? 'N' : 'S' })}
+                disabled={vigMut.isPending} className="gap-2">
+                {vigMut.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                {confirmVig.vigencia !== 'N' ? 'Sí, desactivar' : 'Sí, activar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mantenedor de Dependencias / Servicios — búsqueda-primero + tarjeta
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DEP_FORM_EMPTY = { descripcion: '', codigo: '', codInterno: '', ofpartes: 'N', codigoNuevo: '' };
+
+function depFormInputs(form, setF) {
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label>Nombre del servicio <span className="text-destructive text-xs">*</span></Label>
+        <input type="text" maxLength={60} value={form.descripcion}
+          onChange={(e) => setF('descripcion', e.target.value)}
+          placeholder="Ej: Abastecimiento, Adquisiciones..." className={inputCls} autoFocus />
+        <p className="text-xs text-muted-foreground text-right">{form.descripcion.length}/60</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-sm">Código <span className="text-muted-foreground font-normal text-xs">(máx. 6)</span></Label>
+          <input type="text" maxLength={6} value={form.codigo}
+            onChange={(e) => setF('codigo', e.target.value)} placeholder="ABC" className={cn(inputCls, 'font-mono')} />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Código nuevo <span className="text-muted-foreground font-normal text-xs">(máx. 6)</span></Label>
+          <input type="text" maxLength={6} value={form.codigoNuevo}
+            onChange={(e) => setF('codigoNuevo', e.target.value)} placeholder="XYZ" className={cn(inputCls, 'font-mono')} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-sm">Código interno</Label>
+          <input type="number" value={form.codInterno}
+            onChange={(e) => setF('codInterno', e.target.value)} placeholder="0" className={inputCls} />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm">Oficina de partes</Label>
+          <select value={form.ofpartes} onChange={(e) => setF('ofpartes', e.target.value)}
+            className="w-full h-9 px-3 text-sm rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+            <option value="N">No</option>
+            <option value="S">Sí</option>
+          </select>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function MantenedorDependencias() {
+  const qc = useQueryClient();
+  const [busqueda,    setBusqueda]    = useState('');
+  const [selectedId,  setSelectedId]  = useState(null);
+  const [modalCrear,  setModalCrear]  = useState(false);
+  const [formCrear,   setFormCrear]   = useState(DEP_FORM_EMPTY);
+  const [modalEditar, setModalEditar] = useState(null);
+  const [formEditar,  setFormEditar]  = useState(DEP_FORM_EMPTY);
+  const [confirmVig,  setConfirmVig]  = useState(null);
+
+  const debouncedQ = useDebounce(busqueda, 300);
+
+  const { data: resultados = [], isFetching } = useQuery({
+    queryKey:  ['admin-dependencias', debouncedQ],
+    queryFn:   async () => {
+      const res = await apiClient.get(
+        `/configuracion/dependencias?q=${encodeURIComponent(debouncedQ)}`
+      );
+      return res.data.data;
+    },
+    enabled:         debouncedQ.length > 0,
+    staleTime:       30_000,
+    placeholderData: [],
+  });
+
+  useEffect(() => {
+    if (selectedId != null && resultados.length > 0 && !resultados.some((d) => d.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [resultados, selectedId]);
+
+  const createMut = useMutation({
+    mutationFn: (f) => apiClient.post('/configuracion/dependencias', {
+      descripcion: f.descripcion, codigo: f.codigo || null,
+      codInterno: f.codInterno ? Number(f.codInterno) : null,
+      ofpartes: f.ofpartes, codigoNuevo: f.codigoNuevo || null,
+    }),
+    onSuccess: () => { toast.success('Servicio creado'); qc.invalidateQueries({ queryKey: ['admin-dependencias'] }); setModalCrear(false); setFormCrear(DEP_FORM_EMPTY); },
+    onError:   (e) => toast.error(apiErr(e)),
+  });
+
+  const editMut = useMutation({
+    mutationFn: ({ id, f }) =>
+      apiClient.put(`/configuracion/dependencias/${id}`, {
+        descripcion: f.descripcion, codigo: f.codigo || null,
+        codInterno: f.codInterno ? Number(f.codInterno) : null,
+        ofpartes: f.ofpartes, codigoNuevo: f.codigoNuevo || null,
+      }),
+    onSuccess: () => { toast.success('Servicio actualizado'); qc.invalidateQueries({ queryKey: ['admin-dependencias'] }); setModalEditar(null); },
+    onError:   (e) => toast.error(apiErr(e)),
+  });
+
+  const vigMut = useMutation({
+    mutationFn: ({ id, vigencia }) =>
+      apiClient.patch(`/configuracion/dependencias/${id}/vigencia`, { vigencia }),
+    onSuccess: (_d, vars) => {
+      toast.success(vars.vigencia === 'S' ? 'Servicio activado' : 'Servicio desactivado');
+      qc.invalidateQueries({ queryKey: ['admin-dependencias'] });
+      setConfirmVig(null); setSelectedId(null);
+    },
+    onError: () => toast.error('Error al cambiar vigencia'),
+  });
+
+  const abrirEditar = (dep) => {
+    setFormEditar({
+      descripcion: dep.descripcion, codigo: dep.codigo ?? '',
+      codInterno: dep.codInterno != null ? String(dep.codInterno) : '',
+      ofpartes: dep.ofpartes === 'S' ? 'S' : 'N', codigoNuevo: dep.codigoNuevo ?? '',
+    });
+    setModalEditar(dep);
+  };
+
+  const setFC = (k, v) => setFormCrear((p) => ({ ...p, [k]: v }));
+  const setFE = (k, v) => setFormEditar((p) => ({ ...p, [k]: v }));
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary" />
+              <div>
+                <CardTitle className="text-base">Servicios / Dependencias</CardTitle>
+                <CardDescription>Busca y administra los servicios del sistema</CardDescription>
+              </div>
+            </div>
+            <Button size="sm" className="gap-2 shrink-0" onClick={() => { setFormCrear(DEP_FORM_EMPTY); setModalCrear(true); }}>
+              <Plus className="h-3.5 w-3.5" />Nuevo servicio
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            {isFetching && <RefreshCw className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground animate-spin pointer-events-none" />}
+            <input
+              type="text" placeholder="Escribe para buscar servicios o dependencias..."
+              value={busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setSelectedId(null); }}
+              className="w-full h-9 pl-9 pr-9 text-sm rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {!debouncedQ && (
+            <div className="flex flex-col items-center py-12 gap-2 text-muted-foreground select-none">
+              <Search className="h-8 w-8 opacity-20" />
+              <p className="text-sm font-medium">Escribe para buscar</p>
+              <p className="text-xs opacity-60">Busca por nombre o código</p>
+            </div>
+          )}
+
+          {debouncedQ && !isFetching && resultados.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Sin resultados para "<span className="font-medium">{debouncedQ}</span>"
+            </p>
+          )}
+
+          {resultados.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground px-0.5">
+                {resultados.length} resultado{resultados.length !== 1 ? 's' : ''}
+                {' · '}{resultados.filter((d) => d.vigencia === 'S').length} activo{resultados.filter((d) => d.vigencia === 'S').length !== 1 ? 's' : ''}
+              </p>
+              <div className="divide-y divide-border rounded-xl border overflow-hidden">
+                {resultados.map((dep) => {
+                  const activo     = dep.vigencia === 'S';
+                  const isSelected = selectedId === dep.id;
+                  return (
+                    <div key={dep.id}>
+                      <button
+                        type="button"
+                        className={cn(
+                          'w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/30',
+                          isSelected && 'bg-primary/5',
+                          !activo && 'opacity-55'
+                        )}
+                        onClick={() => setSelectedId(isSelected ? null : dep.id)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={cn('h-2 w-2 rounded-full shrink-0', activo ? 'bg-emerald-500' : 'bg-muted-foreground/30')} />
+                          <span className="font-medium text-sm truncate">{dep.descripcion}</span>
+                          <span className="text-xs text-muted-foreground font-mono shrink-0">#{dep.id}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          {dep.codigo && <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{dep.codigo}</span>}
+                          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform duration-200', isSelected && 'rotate-180')} />
+                        </div>
+                      </button>
+
+                      {isSelected && (
+                        <div className="px-5 py-4 bg-muted/20 border-t border-border/50 space-y-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">ID</p>
+                              <p className="font-mono font-semibold">{dep.id}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">Código</p>
+                              <p className="font-mono">{dep.codigo || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">Cód. Interno</p>
+                              <p className="font-mono">{dep.codInterno ?? '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">Oficina de Partes</p>
+                              <p>{dep.ofpartes === 'S' ? 'Sí' : 'No'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">Estado</p>
+                              <Badge variant="outline" className={cn('text-xs', activo ? 'border-emerald-300 text-emerald-600' : 'border-border text-muted-foreground')}>
+                                {activo ? 'Activo' : 'Inactivo'}
+                              </Badge>
+                            </div>
+                            {dep.codigoNuevo && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-0.5">Código nuevo</p>
+                                <p className="font-mono">{dep.codigoNuevo}</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-end gap-2 pt-1 border-t border-border/40">
+                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={() => abrirEditar(dep)}>
+                              <Pencil className="h-3 w-3" />Editar
+                            </Button>
+                            <Button size="sm" variant="ghost"
+                              className={cn('h-7 text-xs gap-1.5', activo
+                                ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
+                                : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50')}
+                              onClick={() => setConfirmVig(dep)}>
+                              <Power className="h-3 w-3" />{activo ? 'Desactivar' : 'Activar'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">Los servicios no se eliminan físicamente — solo se desactivan para preservar la trazabilidad histórica.</p>
+        </CardContent>
+      </Card>
+
+      {modalCrear && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) { setModalCrear(false); setFormCrear(DEP_FORM_EMPTY); } }}>
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h3 className="font-semibold text-sm">Nuevo servicio / dependencia</h3>
+              <button onClick={() => { setModalCrear(false); setFormCrear(DEP_FORM_EMPTY); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-4">{depFormInputs(formCrear, setFC)}</div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <Button variant="outline" size="sm" onClick={() => { setModalCrear(false); setFormCrear(DEP_FORM_EMPTY); }} disabled={createMut.isPending}>Cancelar</Button>
+              <Button size="sm" onClick={() => createMut.mutate(formCrear)} disabled={createMut.isPending || !formCrear.descripcion.trim()} className="gap-2">
+                {createMut.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}Crear servicio
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalEditar && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setModalEditar(null); }}>
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h3 className="font-semibold text-sm">Editar servicio #{modalEditar.id}</h3>
+              <button onClick={() => setModalEditar(null)} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-4">{depFormInputs(formEditar, setFE)}</div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <Button variant="outline" size="sm" onClick={() => setModalEditar(null)} disabled={editMut.isPending}>Cancelar</Button>
+              <Button size="sm" onClick={() => editMut.mutate({ id: modalEditar.id, f: formEditar })} disabled={editMut.isPending || !formEditar.descripcion.trim()} className="gap-2">
+                {editMut.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}Guardar cambios
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmVig && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmVig(null); }}>
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-sm">
+            <div className="px-5 py-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl shrink-0',
+                  confirmVig.vigencia === 'S' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600')}>
+                  <Power className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">{confirmVig.vigencia === 'S' ? 'Desactivar servicio' : 'Activar servicio'}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{confirmVig.descripcion}</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {confirmVig.vigencia === 'S'
+                  ? 'El servicio dejará de aparecer en formularios. Los documentos históricos no se verán afectados.'
+                  : 'El servicio volverá a estar disponible en los formularios del sistema.'}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t">
+              <Button variant="outline" size="sm" onClick={() => setConfirmVig(null)} disabled={vigMut.isPending}>Cancelar</Button>
+              <Button size="sm" variant={confirmVig.vigencia === 'S' ? 'destructive' : 'default'}
+                onClick={() => vigMut.mutate({ id: confirmVig.id, vigencia: confirmVig.vigencia === 'S' ? 'N' : 'S' })}
+                disabled={vigMut.isPending} className="gap-2">
+                {vigMut.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                {confirmVig.vigencia === 'S' ? 'Sí, desactivar' : 'Sí, activar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+
+// ───────────────────────────────────────────────────────────────────────────
 
 async function fetchConfig(): Promise<SistemaConfig> {
   const res = await apiClient.get<{ ok: boolean; data: SistemaConfig }>('/configuracion');
@@ -657,7 +1262,17 @@ export function ConfiguracionPage() {
         </CardContent>
       </Card>
 
-      {/* Info del sistema */}
+      {/* ── Mantenedores administrativos ─────────────────────────── */}
+      <Separator />
+      <div>
+        <h2 className="text-base font-semibold text-foreground">Mantenedores de catálogos</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">Gestión de los catálogos base del sistema. Solo administradores y oficina de partes.</p>
+      </div>
+
+      <MantenedorTiposDocumento />
+      <MantenedorDependencias />
+
+      {/* Info del sistema — siempre al final */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base text-muted-foreground">Información del sistema</CardTitle>

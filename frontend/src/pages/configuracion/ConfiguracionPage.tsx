@@ -4,6 +4,7 @@ import {
   Settings, Upload, ImageIcon, Building2, Save,
   CheckCircle2, RefreshCw, Palette, Monitor, X, Type, Paperclip,
   Plus, Pencil, Search, Power, Database, ChevronDown,
+  UserCheck, ImagePlus, ShieldCheck,
 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { apiClient } from '@/lib/api/client';
@@ -662,6 +663,430 @@ function MantenedorDependencias() {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Mantenedor de Firmantes para Memorándum
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface CatItem { id: number; descripcion: string }
+
+interface FirmanteAPI {
+  id: number;
+  idDependencia: number;
+  dependencia:   string | null;
+  titular: {
+    nombre: string; cargo: string;
+    firmaTimbreUrl: string | null;   // imagen combinada firma+timbre
+    activo: boolean; vigenciaDesde: string | null; vigenciaHasta: string | null;
+  };
+  subrogante: {
+    nombre: string | null; cargo: string | null;
+    firmaTimbreUrl: string | null;   // imagen combinada firma+timbre
+    activo: boolean; vigenciaDesde: string | null; vigenciaHasta: string | null;
+  };
+}
+
+function ImagenFirmante({
+  label, url, idFirmante, tipoImg, onUploaded, disabled,
+}: {
+  label: string; url: string | null; idFirmante: number;
+  tipoImg: string; onUploaded: () => void; disabled?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('imagen', file);
+      await apiClient.post(`/memorandum/firmantes/${idFirmante}/imagen?tipo=${tipoImg}`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success(`${label} guardada`);
+      onUploaded();
+    } catch {
+      toast.error(`Error al subir ${label}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      {url ? (
+        <div className="relative group w-24 h-14 rounded-lg border border-border overflow-hidden bg-muted/20">
+          <img src={`${url}?t=${Date.now()}`} alt={label} className="w-full h-full object-contain p-1" />
+          <button
+            type="button"
+            disabled={disabled || uploading}
+            onClick={() => inputRef.current?.click()}
+            className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
+          >
+            <RefreshCw className="h-4 w-4 text-white" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled || uploading}
+          onClick={() => inputRef.current?.click()}
+          className="flex flex-col items-center justify-center gap-1 w-24 h-14 rounded-lg border-2 border-dashed border-border hover:border-primary/50 transition-colors text-muted-foreground disabled:opacity-50"
+        >
+          {uploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+          <span className="text-[10px]">{uploading ? 'Subiendo…' : 'Subir'}</span>
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
+      />
+    </div>
+  );
+}
+
+function MantenedorFirmantes() {
+  const qc = useQueryClient();
+  const [selectedId, setSelectedId]   = useState<number | null>(null);
+  const [modalOpen,  setModalOpen]    = useState(false);
+  const [editItem,   setEditItem]     = useState<FirmanteAPI | null>(null);
+  const [busqDep,    setBusqDep]      = useState('');
+  const debouncedDep = useDebounce(busqDep, 300);
+
+  // Formulario
+  const [form, setForm] = useState({
+    idDependencia: '', nombreTitular: '', cargoTitular: '', activoTitular: true,
+    vigDesde: '', vigHasta: '',
+    nombreSubr: '', cargoSubr: '', activoSubr: false,
+    vigDesdeSub: '', vigHastaSub: '',
+  });
+
+  const { data: firmantes = [], isFetching, refetch } = useQuery({
+    queryKey: ['memo-firmantes'],
+    queryFn: async () => {
+      const res = await apiClient.get<{ ok: boolean; data: FirmanteAPI[] }>('/memorandum/firmantes');
+      return res.data.data;
+    },
+    staleTime: 30_000,
+  });
+
+  const { data: dependencias = [] } = useQuery({
+    queryKey: ['dependencias'],
+    queryFn: async () => {
+      const res = await apiClient.get<{ ok: boolean; data: CatItem[] }>('/catalogos/dependencias');
+      return res.data.data;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const depsFiltradas = dependencias.filter((d) =>
+    d.descripcion.toLowerCase().includes(debouncedDep.toLowerCase())
+  );
+
+  const saveMut = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      apiClient.post('/memorandum/firmantes', body),
+    onSuccess: () => {
+      toast.success(editItem ? 'Firmante actualizado' : 'Firmante creado');
+      qc.invalidateQueries({ queryKey: ['memo-firmantes'] });
+      cerrarModal();
+    },
+    onError: (e: unknown) => {
+      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al guardar');
+    },
+  });
+
+  function abrirCrear() {
+    setEditItem(null);
+    setForm({ idDependencia: '', nombreTitular: '', cargoTitular: '', activoTitular: true, vigDesde: '', vigHasta: '', nombreSubr: '', cargoSubr: '', activoSubr: false, vigDesdeSub: '', vigHastaSub: '' });
+    setModalOpen(true);
+  }
+
+  function abrirEditar(f: FirmanteAPI) {
+    setEditItem(f);
+    setForm({
+      idDependencia: String(f.idDependencia),
+      nombreTitular: f.titular.nombre, cargoTitular: f.titular.cargo,
+      activoTitular: f.titular.activo, vigDesde: f.titular.vigenciaDesde ?? '', vigHasta: f.titular.vigenciaHasta ?? '',
+      nombreSubr: f.subrogante.nombre ?? '', cargoSubr: f.subrogante.cargo ?? '',
+      activoSubr: f.subrogante.activo, vigDesdeSub: f.subrogante.vigenciaDesde ?? '', vigHastaSub: f.subrogante.vigenciaHasta ?? '',
+    });
+    setModalOpen(true);
+  }
+
+  function cerrarModal() { setModalOpen(false); setEditItem(null); setBusqDep(''); }
+
+  function handleGuardar() {
+    if (!form.idDependencia) { toast.error('Selecciona una dependencia'); return; }
+    if (!form.nombreTitular.trim() || !form.cargoTitular.trim()) { toast.error('Nombre y cargo del titular son requeridos'); return; }
+    saveMut.mutate({
+      idDependencia: Number(form.idDependencia),
+      nombreTitular: form.nombreTitular.trim(), cargoTitular: form.cargoTitular.trim(),
+      activoTitular: form.activoTitular,
+      vigenciaDesde: form.vigDesde || undefined, vigenciaHasta: form.vigHasta || undefined,
+      nombreSubrogante: form.nombreSubr.trim() || undefined, cargoSubrogante: form.cargoSubr.trim() || undefined,
+      activoSubrogante: form.activoSubr,
+      vigenciaDesdeSubr: form.vigDesdeSub || undefined, vigenciaHastaSubr: form.vigHastaSub || undefined,
+    });
+  }
+
+  const setF = (k: keyof typeof form, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
+  const inCls = 'w-full h-9 px-3 text-sm rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring';
+
+  return (
+    <>
+      <Card className="border-blue-200 dark:border-blue-800/40">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-blue-600" />
+              <div>
+                <CardTitle className="text-base">Firmantes para Memorándum</CardTitle>
+                <CardDescription>
+                  Configura el firmante titular y subrogante por servicio. Se usa automáticamente al generar un Memorándum Institucional.
+                </CardDescription>
+              </div>
+            </div>
+            <Button size="sm" className="gap-2 shrink-0" onClick={abrirCrear}>
+              <Plus className="h-3.5 w-3.5" />Nuevo firmante
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
+              <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />Refrescar
+            </Button>
+          </div>
+
+          {firmantes.length === 0 ? (
+            <div className="flex flex-col items-center py-10 gap-2 text-muted-foreground">
+              <ShieldCheck className="h-8 w-8 opacity-20" />
+              <p className="text-sm font-medium">Sin firmantes configurados</p>
+              <p className="text-xs opacity-60">Agrega un firmante por cada servicio que genera memorándums</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border rounded-xl border overflow-hidden">
+              {firmantes.map((f) => {
+                const isSelected = selectedId === f.id;
+                return (
+                  <div key={f.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(isSelected ? null : f.id)}
+                      className={cn('w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/30 transition-colors', isSelected && 'bg-primary/5')}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={cn('h-2 w-2 rounded-full shrink-0', f.titular.activo ? 'bg-emerald-500' : 'bg-muted-foreground/30')} />
+                        <span className="font-medium text-sm truncate">{f.dependencia ?? `Dependencia #${f.idDependencia}`}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{f.titular.nombre}</span>
+                      </div>
+                      <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ml-2', isSelected && 'rotate-180')} />
+                    </button>
+
+                    {isSelected && (
+                      <div className="px-5 py-4 bg-muted/20 border-t border-border/50 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Titular */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Titular</p>
+                            <p className="text-sm font-medium">{f.titular.nombre}</p>
+                            <p className="text-xs text-muted-foreground">{f.titular.cargo}</p>
+                            <Badge variant="outline" className={cn('text-xs', f.titular.activo ? 'border-emerald-300 text-emerald-600' : 'border-border text-muted-foreground')}>
+                              {f.titular.activo ? 'Activo' : 'Inactivo'}
+                            </Badge>
+                            <div>
+                              <ImagenFirmante label="Firma y timbre" url={f.titular.firmaTimbreUrl} idFirmante={f.id} tipoImg="firma_timbre_titular" onUploaded={() => refetch()} />
+                            </div>
+                          </div>
+                          {/* Subrogante */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Subrogante</p>
+                            {f.subrogante.nombre ? (
+                              <>
+                                <p className="text-sm font-medium">{f.subrogante.nombre}</p>
+                                <p className="text-xs text-muted-foreground">{f.subrogante.cargo}</p>
+                                <Badge variant="outline" className={cn('text-xs', f.subrogante.activo ? 'border-emerald-300 text-emerald-600' : 'border-border text-muted-foreground')}>
+                                  {f.subrogante.activo ? 'Activo' : 'Inactivo'}
+                                </Badge>
+                                <div>
+                                  <ImagenFirmante label="Firma y timbre" url={f.subrogante.firmaTimbreUrl} idFirmante={f.id} tipoImg="firma_timbre_subrogante" onUploaded={() => refetch()} />
+                                </div>
+                              </>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">No configurado</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex justify-end pt-1 border-t border-border/40">
+                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={() => abrirEditar(f)}>
+                            <Pencil className="h-3 w-3" />Editar datos
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modal crear/editar firmante */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) cerrarModal(); }}>
+          <div className="bg-background rounded-xl border shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-background z-10">
+              <h3 className="font-semibold text-sm">{editItem ? 'Editar firmante' : 'Nuevo firmante'}</h3>
+              <button onClick={cerrarModal} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-5">
+              {/* Dependencia */}
+              <div className="space-y-1.5">
+                <Label>Servicio / Dependencia <span className="text-destructive text-xs">*</span></Label>
+
+                {editItem ? (
+                  /* Editar: solo muestra, no se puede cambiar */
+                  <div className="h-9 px-3 flex items-center text-sm rounded-lg border border-input bg-muted/30 text-muted-foreground">
+                    {editItem.dependencia ?? `Dependencia #${editItem.idDependencia}`}
+                  </div>
+                ) : form.idDependencia ? (
+                  /* Dependencia ya seleccionada — chip con opción de limpiar */
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/30 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="font-medium truncate">
+                        {dependencias.find((d) => d.id === Number(form.idDependencia))?.descripcion ?? 'Servicio seleccionado'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setF('idDependencia', ''); setBusqDep(''); }}
+                      className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                      title="Cambiar servicio"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  /* Sin selección — buscador + lista filtrada */
+                  <div className="space-y-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Escribe para buscar servicio..."
+                        value={busqDep}
+                        onChange={(e) => setBusqDep(e.target.value)}
+                        autoFocus
+                        className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                    <div className="rounded-lg border border-input overflow-y-auto max-h-44">
+                      {depsFiltradas.length === 0 ? (
+                        <p className="px-3 py-4 text-sm text-muted-foreground text-center">
+                          {busqDep ? `Sin resultados para "${busqDep}"` : 'Escribe para filtrar los servicios'}
+                        </p>
+                      ) : (
+                        depsFiltradas.map((d) => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => { setF('idDependencia', String(d.id)); setBusqDep(''); }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-muted/50 transition-colors border-b border-border/40 last:border-0 flex items-center gap-2"
+                          >
+                            <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                            {d.descripcion}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{depsFiltradas.length} servicio{depsFiltradas.length !== 1 ? 's' : ''} disponible{depsFiltradas.length !== 1 ? 's' : ''}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Titular */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wide border-b pb-1">Firmante Titular</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5 col-span-2">
+                    <Label className="text-sm">Nombre completo <span className="text-destructive text-xs">*</span></Label>
+                    <input type="text" value={form.nombreTitular} onChange={(e) => setF('nombreTitular', e.target.value)} placeholder="Dr. Juan Pérez González" className={inCls} />
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <Label className="text-sm">Cargo <span className="text-destructive text-xs">*</span></Label>
+                    <input type="text" value={form.cargoTitular} onChange={(e) => setF('cargoTitular', e.target.value)} placeholder="Director de Servicio" className={inCls} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Vigencia desde</Label>
+                    <input type="date" value={form.vigDesde} onChange={(e) => setF('vigDesde', e.target.value)} className={inCls} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Vigencia hasta</Label>
+                    <input type="date" value={form.vigHasta} onChange={(e) => setF('vigHasta', e.target.value)} className={inCls} />
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={form.activoTitular} onChange={(e) => setF('activoTitular', e.target.checked)} className="h-4 w-4" />
+                      <span className="text-sm">Titular activo</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subrogante */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wide border-b pb-1">Firmante Subrogante (opcional)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5 col-span-2">
+                    <Label className="text-sm">Nombre completo</Label>
+                    <input type="text" value={form.nombreSubr} onChange={(e) => setF('nombreSubr', e.target.value)} placeholder="Dra. María López" className={inCls} />
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <Label className="text-sm">Cargo</Label>
+                    <input type="text" value={form.cargoSubr} onChange={(e) => setF('cargoSubr', e.target.value)} placeholder="Subdirectora" className={inCls} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Vigencia desde</Label>
+                    <input type="date" value={form.vigDesdeSub} onChange={(e) => setF('vigDesdeSub', e.target.value)} className={inCls} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Vigencia hasta</Label>
+                    <input type="date" value={form.vigHastaSub} onChange={(e) => setF('vigHastaSub', e.target.value)} className={inCls} />
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={form.activoSubr} onChange={(e) => setF('activoSubr', e.target.checked)} className="h-4 w-4" />
+                      <span className="text-sm">Subrogante activo</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Las imágenes de firma y timbre se suben desde la tarjeta del firmante después de guardarlo.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t sticky bottom-0 bg-background">
+              <Button variant="outline" size="sm" onClick={cerrarModal} disabled={saveMut.isPending}>Cancelar</Button>
+              <Button size="sm" onClick={handleGuardar} disabled={saveMut.isPending} className="gap-2">
+                {saveMut.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                {editItem ? 'Guardar cambios' : 'Crear firmante'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 
 async function fetchConfig(): Promise<SistemaConfig> {
@@ -1271,6 +1696,7 @@ export function ConfiguracionPage() {
 
       <MantenedorTiposDocumento />
       <MantenedorDependencias />
+      <MantenedorFirmantes />
 
       {/* Info del sistema — siempre al final */}
       <Card>

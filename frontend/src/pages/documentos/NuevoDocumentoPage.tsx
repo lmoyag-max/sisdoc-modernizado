@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
   FileText, ArrowLeft, Send, Paperclip, X, AlertCircle,
   Building2, Tag, MessageSquare, Calendar, Loader2, ChevronRight, Lock,
-  Search, CheckSquare, Square, FileStack, ShieldAlert,
+  Search, CheckSquare, Square, FileStack, ShieldAlert, Eye,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth.store';
@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils';
 import { useUploadRules } from '@/hooks/useUploadRules';
 import { NominaModal } from '@/components/documentos/NominaModal';
 import { type NominaData } from '@/lib/utils/nomina.generator';
+import { MemorandumFields } from '@/components/documentos/MemorandumFields';
+import { MemorandumModal, type FirmanteActivo, type MemoDocumentoPayload } from '@/components/documentos/MemorandumModal';
 
 // ── Schema ───────────────────────────────────────────────────
 const schema = z.object({
@@ -81,6 +83,14 @@ export function NuevoDocumentoPage() {
   const [nominaOpen, setNominaOpen]   = useState(false);
   const [nominaData, setNominaData]   = useState<NominaData | null>(null);
   const [idDocCreado, setIdDocCreado] = useState<number | null>(null);
+
+  // ── Estado Memorándum ─────────────────────────────────────
+  const [memoReferencia, setMemoReferencia] = useState('');
+  const [memoCuerpo,     setMemoCuerpo]     = useState('');
+  const [memoCuerpoErr,  setMemoCuerpoErr]  = useState<string | null>(null);
+  const [memoModalOpen,  setMemoModalOpen]  = useState(false);
+  const [memoFirmante,   setMemoFirmante]   = useState<FirmanteActivo | null>(null);
+  const [memoPayload,    setMemoPayload]    = useState<MemoDocumentoPayload | null>(null);
 
   // Solo of.partes y admin ven las opciones especiales
   const esOficinaPartes = user?.roles?.includes('of.partes') || user?.roles?.includes('admin');
@@ -171,8 +181,17 @@ export function NuevoDocumentoPage() {
   });
 
   const puedeExterno = user?.roles?.includes('admin') || user?.roles?.includes('of.partes');
-  const tipoDestinatario = watch('tipoDestinatario');
-  const idTipoCompromiso = watch('idTipoCompromiso');
+  const tipoDestinatario  = watch('tipoDestinatario');
+  const idTipoCompromiso  = watch('idTipoCompromiso');
+  const idTipoDocSelected = watch('idTipoDocumento');
+
+  // Detecta dinámicamente si el tipo seleccionado es Memorándum
+  // (por descripción, no por ID hardcodeado — robusto ante cambios en BD)
+  const esMemorandum = Boolean(
+    idTipoDocSelected &&
+    (tipos ?? []).find((t) => t.id === Number(idTipoDocSelected))
+      ?.descripcion?.toLowerCase().includes('memorandum')
+  );
   const materia          = watch('materia');
 
   const mutation = useMutation({
@@ -280,8 +299,69 @@ export function NuevoDocumentoPage() {
     },
   });
 
-  const isPending = isSubmitting || mutation.isPending;
+  const isPending    = isSubmitting || mutation.isPending;
   const origenNombre = user?.descDependencia ?? 'Sin servicio asignado';
+
+  // ── Handler especial para Memorándum ──────────────────────
+  // Se ejecuta en lugar de mutation.mutate cuando el tipo es Memorándum.
+  // Valida campos extra, resuelve firmante y abre el modal de previsualización.
+  async function abrirPrevisualizacionMemo(data: FormData) {
+    // Validar cuerpo
+    if (!memoCuerpo.trim()) {
+      setMemoCuerpoErr('El cuerpo del memorándum es requerido');
+      return;
+    }
+    setMemoCuerpoErr(null);
+
+    // Validar destino (misma lógica que mutation)
+    if (data.tipoDestinatario === 'D' && destinosSeleccionados.length === 0) {
+      setDestinoError('Selecciona al menos un servicio destino');
+      return;
+    }
+    if (data.tipoDestinatario === 'E' && !destinoExterno) {
+      setDestinoError('Selecciona un destino externo');
+      return;
+    }
+
+    // Resolver firmante desde backend
+    try {
+      const firmanteRes = await apiClient.get<{ ok: boolean; data: FirmanteActivo }>('/memorandum/firmante-activo');
+      const firmante = firmanteRes.data.data;
+      if (!firmante.disponible) {
+        toast.error(firmante.mensaje ?? 'No hay firmante activo configurado');
+        return;
+      }
+
+      // Construir payload para POST /documentos
+      const base: MemoDocumentoPayload = {
+        materia:            data.materia,
+        idTipoDocumento:    Number(data.idTipoDocumento),
+        fechaDocumento:     data.fechaDocumento,
+        observaciones:      data.observaciones,
+        idTipoDistribucion: Number(data.idTipoDistribucion),
+        idTipoCompromiso:   Number(data.idTipoCompromiso),
+        idEstadoCompromiso: Number(data.idEstadoCompromiso),
+        diasCompromiso:     Number(data.diasCompromiso),
+        tipoDestinatario:   data.tipoDestinatario,
+        ...(esOficinaPartes && { tipoSoporte, reservado }),
+      };
+
+      const payload: MemoDocumentoPayload = data.tipoDestinatario === 'D'
+        ? { ...base, destinos: destinosSeleccionados }
+        : { ...base, idDestino: Number(destinoExterno) };
+
+      setMemoFirmante(firmante);
+      setMemoPayload(payload);
+      setMemoModalOpen(true);
+    } catch {
+      toast.error('Error al resolver el firmante. Intenta de nuevo.');
+    }
+  }
+
+  // Nombres de destinos para el PDF del memo
+  const destinosNombresParaMemo = destinosSeleccionados
+    .map((id) => (dependencias ?? []).find((d) => d.id === id)?.descripcion ?? `Servicio #${id}`)
+    .filter(Boolean);
 
   return (
     <>
@@ -297,7 +377,12 @@ export function NuevoDocumentoPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit((d) => mutation.mutate(d))} noValidate>
+        <form
+          onSubmit={handleSubmit((d) =>
+            esMemorandum ? abrirPrevisualizacionMemo(d) : mutation.mutate(d)
+          )}
+          noValidate
+        >
           <div className="space-y-5">
 
             {/* SECCIÓN 0: SOPORTE Y CONDICIÓN (solo Oficina de Partes) */}
@@ -466,6 +551,18 @@ export function NuevoDocumentoPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* SECCIÓN 1b: CAMPOS MEMORÁNDUM (solo visible si tipo = Memorándum) */}
+            {esMemorandum && (
+              <MemorandumFields
+                referencia={memoReferencia}
+                cuerpo={memoCuerpo}
+                cuerpoError={memoCuerpoErr}
+                onReferencia={setMemoReferencia}
+                onCuerpo={(v) => { setMemoCuerpo(v); if (v.trim()) setMemoCuerpoErr(null); }}
+                disabled={isPending}
+              />
+            )}
 
             {/* SECCIÓN 2: ORIGEN AUTOMÁTICO */}
             <Card className="border-emerald-200 dark:border-emerald-800/40">
@@ -759,8 +856,10 @@ export function NuevoDocumentoPage() {
               </Button>
               <Button type="submit" disabled={isPending || excuotaTotal} className="gap-2 px-8">
                 {isPending
-                  ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
-                  : <><Send className="h-4 w-4" />Registrar y Despachar</>
+                  ? <><Loader2 className="h-4 w-4 animate-spin" />Procesando...</>
+                  : esMemorandum
+                    ? <><Eye className="h-4 w-4" />Vista Previa del Memorándum</>
+                    : <><Send className="h-4 w-4" />Registrar y Despachar</>
                 }
               </Button>
             </div>
@@ -776,6 +875,25 @@ export function NuevoDocumentoPage() {
           data={nominaData}
           onNavigate={() => {
             if (idDocCreado) navigate(`/documentos/${idDocCreado}`);
+          }}
+        />
+      )}
+
+      {/* Modal de previsualización y generación del Memorándum */}
+      {memoModalOpen && memoPayload && memoFirmante && (
+        <MemorandumModal
+          open={memoModalOpen}
+          onClose={() => setMemoModalOpen(false)}
+          docPayload={memoPayload}
+          referencia={memoReferencia}
+          cuerpo={memoCuerpo}
+          destinosNombres={destinosNombresParaMemo}
+          origenNombre={origenNombre}
+          firmante={memoFirmante}
+          archivos={archivos}
+          onNavigate={(idDoc) => {
+            setMemoModalOpen(false);
+            navigate(`/documentos/${idDoc}`);
           }}
         />
       )}

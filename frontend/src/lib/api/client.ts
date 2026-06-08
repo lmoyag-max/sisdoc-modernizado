@@ -1,5 +1,11 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
+import { queryClient } from '@/lib/queryClient';
+
+function logoutAndClearCache() {
+  queryClient.clear();
+  useAuthStore.getState().logout();
+}
 
 const API_BASE = '/api/v1';
 
@@ -47,7 +53,7 @@ apiClient.interceptors.response.use(
     // Evitar loop de refresh en /auth/login y /auth/refresh
     const url = original.url ?? '';
     if (url.includes('/auth/login') || url.includes('/auth/refresh')) {
-      useAuthStore.getState().logout();
+      logoutAndClearCache();
       return Promise.reject(error);
     }
 
@@ -72,7 +78,7 @@ apiClient.interceptors.response.use(
       return apiClient(original);
     } catch (refreshError) {
       processQueue(refreshError, null);
-      useAuthStore.getState().logout();
+      logoutAndClearCache();
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

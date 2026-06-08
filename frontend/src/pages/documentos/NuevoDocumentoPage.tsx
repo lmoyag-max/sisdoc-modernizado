@@ -196,15 +196,17 @@ export function NuevoDocumentoPage() {
   const materia = watch('materia');
 
   // ── Firmantes disponibles (solo cuando el tipo es Memorándum) ──
+  // El queryKey incluye idDependencia para que cada usuario tenga su propia caché
+  // y no se contaminen resultados entre sesiones de distintos usuarios.
   const { data: firmantesDisponibles, isLoading: cargandoFirmantes } = useQuery({
-    queryKey: ['firmantes-disponibles'],
+    queryKey: ['firmantes-disponibles', user?.idDependencia],
     queryFn:  async () => {
       const r = await apiClient.get<{ ok: boolean; data: { firmantes: FirmanteActivo[] } }>(
         '/memorandum/firmantes-disponibles'
       );
       return r.data.data.firmantes ?? [];
     },
-    enabled:   esMemorandum,
+    enabled:   esMemorandum && Boolean(user?.idDependencia),
     staleTime: 2 * 60 * 1000,
   });
 

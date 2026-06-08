@@ -143,7 +143,7 @@ export function buildPasswordResetEmail(nombre: string, resetUrl: string, minuto
         <tr>
           <td style="border-top:1px solid #e2e8f0;padding:20px 40px;background:#f8fafc;">
             <p style="margin:0;color:#94a3b8;font-size:11px;text-align:center;">
-              © 2026 DOC360 — Hospital Universitario Asociado de Puebla<br>
+              © 2026 DOC360 — Hospital Asistencia Publica Alejandro Del Rio (HUAP)<br>
               Este es un correo automático, por favor no respondas.
             </p>
           </td>

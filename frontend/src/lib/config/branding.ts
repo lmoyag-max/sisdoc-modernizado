@@ -5,7 +5,7 @@
 
 export const BRANDING = {
   /** Nombre completo de la institución (para cabeceras de documentos oficiales) */
-  nombreInstitucion: 'HOSPITAL DE URGENCIA ASISTENCIA PÚBLICA - HUAP',
+  nombreInstitucion: 'HOSPITAL ASISTENCIA PUBLICA ALEJANDRO DEL RIO - HUAP',
 
   /** Abreviación institucional */
   abreviacion: 'HUAP',

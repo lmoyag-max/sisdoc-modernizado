@@ -574,7 +574,7 @@ export function buildAlertaEmail(nombreServicio: string, docs: DocumentoPendient
       <tr>
         <td style="border-top:1px solid #e2e8f0;padding:16px 32px;background:#f8fafc;">
           <p style="margin:0;color:#94a3b8;font-size:11px;text-align:center;">
-            © 2026 DOC360 — Hospital Universitario Asociado de Puebla<br>
+            © 2026 DOC360 — Hospital Asistencia Publica Alejandro Del Rio (HUAP)<br>
             Este es un correo automático generado por el sistema. Por favor no respondas a este mensaje.
           </p>
         </td>

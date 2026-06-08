@@ -286,9 +286,10 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
     // ── 2. Leer el PDF original del disco ────────────────────
     const arqRes = await pool.request()
       .input('idArq', sql.Int, body.idArchivoOriginal)
+      .input('idDoc', sql.Int, body.idDocumento)
       .query<{ ruta: string; archivo: string }>(`
         SELECT ruta, archivo FROM archivo_digital
-        WHERE id_archivo_digital = @idArq AND id_documento = ${body.idDocumento}
+        WHERE id_archivo_digital = @idArq AND id_documento = @idDoc
       `);
 
     const arq = arqRes.recordset[0];

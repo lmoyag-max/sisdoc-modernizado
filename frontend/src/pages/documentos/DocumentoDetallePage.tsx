@@ -217,14 +217,12 @@ export function DocumentoDetallePage() {
   };
 
   // Acciones por destino específico (multi-destino)
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const recepcionarDestMut = useMutation({
     mutationFn: (idDocumentoDestino: number) =>
       apiClient.post(`/documentos/${idDocumento}/recepcionar-destino`, { idDocumentoDestino }),
     onSuccess: () => { toast.success('Destino recepcionado'); invalidarTodo(); },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al recepcionar'),
   });
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const terminarDestMut = useMutation({
     mutationFn: (idDocumentoDestino: number) =>
       apiClient.post(`/documentos/${idDocumento}/terminar-destino`, { idDocumentoDestino }),
@@ -233,22 +231,21 @@ export function DocumentoDetallePage() {
   });
 
   // Acciones del flujo documental
-  const accion = (endpoint: string, msg: string) => useMutation({
-    mutationFn: () => apiClient.post(`/documentos/${idDocumento}/${endpoint}`, { observaciones: `${msg} desde detalle` }),
-    onSuccess: () => {
-      toast.success(`Documento ${msg.toLowerCase()} correctamente`);
-      invalidarTodo();
-    },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? `Error al ${msg.toLowerCase()}`),
+  const despacharMut = useMutation({
+    mutationFn: () => apiClient.post(`/documentos/${idDocumento}/despachar`, { observaciones: 'Despachado desde detalle' }),
+    onSuccess: () => { toast.success('Documento despachado correctamente'); invalidarTodo(); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al despachar'),
   });
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const despacharMut   = accion('despachar',   'Despachado');
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const recepcionarMut = accion('recepcionar', 'Recepcionado');
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const terminarMut    = accion('terminar',    'Terminado');
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const recepcionarMut = useMutation({
+    mutationFn: () => apiClient.post(`/documentos/${idDocumento}/recepcionar`, { observaciones: 'Recepcionado desde detalle' }),
+    onSuccess: () => { toast.success('Documento recepcionado correctamente'); invalidarTodo(); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al recepcionar'),
+  });
+  const terminarMut = useMutation({
+    mutationFn: () => apiClient.post(`/documentos/${idDocumento}/terminar`, { observaciones: 'Terminado desde detalle' }),
+    onSuccess: () => { toast.success('Documento terminado correctamente'); invalidarTodo(); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al terminar'),
+  });
   const reabrirMut = useMutation({
     mutationFn: () => apiClient.post(`/documentos/${idDocumento}/reabrir`, { observaciones: reabrirObs }),
     onSuccess: () => {
@@ -259,8 +256,7 @@ export function DocumentoDetallePage() {
     },
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al reabrir el documento'),
   });
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const eliminarMut    = useMutation({
+  const eliminarMut = useMutation({
     mutationFn: () => apiClient.delete(`/documentos/${idDocumento}`),
     onSuccess: () => {
       toast.success('Documento eliminado correctamente');

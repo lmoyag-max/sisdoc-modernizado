@@ -25,7 +25,7 @@ async function bootstrap(): Promise<void> {
     const server = app.listen(env.PORT, '0.0.0.0', () => {
       const ip = getLocalIP();
       logger.info('═══════════════════════════════════════════════════');
-      logger.info(`  SISDOC API v2 — ${env.NODE_ENV.toUpperCase()}`);
+      logger.info(`  DOC360 API v2 — ${env.NODE_ENV.toUpperCase()}`);
       logger.info(`  Local:   http://localhost:${env.PORT}/api/v1`);
       logger.info(`  Red:     http://${ip}:${env.PORT}/api/v1`);
       logger.info(`  Docs:    http://localhost:${env.PORT}/api-docs`);

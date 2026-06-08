@@ -136,7 +136,7 @@ router.post('/forgot-password', forgotLimiter, async (req: Request, res: Respons
     const { html, text } = buildPasswordResetEmail(nombre, resetUrl, env.RESET_TOKEN_EXPIRES_MINUTES);
 
     try {
-      await sendMail({ to: email, subject: 'Recupera tu contraseña — SISDOC', html, text });
+      await sendMail({ to: email, subject: 'Recupera tu contraseña — DOC360', html, text });
       await audit(pool, 'FORGOT_CORREO_ENVIADO', { idUsuario: user.id_usuario, email, ip, userAgent });
       logger.info(`forgot-password: correo enviado a ${email} (usuario ${user.usuario})`);
     } catch (mailErr) {

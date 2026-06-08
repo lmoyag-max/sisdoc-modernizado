@@ -5,11 +5,11 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'SISDOC API',
+      title: 'DOC360 API',
       version: '2.0.0',
-      description: 'API REST del Sistema de Gestión Documental SISDOC Modernizado',
+      description: 'API REST del Sistema de Gestión Documental DOC360 — HUAP',
       contact: {
-        name: 'Soporte SISDOC',
+        name: 'Soporte DOC360',
         email: 'soporte@sisdoc.cl',
       },
     },

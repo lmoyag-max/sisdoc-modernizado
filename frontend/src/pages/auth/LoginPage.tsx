@@ -29,7 +29,7 @@ export function LoginPage() {
   const [logoUrl,        setLogoUrl]        = useState<string | null>(null);
   const [logoImgError,   setLogoImgError]   = useState(false);
   const [textos, setTextos] = useState({
-    nombreSistema:        'SISDOC',
+    nombreSistema:        'DOC360',
     subtitulo:            'Sistema de Gestión Documental',
     tituloPrincipal:      'Gestión documental',
     tituloPrincipalAcento:'moderna',
@@ -38,7 +38,7 @@ export function LoginPage() {
     card2: 'Flujo de derivaciones',
     card3: 'Trazabilidad completa',
     card4: 'Historial documental',
-    footer: '© 2026 SISDOC v2.0 — Sistema institucional de gestión documental',
+    footer: '© 2026 DOC360 — Sistema institucional de gestión documental',
   });
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function LoginPage() {
         const acento = palabras.pop() ?? 'moderna';
         const base   = palabras.join(' ');
         setTextos({
-          nombreSistema:         d.loginNombreSistema ?? 'SISDOC',
+          nombreSistema:         d.loginNombreSistema ?? 'DOC360',
           subtitulo:             d.loginSubtitulo     ?? 'Sistema de Gestión Documental',
           tituloPrincipal:       base,
           tituloPrincipalAcento: acento,
@@ -68,7 +68,7 @@ export function LoginPage() {
           card2:                 d.loginCard2         ?? 'Flujo de derivaciones',
           card3:                 d.loginCard3         ?? 'Trazabilidad completa',
           card4:                 d.loginCard4         ?? 'Historial documental',
-          footer:                d.loginFooter        ?? '© 2026 SISDOC v2.0 — Sistema institucional de gestión documental',
+          footer:                d.loginFooter        ?? '© 2026 DOC360 — Sistema institucional de gestión documental',
         });
       })
       .catch(() => {/* usa valores por defecto */});

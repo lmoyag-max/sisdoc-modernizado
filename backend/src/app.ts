@@ -101,7 +101,7 @@ app.get('/uploads/:filename', requireAuth, (req, res) => {
 const healthResponse = () =>
   env.NODE_ENV === 'production'
     ? { ok: true }
-    : { ok: true, sistema: 'SISDOC API v2', version: '2.0.0', entorno: env.NODE_ENV, timestamp: new Date().toISOString() };
+    : { ok: true, sistema: 'DOC360 API v2', version: '2.0.0', entorno: env.NODE_ENV, timestamp: new Date().toISOString() };
 app.get('/health', uiCsp, (_req, res) => res.json(healthResponse()));
 app.get('/api/health', uiCsp, (_req, res) => res.json(healthResponse())); // alias
 
@@ -109,7 +109,7 @@ app.get('/api/health', uiCsp, (_req, res) => res.json(healthResponse())); // ali
 if (env.NODE_ENV !== 'production') {
   app.use('/api-docs', uiCsp, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'SISDOC API Docs',
+    customSiteTitle: 'DOC360 API Docs',
   }));
 }
 
@@ -132,7 +132,7 @@ app.use(`${API}/jefaturas`,   jefaturasRoutes);
 app.use(`${API}/firma-gob`,   firmaGobRoutes);
 
 app.get(`${API}`, (_req, res) => {
-  res.json({ ok: true, api: 'SISDOC v2', docs: '/api-docs' });
+  res.json({ ok: true, api: 'DOC360 v2', docs: '/api-docs' });
 });
 
 // ── Error handlers ─────────────────────────────────────────

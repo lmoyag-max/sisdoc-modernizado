@@ -1,5 +1,5 @@
 /**
- * Configuración de branding institucional HUAP/SISDOC.
+ * Configuración de branding institucional HUAP/DOC360.
  * Centraliza nombre, colores y textos para PDFs, reportes y documentos.
  */
 
@@ -11,13 +11,13 @@ export const BRANDING = {
   abreviacion: 'HUAP',
 
   /** Nombre del sistema de gestión documental */
-  nombreSistema: 'SISDOC',
+  nombreSistema: 'DOC360',
 
   /** Subtítulo para encabezados de documentos */
-  subTitulo: 'Sistema de Gestión Documental — SISDOC',
+  subTitulo: 'Sistema de Gestión Documental — DOC360',
 
   /** Pie de página en PDFs */
-  piePagina: 'SISDOC HUAP',
+  piePagina: 'DOC360 HUAP',
 
   /**
    * Colores institucionales HUAP (valores RGB para jsPDF).

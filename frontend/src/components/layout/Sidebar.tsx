@@ -106,7 +106,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             </div>
             {!collapsed && (
               <div className="animate-fade-in min-w-0">
-                <p className="text-sm font-semibold text-sidebar-foreground leading-tight">SISDOC</p>
+                <p className="text-sm font-semibold text-sidebar-foreground leading-tight">DOC360</p>
                 <p className="text-xs text-sidebar-foreground/50 leading-tight">HUAP · Gestión Documental</p>
               </div>
             )}
@@ -206,7 +206,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   <Building2 className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-sidebar-foreground leading-tight">SISDOC</p>
+                  <p className="text-sm font-semibold text-sidebar-foreground leading-tight">DOC360</p>
                   <p className="text-xs text-sidebar-foreground/50 leading-tight">HUAP · Gestión Documental</p>
                 </div>
               </div>

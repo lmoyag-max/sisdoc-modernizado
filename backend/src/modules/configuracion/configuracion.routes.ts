@@ -61,7 +61,7 @@ const EXTENSIONES_POSIBLES = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg',
 
 // Textos del login con sus valores por defecto
 const LOGIN_DEFAULTS = {
-  loginNombreSistema:   'SISDOC',
+  loginNombreSistema:   'DOC360',
   loginSubtitulo:       'Sistema de Gestión Documental',
   loginTituloPrincipal: 'Gestión documental moderna',
   loginDescripcion:     'Plataforma enterprise para la gestión, seguimiento y trazabilidad de documentos institucionales.',
@@ -69,7 +69,7 @@ const LOGIN_DEFAULTS = {
   loginCard2:           'Flujo de derivaciones',
   loginCard3:           'Trazabilidad completa',
   loginCard4:           'Historial documental',
-  loginFooter:          '© 2026 SISDOC v2.0 — Sistema institucional de gestión documental',
+  loginFooter:          '© 2026 DOC360 — Sistema institucional de gestión documental',
 };
 
 // ── GET /configuracion — leer config completa (pública) ────
@@ -83,7 +83,7 @@ router.get('/', (req, res) => {
   res.json({
     ok: true,
     data: {
-      nombreSistema:     cfg.nombreSistema     ?? 'SISDOC',
+      nombreSistema:     cfg.nombreSistema     ?? 'DOC360',
       nombreInstitucion: cfg.nombreInstitucion ?? 'HUAP',
       logoUrl:           logoFile ? `/uploads/config/${logoFile}` : null,
       backgroundUrl:     bgFile   ? `/uploads/config/${bgFile}`   : null,

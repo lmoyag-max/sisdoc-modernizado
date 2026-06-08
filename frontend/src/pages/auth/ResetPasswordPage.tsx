@@ -76,7 +76,7 @@ export function ResetPasswordPage() {
             SD
           </div>
           <div>
-            <p className="font-semibold text-foreground text-sm">SISDOC</p>
+            <p className="font-semibold text-foreground text-sm">DOC360</p>
             <p className="text-muted-foreground text-xs">Sistema de Gestión Documental</p>
           </div>
         </div>

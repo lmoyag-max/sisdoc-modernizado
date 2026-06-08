@@ -387,7 +387,7 @@ export async function enviarAlertaServicio(
   try {
     await sendMail({
       to:      correos.join(', '),
-      subject: `[SISDOC] Documentos pendientes — ${nombreServicio}`,
+      subject: `[DOC360] Documentos pendientes — ${nombreServicio}`,
       html,
       text,
     });
@@ -516,7 +516,7 @@ export function buildAlertaEmail(nombreServicio: string, docs: DocumentoPendient
                 <span style="color:#fff;font-weight:bold;font-size:13px;">SD</span>
               </td>
               <td style="padding-left:12px;">
-                <p style="margin:0;color:#ffffff;font-weight:700;font-size:15px;">SISDOC</p>
+                <p style="margin:0;color:#ffffff;font-weight:700;font-size:15px;">DOC360</p>
                 <p style="margin:0;color:#94a3b8;font-size:11px;">Sistema de Gestión Documental · HUAP</p>
               </td>
             </tr>
@@ -574,7 +574,7 @@ export function buildAlertaEmail(nombreServicio: string, docs: DocumentoPendient
       <tr>
         <td style="border-top:1px solid #e2e8f0;padding:16px 32px;background:#f8fafc;">
           <p style="margin:0;color:#94a3b8;font-size:11px;text-align:center;">
-            © 2026 SISDOC v2 — Hospital Universitario Asociado de Puebla<br>
+            © 2026 DOC360 — Hospital Universitario Asociado de Puebla<br>
             Este es un correo automático generado por el sistema. Por favor no respondas a este mensaje.
           </p>
         </td>
@@ -590,7 +590,7 @@ export function buildAlertaEmail(nombreServicio: string, docs: DocumentoPendient
   ).join('\n');
 
   const text = `
-SISDOC — Documentos pendientes: ${nombreServicio}
+DOC360 — Documentos pendientes: ${nombreServicio}
 ${'='.repeat(50)}
 
 Fecha: ${fecha}
@@ -600,7 +600,7 @@ Detalle:
 ${textRows}
 
 ${'—'.repeat(50)}
-SISDOC v2 — HUAP
+DOC360 — HUAP
 `.trim();
 
   return { html, text };

@@ -173,7 +173,7 @@ export function DashboardPage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">{fechaCapitalizada}</p>
           <p className="text-[11px] text-muted-foreground/50 mt-0.5 tracking-wide uppercase">
-            Centro de Control Operacional · SISDOC HUAP
+            Centro de Control Operacional · DOC360 HUAP
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">

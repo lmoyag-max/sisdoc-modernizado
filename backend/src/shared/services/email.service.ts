@@ -65,7 +65,7 @@ export function buildPasswordResetEmail(nombre: string, resetUrl: string, minuto
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recuperar contraseña — SISDOC</title>
+  <title>Recuperar contraseña — DOC360</title>
 </head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 0;">
@@ -81,7 +81,7 @@ export function buildPasswordResetEmail(nombre: string, resetUrl: string, minuto
                   <span style="color:#fff;font-weight:bold;font-size:14px;">SD</span>
                 </td>
                 <td style="padding-left:12px;">
-                  <p style="margin:0;color:#ffffff;font-weight:700;font-size:16px;">SISDOC</p>
+                  <p style="margin:0;color:#ffffff;font-weight:700;font-size:16px;">DOC360</p>
                   <p style="margin:0;color:#94a3b8;font-size:12px;">Sistema de Gestión Documental</p>
                 </td>
               </tr>
@@ -94,7 +94,7 @@ export function buildPasswordResetEmail(nombre: string, resetUrl: string, minuto
           <td style="padding:40px 40px 32px;">
             <h1 style="margin:0 0 8px;color:#1e293b;font-size:22px;font-weight:700;">Recuperación de contraseña</h1>
             <p style="margin:0 0 24px;color:#64748b;font-size:14px;line-height:1.6;">
-              Hola <strong>${nombre}</strong>, recibimos una solicitud para restablecer la contraseña de tu cuenta en SISDOC.
+              Hola <strong>${nombre}</strong>, recibimos una solicitud para restablecer la contraseña de tu cuenta en DOC360.
             </p>
             <p style="margin:0 0 24px;color:#64748b;font-size:14px;line-height:1.6;">
               Haz clic en el botón para crear una nueva contraseña. Este enlace es válido por <strong>${minutosExpira} minutos</strong> y solo puede usarse una vez.
@@ -143,7 +143,7 @@ export function buildPasswordResetEmail(nombre: string, resetUrl: string, minuto
         <tr>
           <td style="border-top:1px solid #e2e8f0;padding:20px 40px;background:#f8fafc;">
             <p style="margin:0;color:#94a3b8;font-size:11px;text-align:center;">
-              © 2026 SISDOC v2 — Hospital Universitario Asociado de Puebla<br>
+              © 2026 DOC360 — Hospital Universitario Asociado de Puebla<br>
               Este es un correo automático, por favor no respondas.
             </p>
           </td>
@@ -156,12 +156,12 @@ export function buildPasswordResetEmail(nombre: string, resetUrl: string, minuto
 </html>`;
 
   const text = `
-SISDOC — Recuperación de contraseña
+DOC360 — Recuperación de contraseña
 =====================================
 
 Hola ${nombre},
 
-Recibimos una solicitud para restablecer tu contraseña en SISDOC.
+Recibimos una solicitud para restablecer tu contraseña en DOC360.
 
 Usa el siguiente enlace para crear una nueva contraseña (válido por ${minutosExpira} minutos):
 ${resetUrl}
@@ -170,7 +170,7 @@ ${resetUrl}
 
 Si no solicitaste este cambio, ignora este correo.
 
-© 2026 SISDOC v2
+© 2026 DOC360
 `.trim();
 
   return { html, text };

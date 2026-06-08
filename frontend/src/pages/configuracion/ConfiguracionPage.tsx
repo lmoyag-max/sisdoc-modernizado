@@ -1393,7 +1393,7 @@ export function ConfiguracionPage() {
                   id="nombreSistema"
                   value={isLoading ? '' : nombreSistema}
                   onChange={(e) => setNombreSistema(e.target.value)}
-                  placeholder="SISDOC"
+                  placeholder="DOC360"
                   disabled={isLoading}
                 />
               </div>
@@ -1487,7 +1487,7 @@ export function ConfiguracionPage() {
               <Input
                 value={isLoading ? '' : loginTextos.loginNombreSistema}
                 onChange={(e) => setLoginTextos((p) => ({ ...p, loginNombreSistema: e.target.value }))}
-                placeholder="SISDOC"
+                placeholder="DOC360"
                 disabled={isLoading}
               />
             </div>
@@ -1550,7 +1550,7 @@ export function ConfiguracionPage() {
             <Input
               value={isLoading ? '' : loginTextos.loginFooter}
               onChange={(e) => setLoginTextos((p) => ({ ...p, loginFooter: e.target.value }))}
-              placeholder="© 2026 SISDOC v2.0 — Sistema institucional de gestión documental"
+              placeholder="© 2026 DOC360 — Sistema institucional de gestión documental"
               disabled={isLoading}
             />
           </div>

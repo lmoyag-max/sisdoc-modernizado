@@ -24,7 +24,7 @@ export function MemorandumFields({
           <FileText className="h-4 w-4 text-blue-600" />
           Contenido del Memorándum
           <span className="ml-auto text-xs font-normal text-blue-600 dark:text-blue-400">
-            Generado automáticamente por SysDoc
+            Generado automáticamente por DOC360
           </span>
         </CardTitle>
         <CardDescription>

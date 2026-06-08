@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Settings, Upload, ImageIcon, Building2, Save,
   CheckCircle2, RefreshCw, Palette, Monitor, X, Type, Paperclip,
   Plus, Pencil, Search, Power, Database, ChevronDown,
-  UserCheck, ImagePlus, ShieldCheck,
+  UserCheck, ImagePlus, ShieldCheck, ArrowRight,
 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { apiClient } from '@/lib/api/client';
@@ -1696,7 +1697,35 @@ export function ConfiguracionPage() {
 
       <MantenedorTiposDocumento />
       <MantenedorDependencias />
-      <MantenedorFirmantes />
+
+      {/* Firmantes → módulo dedicado */}
+      <Card className="border-blue-200 dark:border-blue-800/40">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <UserCheck className="h-4 w-4 text-blue-600" />
+            <div>
+              <CardTitle className="text-base">Jefaturas y Subrogancias</CardTitle>
+              <CardDescription>
+                Configura el firmante titular y subrogante por servicio para el Memorándum Institucional
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-blue-100 bg-blue-50/50">
+            <p className="text-sm text-blue-800">
+              La gestión de jefaturas se trasladó a su propio módulo en{' '}
+              <strong>Administración → Jefaturas</strong>.
+            </p>
+            <Link to="/admin/jefaturas">
+              <Button size="sm" variant="outline" className="gap-1.5 shrink-0 border-blue-300 text-blue-700 hover:bg-blue-100">
+                Ir a Jefaturas
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Info del sistema — siempre al final */}
       <Card>

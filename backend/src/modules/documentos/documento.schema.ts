@@ -5,7 +5,7 @@ import { z } from 'zod';
 // son ignorados — el backend los asigna automáticamente desde el usuario autenticado.
 export const crearDocumentoSchema = z.object({
   // Identificación del documento
-  materia: z.string().min(1, 'La materia es requerida').max(250),
+  materia: z.string().max(250).optional().default(''),
   idTipoDocumento: z.number().int().positive('Selecciona un tipo de documento'),
   fechaDocumento: z.string().optional(),
   observaciones: z.string().max(500).optional(),

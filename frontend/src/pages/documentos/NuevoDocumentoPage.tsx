@@ -25,7 +25,7 @@ import { MemorandumModal, type FirmanteActivo, type MemoDocumentoPayload } from 
 
 // ── Schema ───────────────────────────────────────────────────
 const schema = z.object({
-  materia:            z.string().min(5, 'Mínimo 5 caracteres').max(250),
+  materia:            z.string().max(250).optional().default(''),
   idTipoDocumento:    z.string().min(1, 'Selecciona el tipo de documento'),
   fechaDocumento:     z.string().optional(),
   observaciones:      z.string().max(500).optional(),
@@ -85,12 +85,13 @@ export function NuevoDocumentoPage() {
   const [idDocCreado, setIdDocCreado] = useState<number | null>(null);
 
   // ── Estado Memorándum ─────────────────────────────────────
-  const [memoReferencia, setMemoReferencia] = useState('');
-  const [memoCuerpo,     setMemoCuerpo]     = useState('');
-  const [memoCuerpoErr,  setMemoCuerpoErr]  = useState<string | null>(null);
-  const [memoModalOpen,  setMemoModalOpen]  = useState(false);
-  const [memoFirmante,   setMemoFirmante]   = useState<FirmanteActivo | null>(null);
-  const [memoPayload,    setMemoPayload]    = useState<MemoDocumentoPayload | null>(null);
+  const [memoReferencia,        setMemoReferencia]        = useState('');
+  const [memoCuerpo,            setMemoCuerpo]            = useState('');
+  const [memoCuerpoErr,         setMemoCuerpoErr]         = useState<string | null>(null);
+  const [memoModalOpen,         setMemoModalOpen]         = useState(false);
+  const [memoFirmante,          setMemoFirmante]          = useState<FirmanteActivo | null>(null);
+  const [memoPayload,           setMemoPayload]           = useState<MemoDocumentoPayload | null>(null);
+  const [firmanteSeleccionado,  setFirmanteSeleccionado]  = useState<FirmanteActivo | null>(null);
 
   // Solo of.partes y admin ven las opciones especiales
   const esOficinaPartes = user?.roles?.includes('of.partes') || user?.roles?.includes('admin');
@@ -168,7 +169,7 @@ export function NuevoDocumentoPage() {
     [dependencias]
   );
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, watch, setError, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       fechaDocumento:     new Date().toISOString().split('T')[0],
@@ -192,10 +193,38 @@ export function NuevoDocumentoPage() {
     (tipos ?? []).find((t) => t.id === Number(idTipoDocSelected))
       ?.descripcion?.toLowerCase().includes('memorandum')
   );
-  const materia          = watch('materia');
+  const materia = watch('materia');
+
+  // ── Firmantes disponibles (solo cuando el tipo es Memorándum) ──
+  const { data: firmantesDisponibles, isLoading: cargandoFirmantes } = useQuery({
+    queryKey: ['firmantes-disponibles'],
+    queryFn:  async () => {
+      const r = await apiClient.get<{ ok: boolean; data: { firmantes: FirmanteActivo[] } }>(
+        '/memorandum/firmantes-disponibles'
+      );
+      return r.data.data.firmantes ?? [];
+    },
+    enabled:   esMemorandum,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Auto-seleccionar el primer firmante vigente cuando carga la lista
+  useEffect(() => {
+    if (!firmantesDisponibles) return;
+    if (firmanteSeleccionado) return;
+    const primerVigente = firmantesDisponibles.find((f) => f.vigente !== false);
+    if (primerVigente) setFirmanteSeleccionado(primerVigente);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmantesDisponibles]);
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
+      // Para documentos que NO son memorándum, materia es obligatoria (mín. 5 chars)
+      if (!data.materia || data.materia.trim().length < 5) {
+        setError('materia', { type: 'manual', message: 'Mínimo 5 caracteres' });
+        return null;
+      }
+
       // Validación de destino (no corre dentro de RHF porque es estado local)
       if (data.tipoDestinatario === 'D' && destinosSeleccionados.length === 0) {
         setDestinoError('Selecciona al menos un servicio destino');
@@ -304,7 +333,7 @@ export function NuevoDocumentoPage() {
 
   // ── Handler especial para Memorándum ──────────────────────
   // Se ejecuta en lugar de mutation.mutate cuando el tipo es Memorándum.
-  // Valida campos extra, resuelve firmante y abre el modal de previsualización.
+  // Valida campos extra, usa firmante seleccionado y abre el modal de previsualización.
   async function abrirPrevisualizacionMemo(data: FormData) {
     // Validar cuerpo
     if (!memoCuerpo.trim()) {
@@ -323,39 +352,36 @@ export function NuevoDocumentoPage() {
       return;
     }
 
-    // Resolver firmante desde backend
-    try {
-      const firmanteRes = await apiClient.get<{ ok: boolean; data: FirmanteActivo }>('/memorandum/firmante-activo');
-      const firmante = firmanteRes.data.data;
-      if (!firmante.disponible) {
-        toast.error(firmante.mensaje ?? 'No hay firmante activo configurado');
-        return;
-      }
-
-      // Construir payload para POST /documentos
-      const base: MemoDocumentoPayload = {
-        materia:            data.materia,
-        idTipoDocumento:    Number(data.idTipoDocumento),
-        fechaDocumento:     data.fechaDocumento,
-        observaciones:      data.observaciones,
-        idTipoDistribucion: Number(data.idTipoDistribucion),
-        idTipoCompromiso:   Number(data.idTipoCompromiso),
-        idEstadoCompromiso: Number(data.idEstadoCompromiso),
-        diasCompromiso:     Number(data.diasCompromiso),
-        tipoDestinatario:   data.tipoDestinatario,
-        ...(esOficinaPartes && { tipoSoporte, reservado }),
-      };
-
-      const payload: MemoDocumentoPayload = data.tipoDestinatario === 'D'
-        ? { ...base, destinos: destinosSeleccionados }
-        : { ...base, idDestino: Number(destinoExterno) };
-
-      setMemoFirmante(firmante);
-      setMemoPayload(payload);
-      setMemoModalOpen(true);
-    } catch {
-      toast.error('Error al resolver el firmante. Intenta de nuevo.');
+    // Verificar firmante seleccionado
+    if (!firmanteSeleccionado) {
+      toast.error('Selecciona un firmante antes de continuar');
+      return;
     }
+
+    // Para memorándum la materia se genera automáticamente desde la referencia
+    const materiaFinal = memoReferencia.trim().substring(0, 250) || 'Memorándum Institucional';
+
+    // Construir payload para POST /documentos
+    const base: MemoDocumentoPayload = {
+      materia:            materiaFinal,
+      idTipoDocumento:    Number(data.idTipoDocumento),
+      fechaDocumento:     data.fechaDocumento,
+      observaciones:      data.observaciones,
+      idTipoDistribucion: Number(data.idTipoDistribucion),
+      idTipoCompromiso:   Number(data.idTipoCompromiso),
+      idEstadoCompromiso: Number(data.idEstadoCompromiso),
+      diasCompromiso:     Number(data.diasCompromiso),
+      tipoDestinatario:   data.tipoDestinatario,
+      ...(esOficinaPartes && { tipoSoporte, reservado }),
+    };
+
+    const payload: MemoDocumentoPayload = data.tipoDestinatario === 'D'
+      ? { ...base, destinos: destinosSeleccionados }
+      : { ...base, idDestino: Number(destinoExterno) };
+
+    setMemoFirmante(firmanteSeleccionado);
+    setMemoPayload(payload);
+    setMemoModalOpen(true);
   }
 
   // Nombres de destinos para el PDF del memo
@@ -478,6 +504,89 @@ export function NuevoDocumentoPage() {
               </Card>
             )}
 
+            {/* SECCIÓN 1b: CONTENIDO MEMORÁNDUM — aparece ANTES de Identificación cuando el tipo es Memorándum */}
+            {esMemorandum && (
+              <MemorandumFields
+                referencia={memoReferencia}
+                cuerpo={memoCuerpo}
+                cuerpoError={memoCuerpoErr}
+                onReferencia={setMemoReferencia}
+                onCuerpo={(v) => { setMemoCuerpo(v); if (v.trim()) setMemoCuerpoErr(null); }}
+                disabled={isPending}
+              />
+            )}
+
+            {/* SECCIÓN 1c: FIRMANTE — solo para Memorándum */}
+            {esMemorandum && (
+              <Card className="border-blue-200/60 bg-blue-50/30 dark:bg-blue-900/10">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Send className="h-4 w-4 text-blue-600" />
+                    Firmante del Memorándum
+                  </CardTitle>
+                  <CardDescription>Selecciona quién firmará digitalmente el documento en FirmaGov</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {cargandoFirmantes ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando firmantes disponibles…
+                    </div>
+                  ) : !firmantesDisponibles || firmantesDisponibles.length === 0 ? (
+                    <div className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg px-3 py-2.5">
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>No hay firmantes configurados para tu servicio. Configúralos en Administración → Jefaturas.</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {firmantesDisponibles.map((f) => {
+                        const seleccionado = firmanteSeleccionado?.tipo === f.tipo;
+                        return (
+                          <label
+                            key={f.tipo}
+                            className={cn(
+                              'flex items-start gap-3 cursor-pointer rounded-lg border-2 px-4 py-3 transition-all',
+                              seleccionado
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                : 'border-border hover:border-blue-300',
+                              !f.vigente && 'opacity-60'
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="firmante"
+                              checked={seleccionado}
+                              onChange={() => setFirmanteSeleccionado(f)}
+                              className="mt-0.5 h-4 w-4"
+                              disabled={isPending}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium">{f.nombre}</span>
+                                <span className="text-xs text-muted-foreground">{f.cargo}</span>
+                                {f.tipo !== 'TITULAR' && (
+                                  <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                    {f.tipo === 'SUBROGANTE' ? 'Subrogante' : '2° Subrogante'}
+                                  </span>
+                                )}
+                                {!f.vigente && (
+                                  <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">Fuera de vigencia</span>
+                                )}
+                              </div>
+                              {f.rut
+                                ? <p className="text-xs text-emerald-600 mt-0.5">RUT: {f.rut} ✓</p>
+                                : <p className="text-xs text-orange-500 mt-0.5">Sin RUT — configúralo para poder firmar</p>
+                              }
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* SECCIÓN 1: IDENTIFICACIÓN */}
             <Card>
               <CardHeader className="pb-3">
@@ -487,31 +596,6 @@ export function NuevoDocumentoPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label className="flex items-center gap-1.5">
-                    <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-                    Materia / Asunto <span className="text-destructive">*</span>
-                  </Label>
-                  <textarea
-                    rows={3}
-                    {...register('materia')}
-                    placeholder="Descripción del documento..."
-                    className={cn(
-                      'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm',
-                      'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none',
-                      errors.materia && 'border-destructive'
-                    )}
-                  />
-                  <div className="flex justify-between">
-                    {errors.materia
-                      ? <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.materia.message}</p>
-                      : <span />}
-                    <span className={cn('text-xs', (materia?.length ?? 0) > 230 ? 'text-amber-500' : 'text-muted-foreground')}>
-                      {materia?.length ?? 0}/250
-                    </span>
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="flex items-center gap-1.5 text-sm">
@@ -543,26 +627,37 @@ export function NuevoDocumentoPage() {
                     </Label>
                     <Input type="date" {...register('fechaDocumento')} />
                   </div>
-
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label className="text-sm">Observaciones</Label>
-                    <Input {...register('observaciones')} placeholder="Notas adicionales sobre el documento..." />
-                  </div>
                 </div>
+
+                {/* Materia / Asunto — al final del bloque; oculta para Memorándum (se auto-genera desde la Referencia) */}
+                {!esMemorandum && (
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5">
+                      <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                      Materia / Asunto <span className="text-destructive">*</span>
+                    </Label>
+                    <textarea
+                      rows={3}
+                      {...register('materia')}
+                      placeholder="Descripción del documento..."
+                      className={cn(
+                        'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm',
+                        'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none',
+                        errors.materia && 'border-destructive'
+                      )}
+                    />
+                    <div className="flex justify-between">
+                      {errors.materia
+                        ? <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.materia.message}</p>
+                        : <span />}
+                      <span className={cn('text-xs', (materia?.length ?? 0) > 230 ? 'text-amber-500' : 'text-muted-foreground')}>
+                        {materia?.length ?? 0}/250
+                      </span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
-
-            {/* SECCIÓN 1b: CAMPOS MEMORÁNDUM (solo visible si tipo = Memorándum) */}
-            {esMemorandum && (
-              <MemorandumFields
-                referencia={memoReferencia}
-                cuerpo={memoCuerpo}
-                cuerpoError={memoCuerpoErr}
-                onReferencia={setMemoReferencia}
-                onCuerpo={(v) => { setMemoCuerpo(v); if (v.trim()) setMemoCuerpoErr(null); }}
-                disabled={isPending}
-              />
-            )}
 
             {/* SECCIÓN 2: ORIGEN AUTOMÁTICO */}
             <Card className="border-emerald-200 dark:border-emerald-800/40">

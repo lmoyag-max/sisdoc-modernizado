@@ -74,9 +74,11 @@ function esFirmanteVigenteHoy(desde: string | null, hasta: string | null): boole
 
 // ── GET /memorandum/firmante-activo ───────────────────────────
 // Resuelve el firmante del usuario autenticado:
-// 1. Titular activo y vigente → usa titular
-// 2. Si no, subrogante activo y vigente → usa subrogante
-// 3. Si ninguno → { disponible: false, mensaje }
+// 1. Busca en jefatura (nueva fuente de verdad)
+// 2. Si no hay registro en jefatura, hace fallback a memo_firmante
+// 3. Titular activo y vigente → usa titular
+// 4. Si no, subrogante activo y vigente → usa subrogante
+// 5. Si ninguno → { disponible: false, mensaje }
 router.get('/firmante-activo', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as unknown as AuthenticatedRequest).user;
@@ -91,21 +93,54 @@ router.get('/firmante-activo', async (req: Request, res: Response, next: NextFun
     }
 
     const pool = await getPool();
-    const result = await pool.request()
+
+    // ── Intentar fuente primaria: jefatura ────────────────────
+    let result = await pool.request()
       .input('idDep', sql.Int, idDep)
       .query<FirmanteRow>(`
-        SELECT mf.*,
-               LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia
-        FROM   memo_firmante mf
-        JOIN   dependencia   d ON d.id_dependencia = mf.id_dependencia
-        WHERE  mf.id_dependencia = @idDep
+        SELECT
+          j.id_jefatura          AS id_firmante,
+          j.id_dependencia,
+          j.nombre_titular,
+          j.cargo_titular,
+          NULL                   AS firma_titular_ruta,
+          NULL                   AS timbre_titular_ruta,
+          j.firma_timbre_titular_ruta,
+          j.activo_titular,
+          j.vigencia_desde_titular,
+          j.vigencia_hasta_titular,
+          j.nombre_subrogante,
+          j.cargo_subrogante,
+          NULL                   AS firma_subrogante_ruta,
+          NULL                   AS timbre_subrogante_ruta,
+          j.firma_timbre_subrogante_ruta,
+          j.activo_subrogante,
+          j.vigencia_desde_sub,
+          j.vigencia_hasta_sub,
+          LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia
+        FROM   jefatura    j
+        JOIN   dependencia d ON d.id_dependencia = j.id_dependencia
+        WHERE  j.id_dependencia = @idDep
       `);
+
+    // ── Fallback a memo_firmante si no hay registro en jefatura ──
+    if (!result.recordset[0]) {
+      result = await pool.request()
+        .input('idDep', sql.Int, idDep)
+        .query<FirmanteRow>(`
+          SELECT mf.*,
+                 LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia
+          FROM   memo_firmante mf
+          JOIN   dependencia   d ON d.id_dependencia = mf.id_dependencia
+          WHERE  mf.id_dependencia = @idDep
+        `);
+    }
 
     const row = result.recordset[0];
     if (!row) {
       sendSuccess(res, {
         disponible: false,
-        mensaje: 'No existe configuración de firmante para tu servicio. Configúrala en Administración → Configuración.',
+        mensaje: 'No existe configuración de firmante para tu servicio. Configúrala en Administración → Jefaturas.',
       });
       return;
     }
@@ -126,7 +161,7 @@ router.get('/firmante-activo', async (req: Request, res: Response, next: NextFun
       if (!firmaTimbreUrl) {
         sendSuccess(res, {
           disponible: false,
-          mensaje: 'El firmante titular no tiene imagen de firma y timbre configurada. Súbela en Configuración → Firmantes.',
+          mensaje: 'El firmante titular no tiene imagen de firma y timbre configurada. Súbela en Administración → Jefaturas.',
         });
         return;
       }
@@ -171,8 +206,144 @@ router.get('/firmante-activo', async (req: Request, res: Response, next: NextFun
 
     sendSuccess(res, {
       disponible: false,
-      mensaje: 'No hay firmante activo y vigente configurado para tu servicio. Verifica la configuración en Administración → Firmantes.',
+      mensaje: 'No hay firmante activo y vigente configurado para tu servicio. Verifica la configuración en Administración → Jefaturas.',
     });
+  } catch (e) { next(e); }
+});
+
+// ── GET /memorandum/firmantes-disponibles ─────────────────────
+// Devuelve la lista de firmantes disponibles para el memorándum del usuario.
+// El usuario selecciona uno; si es subrogante pero no hay RUT configurado
+// aún puede firmar (se advierte en frontend que FirmaGov necesitará el RUT).
+router.get('/firmantes-disponibles', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user  = (req as unknown as AuthenticatedRequest).user;
+    const idDep = user.idDependencia;
+
+    if (!idDep) {
+      sendSuccess(res, { firmantes: [], mensaje: 'Tu usuario no tiene dependencia asignada.' });
+      return;
+    }
+
+    const pool = await getPool();
+
+    const result = await pool.request()
+      .input('idDep', sql.Int, idDep)
+      .query<{
+        id_jefatura:                    number;
+        id_dependencia:                 number;
+        desc_dependencia:               string | null;
+        nombre_titular:                 string;
+        cargo_titular:                  string;
+        rut_titular:                    string | null;
+        firma_timbre_titular_ruta:      string | null;
+        activo_titular:                 boolean;
+        vigencia_desde_titular:         string | null;
+        vigencia_hasta_titular:         string | null;
+        nombre_subrogante:              string | null;
+        cargo_subrogante:               string | null;
+        rut_subrogante:                 string | null;
+        firma_timbre_subrogante_ruta:   string | null;
+        activo_subrogante:              boolean;
+        vigencia_desde_sub:             string | null;
+        vigencia_hasta_sub:             string | null;
+        nombre_subrogante_2:            string | null;
+        cargo_subrogante_2:             string | null;
+        rut_subrogante_2:               string | null;
+        firma_timbre_subrogante_2_ruta: string | null;
+        activo_subrogante_2:            boolean;
+        vigencia_desde_sub_2:           string | null;
+        vigencia_hasta_sub_2:           string | null;
+      }>(`
+        SELECT
+          j.id_jefatura, j.id_dependencia,
+          LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia,
+          j.nombre_titular, j.cargo_titular, j.rut_titular,
+          j.firma_timbre_titular_ruta,
+          j.activo_titular, j.vigencia_desde_titular, j.vigencia_hasta_titular,
+          j.nombre_subrogante, j.cargo_subrogante, j.rut_subrogante,
+          j.firma_timbre_subrogante_ruta,
+          j.activo_subrogante, j.vigencia_desde_sub, j.vigencia_hasta_sub,
+          j.nombre_subrogante_2, j.cargo_subrogante_2, j.rut_subrogante_2,
+          j.firma_timbre_subrogante_2_ruta,
+          j.activo_subrogante_2, j.vigencia_desde_sub_2, j.vigencia_hasta_sub_2
+        FROM   jefatura    j
+        JOIN   dependencia d ON d.id_dependencia = j.id_dependencia
+        WHERE  j.id_dependencia = @idDep
+      `);
+
+    const row = result.recordset[0];
+    if (!row) {
+      sendSuccess(res, {
+        firmantes: [],
+        mensaje: 'No existe configuración de jefatura para tu servicio.',
+      });
+      return;
+    }
+
+    type FirmanteDisponible = {
+      tipo:           string;
+      idFirmante:     number;
+      nombre:         string;
+      cargo:          string;
+      rut:            string | null;
+      firmaTimbreUrl: string | null;
+      dependencia:    string | null;
+      idDependencia:  number;
+      vigente:        boolean;
+    };
+
+    const firmantes: FirmanteDisponible[] = [];
+
+    if (row.activo_titular) {
+      firmantes.push({
+        tipo:           'TITULAR',
+        idFirmante:     row.id_jefatura,
+        nombre:         row.nombre_titular,
+        cargo:          row.cargo_titular,
+        rut:            row.rut_titular ?? null,
+        firmaTimbreUrl: row.firma_timbre_titular_ruta
+          ? `/uploads/config/memo/${row.firma_timbre_titular_ruta}`
+          : null,
+        dependencia:    row.desc_dependencia ?? null,
+        idDependencia:  row.id_dependencia,
+        vigente:        esFirmanteVigenteHoy(row.vigencia_desde_titular, row.vigencia_hasta_titular),
+      });
+    }
+
+    if (row.activo_subrogante && row.nombre_subrogante) {
+      firmantes.push({
+        tipo:           'SUBROGANTE',
+        idFirmante:     row.id_jefatura,
+        nombre:         row.nombre_subrogante,
+        cargo:          row.cargo_subrogante ?? '',
+        rut:            row.rut_subrogante ?? null,
+        firmaTimbreUrl: row.firma_timbre_subrogante_ruta
+          ? `/uploads/config/memo/${row.firma_timbre_subrogante_ruta}`
+          : null,
+        dependencia:    row.desc_dependencia ?? null,
+        idDependencia:  row.id_dependencia,
+        vigente:        esFirmanteVigenteHoy(row.vigencia_desde_sub, row.vigencia_hasta_sub),
+      });
+    }
+
+    if (row.activo_subrogante_2 && row.nombre_subrogante_2) {
+      firmantes.push({
+        tipo:           'SUBROGANTE_2',
+        idFirmante:     row.id_jefatura,
+        nombre:         row.nombre_subrogante_2,
+        cargo:          row.cargo_subrogante_2 ?? '',
+        rut:            row.rut_subrogante_2 ?? null,
+        firmaTimbreUrl: row.firma_timbre_subrogante_2_ruta
+          ? `/uploads/config/memo/${row.firma_timbre_subrogante_2_ruta}`
+          : null,
+        dependencia:    row.desc_dependencia ?? null,
+        idDependencia:  row.id_dependencia,
+        vigente:        esFirmanteVigenteHoy(row.vigencia_desde_sub_2, row.vigencia_hasta_sub_2),
+      });
+    }
+
+    sendSuccess(res, { firmantes });
   } catch (e) { next(e); }
 });
 
@@ -197,8 +368,8 @@ router.post('/confirmar', async (req: Request, res: Response, next: NextFunction
       idDependencia?:     number;
     };
 
-    if (!body.idDocumento || !body.materia) {
-      sendError(res, 'idDocumento y materia son requeridos', 400);
+    if (!body.idDocumento) {
+      sendError(res, 'idDocumento es requerido', 400);
       return;
     }
 
@@ -241,7 +412,7 @@ router.post('/confirmar', async (req: Request, res: Response, next: NextFunction
       .input('numero',        sql.Int,          numero)
       .input('idUsr',         sql.Int,          user.idUsuario)
       .input('idDep',         sql.Int,          body.idDependencia ?? null)
-      .input('materia',       sql.VarChar(250), body.materia.substring(0, 250))
+      .input('materia',       sql.VarChar(250), (body.materia ?? '').substring(0, 250))
       .input('referencia',    sql.VarChar(250), (body.referencia ?? '').substring(0, 250) || null)
       .input('cuerpo',        sql.VarChar(8000), (body.cuerpo ?? '').substring(0, 8000) || null)
       .input('nomFirm',       sql.VarChar(100), body.nombreFirmante ?? null)

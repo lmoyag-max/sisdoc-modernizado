@@ -91,9 +91,12 @@ export async function crearDocumento(
   idUsuario: number,
   idDependenciaUsuario: number | null,
 ) {
-  const idProcedencia = idDependenciaUsuario ?? 1;
-  const esReservado   = dto.reservado === true;
-  const esFisico      = dto.tipoSoporte === 'F';
+  const idProcedencia  = idDependenciaUsuario ?? 1;
+  const esReservado    = dto.reservado === true;
+  const esFisico       = dto.tipoSoporte === 'F';
+  // despacharAhora===false → crea el documento en estado 1 (Generado) sin auto-despachar.
+  // Usado por el flujo de Memorándum + FirmaGov: el despacho ocurre tras recibir el PDF firmado.
+  const pendienteFirma = dto.despacharAhora === false;
 
   // Si es reservado, el destino siempre es Dirección — ignorar lo que envíe el frontend
   const listaDestinos: number[] = esReservado
@@ -104,17 +107,21 @@ export async function crearDocumento(
 
   // Prefijo de trazabilidad en observaciones del trámite inicial
   const prefijos: string[] = [];
-  if (esFisico)    prefijos.push('[SOPORTE:FÍSICO]');
-  if (esReservado) prefijos.push('[RESERVADO→DIRECCIÓN]');
+  if (esFisico)        prefijos.push('[SOPORTE:FÍSICO]');
+  if (esReservado)     prefijos.push('[RESERVADO→DIRECCIÓN]');
+  if (pendienteFirma)  prefijos.push('[PENDIENTE:FIRMA]');
   const obsConPrefijo = prefijos.length > 0
     ? `${prefijos.join(' ')} ${dto.observaciones ?? ''}`.trim().substring(0, 250)
     : dto.observaciones;
+
+  // Estado inicial: 2 (Despachado) en flujo normal; 1 (Generado) cuando pendienteFirma
+  const estadoInicial = pendienteFirma ? 1 : 2;
 
   // Crear el documento principal (solo 1 vez)
   const { idDocumento, idSeguimiento } = await repo.insert({
     idTipoDocumento:    dto.idTipoDocumento,
     materia:            dto.materia,
-    idEstadoDocumento:  2,
+    idEstadoDocumento:  estadoInicial,
     idUsuario,
     fechaDocumento:     dto.fechaDocumento ? new Date(dto.fechaDocumento) : undefined,
     original:           dto.original ?? 'S',
@@ -130,7 +137,11 @@ export async function crearDocumento(
     diasCompromiso:     dto.diasCompromiso,
     observaciones:      obsConPrefijo,
   });
-  await repo.updateTramiteEstado(idSeguimiento, 2, { fechaDespacho: new Date() });
+
+  // Solo despachar inmediatamente en flujo normal (no pendienteFirma)
+  if (!pendienteFirma) {
+    await repo.updateTramiteEstado(idSeguimiento, 2, { fechaDespacho: new Date() });
+  }
 
   // Registrar el primer destino en documento_destino (primer elemento de la lista)
   await repo.insertDocumentoDestino({
@@ -162,14 +173,14 @@ export async function crearDocumento(
              tipo_procedencia, tipo_destinatario,
              id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
              id_estado_tramite, dias_compromiso, observaciones,
-             fecha_sistema, fecha_update, fecha_despacho)
+             fecha_sistema, fecha_update${pendienteFirma ? '' : ', fecha_despacho'})
           OUTPUT INSERTED.id_seguimiento
           VALUES
             (@idDoc, @idUsr, @idProc, @idDest,
              'D', 'D',
              @idTipDis, @idTipCom, @idEstCom,
-             2, @dias, @obs,
-             GETDATE(), GETDATE(), GETDATE())
+             ${estadoInicial}, @dias, @obs,
+             GETDATE(), GETDATE()${pendienteFirma ? '' : ', GETDATE()'})
         `);
       void tramRes; // tramite adicional insertado
 

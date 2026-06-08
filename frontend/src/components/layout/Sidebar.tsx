@@ -4,7 +4,7 @@ import {
   LayoutDashboard, FileText, Inbox, Send, ClipboardList,
   Network, Search, Upload, Users, BarChart3,
   Settings, LogOut, ChevronLeft, ChevronRight, X,
-  Building2, Shield, Bell,
+  Building2, Shield, Bell, UserCheck, PenLine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore, displayName } from '@/stores/auth.store';
@@ -39,6 +39,8 @@ const NAV_ADMIN: NavItem[] = [
   { label: 'Reportes',      to: '/reportes',            icon: BarChart3,  modulo: 'reportes'     },
   { label: 'Roles',         to: '/admin/roles',         icon: Shield,     modulo: 'roles'        },
   { label: 'Alertas',       to: '/admin/alertas',       icon: Bell,       modulo: 'alertas'      },
+  { label: 'Jefaturas',     to: '/admin/jefaturas',     icon: UserCheck,  modulo: 'jefaturas'    },
+  { label: 'Firma.gob',     to: '/admin/firma-gob',     icon: PenLine,    modulo: 'firma-gob'    },
   { label: 'Configuración', to: '/admin/configuracion', icon: Settings,   modulo: 'configuracion'},
 ];
 

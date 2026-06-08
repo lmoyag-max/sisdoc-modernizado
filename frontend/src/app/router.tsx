@@ -19,6 +19,8 @@ import { ArchivosPage } from '@/pages/archivos/ArchivosPage';
 import { ConfiguracionPage } from '@/pages/configuracion/ConfiguracionPage';
 import { UsuariosPage } from '@/pages/admin/UsuariosPage';
 import { RolesPage } from '@/pages/admin/RolesPage';
+import { JefaturasPage } from '@/pages/admin/JefaturasPage';
+import { FirmaGobPage } from '@/pages/admin/FirmaGobPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ReportesPage } from '@/pages/reportes/ReportesPage';
 import { AlertasPage } from '@/pages/alertas/AlertasPage';
@@ -58,6 +60,8 @@ export const router = createBrowserRouter([
           { path: '/admin/usuarios',      element: <M m="usuarios"><UsuariosPage /></M>,            errorElement: <RouteError /> },
           { path: '/admin/roles',         element: <M m="roles"><RolesPage /></M>,                  errorElement: <RouteError /> },
           { path: '/admin/configuracion', element: <M m="configuracion"><ConfiguracionPage /></M>, errorElement: <RouteError /> },
+          { path: '/admin/jefaturas',     element: <M m="jefaturas"><JefaturasPage /></M>,          errorElement: <RouteError /> },
+          { path: '/admin/firma-gob',     element: <M m="firma-gob"><FirmaGobPage /></M>,           errorElement: <RouteError /> },
           { path: '/reportes',            element: <M m="reportes"><ReportesPage /></M>,            errorElement: <RouteError /> },
           { path: '/admin/alertas',       element: <M m="alertas"><AlertasPage /></M>,               errorElement: <RouteError /> },
         ],

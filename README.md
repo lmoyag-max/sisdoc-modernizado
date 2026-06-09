@@ -197,19 +197,32 @@ docker compose down -v
 docker compose --profile prod build backend --no-cache
 ```
 
+### Backup automático de la base de datos
+
+El script `scripts/backup-db.ps1` está programado en Task Scheduler para ejecutarse **todos los domingos a las 2:00 AM**.
+Los backups se guardan en `database/backups/` con retención de 30 días.
+
+```powershell
+# Ejecutar backup manual
+.\scripts\backup-db.ps1 -SaPassword "CONTRASENA_SA"
+
+# Ver backups disponibles
+Get-ChildItem database\backups\
+```
+
 ### Si la base de datos se pierde
 
 ```powershell
 # Restaurar desde backup automáticamente
 .\scripts\restore-db.ps1
 
-# O manualmente
+# O manualmente desde un backup
 docker exec sisdoc_sqlserver /opt/mssql-tools18/bin/sqlcmd `
-  -S localhost -U sa -P "<DB_PASSWORD>" -C `
-  -Q "RESTORE DATABASE [SISDOC] FROM DISK='/var/opt/mssql/backup/respaldo anterior.bak' WITH MOVE 'sisdoc_Data' TO '/var/opt/mssql/data/SISDOC.mdf', MOVE 'sisdoc_Log' TO '/var/opt/mssql/data/SISDOC_log.ldf', REPLACE"
+  -S localhost -U sa -P "<SA_PASSWORD>" -C `
+  -Q "RESTORE DATABASE [SISDOC] FROM DISK='/var/opt/mssql/backup/SISDOC_backup_FECHA.bak' WITH MOVE 'sisdoc_Data' TO '/var/opt/mssql/data/SISDOC.mdf', MOVE 'sisdoc_Log' TO '/var/opt/mssql/data/SISDOC_log.ldf', REPLACE"
 ```
 
-> **Nota de puerto:** SQL Server corre en el puerto `11433` del host (no 1433 — reservado por Windows/Hyper-V). Se mapea como `127.0.0.1:11433:1433` en docker-compose.
+> **Nota de puerto:** SQL Server corre en el puerto `11433` del host (no 1433 — reservado por Windows/Hyper-V). Se mapea como `127.0.0.1:11433:1433` — accesible solo desde localhost.
 
 ---
 
@@ -258,18 +271,18 @@ sisdoc-modernizado/
 NODE_ENV=development
 PORT=3001
 
-# Base de datos
-DB_USER=sa
-DB_PASSWORD=CAMBIAR_EN_PRODUCCION
+# Base de datos — usuario de aplicación (no sa)
+DB_USER=doc360_app
+DB_PASSWORD=CONTRASENA_APLICACION
 DB_SERVER=localhost
 DB_PORT=11433
 DB_DATABASE=SISDOC
 DB_TRUST_CERT=true
 DB_ENCRYPT=false
 
-# JWT (cambiar en producción — mínimo 32 chars aleatorios)
-JWT_SECRET=clave-secreta-minimo-32-caracteres
-JWT_REFRESH_SECRET=clave-refresh-secreta-minimo-32-chars
+# JWT — generar con: [Convert]::ToBase64String((New-Object Security.Cryptography.RNGCryptoServiceProvider).GetBytes(64))
+JWT_SECRET=GENERAR_MINIMO_64_BYTES_BASE64
+JWT_REFRESH_SECRET=GENERAR_MINIMO_64_BYTES_BASE64
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
@@ -295,11 +308,14 @@ RESET_TOKEN_EXPIRES_MINUTES=30
 
 ## Seguridad
 
-- Cambiar `JWT_SECRET` y `JWT_REFRESH_SECRET` antes de producción (mínimo 32 chars)
-- Cambiar contraseña SA de SQL Server antes de exponer en red
+- La aplicación conecta a SQL Server con usuario `doc360_app` (no `sa`) — permisos limitados a la BD `SISDOC`
+- `JWT_SECRET` y `JWT_REFRESH_SECRET` generados con 64 bytes aleatorios (512 bits) — nunca usar strings predecibles
+- Contraseñas de usuarios almacenadas con bcrypt $2b$12 — la columna `clave` (legacy) no contiene texto plano
 - El `.env` **nunca** debe subirse a Git (está en `.gitignore`)
+- Puerto SQL Server vinculado a `127.0.0.1:11433` — no accesible desde la red externa
 - En producción usar `DB_ENCRYPT=true` y `DB_TRUST_CERT=false` con certificado válido
 - Restringir `CORS_ORIGIN` a dominios específicos en producción
+- `Page Verify = CHECKSUM` activo — detecta corrupción de páginas en disco
 
 ---
 

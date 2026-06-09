@@ -197,10 +197,13 @@ sisdoc-modernizado/
 | `/trazabilidad` | `TrazabilidadPage` | Timeline documental |
 | `/busqueda` | `BusquedaPage` | Búsqueda global |
 | `/archivos` | `ArchivosPage` | Gestión de archivos digitales |
-| `/expedientes` | `ExpedientesPage` | Expedientes + vinculación docs |
 | `/reportes` | `ReportesPage` | Dashboard métricas + exportar CSV |
-| `/admin/usuarios` | `UsuariosPage` | CRUD usuarios + roles |
-| `/admin/configuracion` | `ConfiguracionPage` | Logo, fondo, nombres |
+| `/admin/usuarios` | `UsuariosPage` | CRUD usuarios |
+| `/admin/roles` | `RolesPage` | Gestión de módulos por rol |
+| `/admin/jefaturas` | `JefaturasPage` | Titular/subrogante + imagen firma/timbre |
+| `/admin/firma-gob` | `FirmaGobPage` | Configuración integración FirmaGOB |
+| `/admin/alertas` | `AlertasPage` | Configuración alertas y logs SMTP |
+| `/admin/configuracion` | `ConfiguracionPage` | Logo, fondo, nombres, reglas upload |
 
 ---
 
@@ -237,14 +240,6 @@ GET    /               → lista (idDocumento?)
 DELETE /:id            → elimina registro y archivo físico
 ```
 
-### Expedientes (`/api/v1/expedientes`) — requireAuth
-```
-GET    /               → lista paginada (q)
-POST   /               → { descripcion }
-GET    /:id/documentos → docs del expediente
-PATCH  /vincular       → { idDocumento, idExpediente }
-```
-
 ### Usuarios (`/api/v1/usuarios`) — requireAuth
 ```
 GET    /               → lista paginada (q)
@@ -264,10 +259,15 @@ GET    /exportar       → CSV download con BOM para Excel
 
 ### Configuración (`/api/v1/configuracion`)
 ```
-GET    /               → pública — { nombreSistema, nombreInstitucion, logoUrl, backgroundUrl, version }
-PATCH  /               → requireAuth — { nombreSistema?, nombreInstitucion? }
-POST   /logo           → requireAuth — multipart/form-data: archivo
-POST   /background     → requireAuth — multipart/form-data: archivo
+GET    /               → pública — { nombreSistema, nombreInstitucion, logoUrl, backgroundUrl, version, uploadRules }
+PATCH  /               → requireAuth + requireRole('admin') — { nombreSistema?, nombreInstitucion?, textos login... }
+POST   /logo           → requireAuth + requireRole('admin') — multipart/form-data: archivo
+POST   /background     → requireAuth + requireRole('admin') — multipart/form-data: archivo
+PATCH  /upload-rules   → requireAuth + requireRole('admin') — { extensionesPermitidas, maxFileMB, maxTotalMB }
+GET    /tipos-documento         → lista con campo vigencia
+PATCH  /tipos-documento/:id/vigencia
+GET    /dependencias            → lista con campo vigencia
+PATCH  /dependencias/:id/vigencia
 ```
 
 ### Búsqueda (`/api/v1/busqueda`) — requireAuth
@@ -278,8 +278,73 @@ GET    /?q=&tipo=documentos|tramites|funcionarios|todos&pagina=
 ### Catálogos (`/api/v1/catalogos`) — requireAuth
 ```
 GET    /tipos-documento
-GET    /estados-documento
+GET    /estados              ← nombre real (NO /estados-documento)
+GET    /prioridades
 GET    /dependencias
+GET    /tipos-distribucion
+GET    /tipos-compromiso
+GET    /estados-compromiso
+```
+
+### Memorándum (`/api/v1/memorandum`) — requireAuth
+```
+GET    /firmante-activo        → { disponible, firmante? } — firmante de la dependencia del usuario
+GET    /firmantes-disponibles  → titular + subrogante con estado de imagen
+POST   /confirmar              → { idDocumento, materia?, referencia?, cuerpo?, idFirmante? }
+                                 → asigna correlativo MEMO-YYYY-NNNNNN y genera PDF si hay firma/timbre
+PATCH  /vincular-archivo       → { idMemo, idArchivoDigital }
+GET    /firmantes              → requireRole('admin') — lista todos los firmantes
+GET    /firmantes/:id          → requireRole('admin')
+POST   /firmantes              → requireRole('admin') — crear firmante
+POST   /firmantes/:id/imagen   → requireRole('admin') — subir imagen firma+timbre
+```
+**Requisito operacional:** Para generar PDF de memorándum, el firmante de la jefatura debe tener imagen
+subida vía `/admin/jefaturas` → botón "Subir firma y timbre". Sin imagen: correlativo se asigna pero PDF no se genera.
+Correlativo actual: MEMO-2026-000010 (próximo: MEMO-2026-000011).
+
+### Jefaturas (`/api/v1/jefaturas`) — requireAuth
+```
+GET    /                       → lista de jefaturas con titular y subrogante por dependencia
+```
+Administración completa en `/admin/jefaturas` (UI). Fuente de verdad para firmantes de memorándum.
+
+### Firma GOB (`/api/v1/firma-gob`) — requireAuth
+```
+GET    /config                 → requireRole('admin') — configuración ambientes TEST/PRODUCCION
+PATCH  /config/:ambiente       → requireRole('admin') — { url_api, entity, purpose, api_token_key, jwt_secret }
+POST   /config/:ambiente/limpiar-secreto → requireRole('admin')
+GET    /historial              → requireRole('admin') — historial de firmas electrónicas
+POST   /test-conexion          → requireRole('admin') — prueba conexión con FirmaGOB
+POST   /solicitar              → requireAuth — solicitar firma electrónica para un documento
+```
+**Estado actual:** Integración no configurada. Ambientes TEST y PRODUCCION sin credenciales.
+Configurar en `/admin/firma-gob` antes de usar firma electrónica institucional.
+
+### Alertas (`/api/v1/alertas`) — requireAuth + requireRole('admin')
+```
+GET    /configuracion          → { activo, horarios }
+PUT    /configuracion          → { activo, horarios[] }
+GET    /pendientes             → alertas pendientes de envío
+GET    /destinatarios          → destinatarios configurados
+GET    /logs                   → historial de envíos
+POST   /enviar-manual          → disparo manual inmediato
+POST   /enviar-todos           → enviar todas las alertas pendientes
+POST   /probar-servicio/:id    → prueba de conectividad SMTP
+```
+
+### Roles (`/api/v1/roles`) — requireAuth
+```
+GET    /                       → lista de roles con módulos asignados
+```
+Administración de módulos por rol en `/admin/roles` (UI).
+
+### Reportes (`/api/v1/reportes`) — requireAuth
+```
+GET    /dashboard              → requireModule('dashboard') — totales + porEstado + porMes + porTipo
+                                 Funcionario ve sus documentos; admin ve todos
+GET    /actividad-reciente     → requireModule('dashboard') — últimas 15 acciones
+GET    /exportar               → requireModule('reportes') — CSV con BOM para Excel
+                                 Solo accesible a usuarios con módulo 'reportes' (admin por defecto)
 ```
 
 ---

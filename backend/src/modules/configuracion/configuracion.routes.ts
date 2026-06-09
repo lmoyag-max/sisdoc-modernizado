@@ -111,7 +111,7 @@ router.get('/', (req, res) => {
 });
 
 // ── PATCH /configuracion — actualizar nombres y textos ─────
-router.patch('/', requireAuth, (req, res) => {
+router.patch('/', requireAuth, requireRole('admin'), (req, res) => {
   const body = req.body as Record<string, string | undefined>;
   const cfg  = readConfig();
 
@@ -134,7 +134,7 @@ router.patch('/', requireAuth, (req, res) => {
 });
 
 // ── PATCH /configuracion/upload-rules — actualizar reglas de carga ──
-router.patch('/upload-rules', requireAuth, (req, res) => {
+router.patch('/upload-rules', requireAuth, requireRole('admin'), (req, res) => {
   const body = req.body as {
     extensionesPermitidas?: unknown;
     maxFileMB?:             unknown;

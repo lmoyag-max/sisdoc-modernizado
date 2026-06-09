@@ -1,4 +1,0 @@
-<? php 
-fecha = date (dd-mm-Y);
-echo  "fecha : " . fecha;
-?>

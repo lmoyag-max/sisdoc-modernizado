@@ -99,16 +99,20 @@ sisdoc-modernizado/
 │   │   │   ├── error.middleware.ts
 │   │   │   └── logger.middleware.ts
 │   │   ├── modules/
-│   │   │   ├── auth/                 # Login, refresh, logout, /me
+│   │   │   ├── auth/                 # Login, refresh, logout, /me, forgot/reset password
 │   │   │   ├── documentos/           # CRUD documentos + derivar + historial
 │   │   │   ├── tramites/             # Bandeja + recibir + cerrar
 │   │   │   ├── archivos/             # Upload multer + listado + delete
-│   │   │   ├── expedientes/          # CRUD expedientes legacy
 │   │   │   ├── usuarios/             # CRUD usuarios + roles
 │   │   │   ├── catalogos/            # Tipos de doc, estados, dependencias
 │   │   │   ├── busqueda/             # Búsqueda global docs/tramites/funcionarios
 │   │   │   ├── reportes/             # Dashboard + actividad + exportar CSV
-│   │   │   └── configuracion/        # Logo, background login, nombres sistema
+│   │   │   ├── configuracion/        # Logo, background login, nombres sistema, upload rules
+│   │   │   ├── memorandum/           # Correlativos + generación PDF con firma/timbre
+│   │   │   ├── jefaturas/            # Titular/subrogante + imagen firma por dependencia
+│   │   │   ├── firma-gob/            # Integración FirmaGOB (ambientes TEST/PRODUCCION)
+│   │   │   ├── alertas/              # Configuración SMTP + horarios + envío manual
+│   │   │   └── roles/                # Gestión de módulos por rol
 │   │   ├── shared/
 │   │   │   ├── types/api.types.ts    # AuthenticatedRequest, JwtPayload, etc.
 │   │   │   └── utils/response.ts     # sendSuccess, sendError, sendPaginated
@@ -138,21 +142,26 @@ sisdoc-modernizado/
 │   │   │       └── MetricCard.tsx
 │   │   ├── pages/
 │   │   │   ├── auth/LoginPage.tsx
+│   │   │   ├── auth/ForgotPasswordPage.tsx
+│   │   │   ├── auth/ResetPasswordPage.tsx
 │   │   │   ├── dashboard/DashboardPage.tsx
 │   │   │   ├── documentos/
 │   │   │   │   ├── DocumentosPage.tsx       # Listado paginado con filtros
 │   │   │   │   ├── DocumentoDetallePage.tsx # Detalle individual (/documentos/:id)
-│   │   │   │   └── NuevoDocumentoPage.tsx   # Formulario creación
+│   │   │   │   └── NuevoDocumentoPage.tsx   # Formulario creación + upload múltiple
 │   │   │   ├── bandeja/BandejaPage.tsx
 │   │   │   ├── enviados/EnviadosPage.tsx
 │   │   │   ├── tramites/TramitesPage.tsx
 │   │   │   ├── trazabilidad/TrazabilidadPage.tsx
 │   │   │   ├── busqueda/BusquedaPage.tsx
 │   │   │   ├── archivos/ArchivosPage.tsx
-│   │   │   ├── expedientes/ExpedientesPage.tsx
 │   │   │   ├── reportes/ReportesPage.tsx
 │   │   │   ├── admin/
-│   │   │   │   └── UsuariosPage.tsx
+│   │   │   │   ├── UsuariosPage.tsx
+│   │   │   │   ├── RolesPage.tsx
+│   │   │   │   ├── JefaturasPage.tsx
+│   │   │   │   ├── FirmaGobPage.tsx
+│   │   │   │   └── AlertasPage.tsx
 │   │   │   └── configuracion/ConfiguracionPage.tsx
 │   │   ├── lib/
 │   │   │   ├── api/
@@ -447,20 +456,34 @@ GET    /exportar               → requireModule('reportes') — CSV con BOM par
 ```env
 NODE_ENV=development
 PORT=3001
-DB_USER=sa
+
+DB_USER=doc360_app              # Usuario de aplicación — NOT sa (db_owner en SISDOC, sin sysadmin)
 DB_PASSWORD=<DB_PASSWORD>
 DB_SERVER=localhost
-DB_PORT=11433   # Puerto 1433 reservado por Windows/Hyper-V — se mapea como 127.0.0.1:11433:1433 en docker-compose
+DB_PORT=11433                   # Puerto 1433 reservado por Windows/Hyper-V → mapeado como 127.0.0.1:11433:1433
 DB_DATABASE=SISDOC
 DB_TRUST_CERT=true
-DB_ENCRYPT=false
-JWT_SECRET=<JWT_SECRET>
-JWT_REFRESH_SECRET=<JWT_REFRESH_SECRET>
+DB_ENCRYPT=false                # En producción: DB_ENCRYPT=true, DB_TRUST_CERT=false + cert válido
+
+JWT_SECRET=<512-bit random>     # Generar: openssl rand -base64 64
+JWT_REFRESH_SECRET=<512-bit random>
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
-CORS_ORIGIN=http://localhost:5173
+
+CORS_ORIGIN=http://localhost:5173,http://10.6.15.182:5173
+
 UPLOAD_DIR=./uploads
-MAX_FILE_SIZE=20971520
+MAX_FILE_SIZE=20971520          # Hardcap multer — UI solo puede restringir por debajo
+
+# Recuperación de contraseña por email
+SMTP_HOST=mail.huap.online
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=operaciones@huap.online
+SMTP_PASS=<SMTP_PASSWORD>
+SMTP_FROM=DOC360 HUAP <operaciones@huap.online>
+FRONTEND_URL=http://localhost:5173
+RESET_TOKEN_EXPIRES_MINUTES=30
 ```
 
 ---
@@ -471,9 +494,9 @@ MAX_FILE_SIZE=20971520
 # Ver contenedor SQL Server
 docker ps
 
-# Ejecutar query SQL directa
-docker exec sisdoc_sqlserver /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U sa -P "<DB_PASSWORD>" -C -d SISDOC -Q "SELECT TOP 5 * FROM documento"
+# Ejecutar query SQL directa (usar -U sa solo para tareas de admin; app usa doc360_app)
+docker exec sisdoc_sqlserver /opt/mssql-tools18/bin/sqlcmd `
+  -S localhost -U sa -P "<SA_PASSWORD>" -C -d SISDOC -Q "SELECT TOP 5 * FROM documento"
 
 # Reiniciar backend (si hay cambios en .env)
 # Ctrl+C en la terminal del backend, luego: npm run dev
@@ -501,7 +524,6 @@ cd frontend && npm run typecheck
 | `Cannot read properties of undefined (reading 'descripcion')` | `mapDocumento` no retornaba `destino`/`prioridad` | Ya corregido: incluir esos campos con `null` |
 | Archivos subidos no aparecen en BD | `ruta` varchar(50) overflow con filename largo | Ya corregido: filenames cortos de 12 chars |
 | `App.jsx` carga en lugar de `App.tsx` | Vite resuelve .jsx antes | `main.tsx` importa `from './App.tsx'` explícitamente |
-| Error al crear expediente | Columnas `desc_expediente` / `fecha_expediente` (no `descripcion` / `fecha_sistema`) | Ya corregido en `expedientes.routes.ts` |
 | mssql TypeScript sin types | mssql v12 no incluye `.d.ts` | `src/types/mssql.d.ts` con declaraciones manuales |
 
 ---
@@ -518,30 +540,39 @@ cd frontend && npm run typecheck
 
 ---
 
-## Estado actual del sistema (Mayo 2026)
+## Estado actual del sistema (Junio 2026)
+
+Auditado funcionalmente el 2026-06-09. Correcciones de seguridad aplicadas.
 
 ### Módulos funcionales ✅
-- Login + JWT + refresh automático
-- Dashboard con métricas reales y gráficos
-- Documentos: listado, detalle, crear
-- Bandeja de entrada con paginación
+- Login + JWT + refresh automático + recuperación de contraseña por email
+- Dashboard con métricas reales, gráficos y actividad reciente (filtrado por servicio)
+- Documentos: listado paginado, detalle, crear, derivar, historial
+- Bandeja de entrada con paginación y estado
 - Enviados
 - Trámites
 - Trazabilidad documental
-- Búsqueda global
-- Archivos: upload + listado + descarga + asociar a documento
-- Expedientes: listado (19,373 registros legacy) + crear + documentos del expediente
+- Búsqueda global (documentos, trámites, funcionarios)
+- Archivos: upload múltiple + listado + descarga + asociar a documento
+- Memorándum: correlativos MEMO-YYYY-NNNNNN, generación PDF con firma/timbre
+- Jefaturas: titular + subrogante + imagen firma/timbre por dependencia
 - Usuarios: CRUD + asignación de roles
-- Reportes: métricas, gráficos, exportar CSV
+- Roles: gestión de módulos por rol
+- Alertas: configuración SMTP, horarios, envío manual
+- Reportes: métricas, gráficos, exportar CSV (filtrado por servicio)
 - Configuración: logo, fondo login, nombres del sistema, reglas de carga configurables
+- FirmaGOB: módulo implementado, pendiente de configuración de credenciales
+
+### Requiere configuración operacional
+- **Memorándum PDF:** subir imagen de firma+timbre en `/admin/jefaturas`
+- **FirmaGOB:** configurar URL y credenciales en `/admin/firma-gob`
 
 ### Pendiente / mejoras futuras
-- Módulo de derivación de documentos (formulario en detalle documento)
 - Notificaciones en tiempo real (WebSocket)
 - Modo oscuro
-- Branding dinámico (logo en sidebar desde configuración)
 - Export a PDF en reportes
-- Tests automatizados (Jest/Vitest)
+- Tests automatizados (Vitest + Supertest)
+- CI/CD pipeline
 
 ---
 

@@ -8,6 +8,7 @@ import { getPool, sql } from '../../config/database';
 import { sendSuccess, sendError, sendPaginated, buildPaginationMeta } from '../../shared/utils/response';
 import { AuthenticatedRequest } from '../../shared/types/api.types';
 import { env } from '../../config/env';
+import { logger } from '../../shared/utils/logger';
 
 const router = Router();
 router.use(requireAuth);
@@ -231,11 +232,18 @@ router.post('/test-conexion', ...soloAdmin, async (req: Request, res: Response, 
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      sendSuccess(res, {
-        ok:      response.status < 500,
-        status:  response.status,
-        mensaje: response.ok ? 'Conexión exitosa' : `Servidor respondió con status ${response.status}`,
-      });
+
+      const reachable          = response.status < 500;
+      const isMethodNotAllowed = response.status === 405;
+      let mensaje: string;
+      if (response.ok) {
+        mensaje = 'Servidor alcanzable y respondiendo correctamente';
+      } else if (isMethodNotAllowed) {
+        mensaje = `Servidor alcanzable (status ${response.status} — el endpoint existe pero no acepta HEAD). La conectividad está OK; las credenciales y payload solo se validan en un envío real.`;
+      } else {
+        mensaje = `Servidor respondió con status ${response.status} — puede indicar error de URL o configuración`;
+      }
+      sendSuccess(res, { ok: reachable, status: response.status, mensaje });
     } catch (_err) {
       sendSuccess(res, { ok: false, mensaje: 'No se pudo conectar al endpoint de Firma.gob' });
     }
@@ -315,11 +323,17 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
     const runLimpio = body.run.trim();
     const nowSec    = Math.floor(Date.now() / 1000);
 
+    // FirmaGov espera el campo 'expiration' sin milisegundos ni sufijo de zona (no ISO completo).
+    // Formato correcto: "YYYY-MM-DDTHH:mm:ss" — se obtiene cortando ".mmmZ" del toISOString().
+    const expirationStr = new Date(Date.now() + 30 * 60 * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, '');
+
     const jwtPayload = {
       run:         runLimpio,
       entity:      cfg.entity,
       purpose:     cfg.purpose,
-      expiration:  new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      expiration:  expirationStr,
       iat:         nowSec,
       exp:         nowSec + 1800,
     };
@@ -375,7 +389,10 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
 
       if (!firmResponse.ok) {
         const errText = await firmResponse.text().catch(() => '');
-        // Actualizar historial a Error
+        logger.warn('[FirmaGov] Error HTTP %d | doc=%d | ambiente=%s | respuesta: %s',
+          firmResponse.status, body.idDocumento, cfg.ambiente,
+          errText.substring(0, 300)
+        );
         await pool.request()
           .input('id',  sql.Int,         idHistorial)
           .input('res', sql.VarChar(500), `HTTP ${firmResponse.status}: ${errText.substring(0, 400)}`)

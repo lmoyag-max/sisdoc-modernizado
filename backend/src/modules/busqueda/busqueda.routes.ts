@@ -6,7 +6,14 @@ import { sendSuccess } from '../../shared/utils/response';
 const router = Router();
 router.use(requireAuth);
 
-// GET /api/v1/busqueda?q=texto&tipo=documentos|tramites|funcionarios
+// Detecta errores de FTS no disponible (índice full-text no creado en la BD)
+function esFTSError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return msg.includes('full-text') || msg.includes('7601') || msg.includes('7603')
+    || msg.includes('7613') || msg.includes('freetext') || msg.includes('not full-text indexed');
+}
+
+// GET /api/v1/busqueda?q=texto&tipo=documentos|tramites|funcionarios|todos
 router.get('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const q = String(req.query.q ?? '').trim();
@@ -22,88 +29,153 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
 
     const pool = await getPool();
     const like = `%${q}%`;
-    // Sanitizar operadores FTS para prevenir manipulación de consultas Full-Text Search
     const qSanitized = q
       .replace(/"/g, ' ')
       .replace(/\b(AND|OR|NOT|NEAR|FORMSOF|ISABOUT)\b/gi, ' ')
       .replace(/[~*]/g, '')
       .trim();
-    // Formato para CONTAINS: "palabra*" busca prefijos; requiere script 05-full-text-index.sql
     const ftsQ = `"${qSanitized}*"`;
 
-    const [docs, trams, funcs] = await Promise.all([
-      // Documentos — CONTAINS en materia (FTS), LIKE en num_interno/num_oficial (INT, sin FTS)
-      tipo === 'documentos' || tipo === 'todos'
-        ? pool.request()
-            .input('ftsQ', sql.NVarChar(200), ftsQ)
-            .input('like', sql.NVarChar(200), like)
-            .input('offset', sql.Int, offset)
-            .input('n', sql.Int, porPagina)
-            .query<{
-              id_documento: number; materia: string | null;
-              num_interno: string | null; desc_tipo_documento: string | null;
-              desc_estado_documento: string | null; fecha_sistema: Date | null; total: number;
-            }>(`
-              SELECT d.id_documento, d.materia, d.num_interno,
-                     td.desc_tipo_documento, ed.desc_estado_documento,
-                     d.fecha_sistema,
-                     COUNT(*) OVER() AS total
-              FROM documento d
-              LEFT JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
-              LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
-              WHERE CONTAINS(d.materia, @ftsQ)
-                 OR CAST(d.num_interno AS NVARCHAR) LIKE @like
-                 OR CAST(d.num_oficial AS NVARCHAR) LIKE @like
-              ORDER BY d.fecha_sistema DESC
-              OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
-            `)
-        : Promise.resolve({ recordset: [] as never[] }),
+    type DocRow = {
+      id_documento: number; materia: string | null;
+      num_interno: string | null; desc_tipo_documento: string | null;
+      desc_estado_documento: string | null; fecha_sistema: Date | null; total: number;
+    };
+    type TramRow = {
+      id_seguimiento: number; id_documento: number | null;
+      materia: string | null; observaciones: string | null;
+      fecha_sistema: Date | null; total: number;
+    };
+    type FuncRow = {
+      id_funcionario: number; nombres: string | null;
+      apellidos: string | null; rut: string | null; desc_dependencia: string | null;
+    };
 
-      // Trámites — CONTAINS en materia (FTS), LIKE en observaciones
-      tipo === 'tramites' || tipo === 'todos'
-        ? pool.request()
-            .input('ftsQ', sql.NVarChar(200), ftsQ)
-            .input('like', sql.NVarChar(200), like)
-            .input('offset', sql.Int, offset)
-            .input('n', sql.Int, porPagina)
-            .query<{
-              id_seguimiento: number; id_documento: number | null;
-              materia: string | null; observaciones: string | null;
-              fecha_sistema: Date | null; total: number;
-            }>(`
-              SELECT t.id_seguimiento, t.id_documento, d.materia, t.observaciones,
-                     t.fecha_sistema, COUNT(*) OVER() AS total
-              FROM tramite t
-              LEFT JOIN documento d ON t.id_documento = d.id_documento
-              WHERE CONTAINS(d.materia, @ftsQ) OR t.observaciones LIKE @like
-              ORDER BY t.fecha_sistema DESC
-              OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
-            `)
-        : Promise.resolve({ recordset: [] as never[] }),
+    const empty = { recordset: [] as never[] };
+    let docs: { recordset: DocRow[] };
+    let trams: { recordset: TramRow[] };
+    let funcs: { recordset: FuncRow[] };
 
-      // Funcionarios — CONTAINS en nombres/apellidos (FTS), LIKE en rut (VARCHAR corto)
-      tipo === 'funcionarios' || tipo === 'todos'
-        ? pool.request()
-            .input('ftsQ', sql.NVarChar(200), ftsQ)
-            .input('like', sql.NVarChar(200), like)
-            .query<{
-              id_funcionario: number; nombres: string | null;
-              apellidos: string | null; rut: string | null; desc_dependencia: string | null;
-            }>(`
-              SELECT TOP 20 f.id_funcionario, f.nombres, f.apellidos, f.rut,
-                     d.desc_dependencia
-              FROM funcionario f
-              LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
-              WHERE CONTAINS((f.nombres, f.apellidos), @ftsQ) OR f.rut LIKE @like
-              ORDER BY f.apellidos, f.nombres
-            `)
-        : Promise.resolve({ recordset: [] as never[] }),
-    ]);
+    // Primer intento: búsqueda FTS (CONTAINS) — requiere índice full-text en BD
+    try {
+      [docs, trams, funcs] = await Promise.all([
+        tipo === 'documentos' || tipo === 'todos'
+          ? pool.request()
+              .input('ftsQ', sql.NVarChar(200), ftsQ)
+              .input('like', sql.NVarChar(200), like)
+              .input('offset', sql.Int, offset)
+              .input('n', sql.Int, porPagina)
+              .query<DocRow>(`
+                SELECT d.id_documento, d.materia, d.num_interno,
+                       td.desc_tipo_documento, ed.desc_estado_documento,
+                       d.fecha_sistema,
+                       COUNT(*) OVER() AS total
+                FROM documento d
+                LEFT JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
+                LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
+                WHERE CONTAINS(d.materia, @ftsQ)
+                   OR CAST(d.num_interno AS NVARCHAR) LIKE @like
+                   OR CAST(d.num_oficial AS NVARCHAR) LIKE @like
+                ORDER BY d.fecha_sistema DESC
+                OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
+              `)
+          : Promise.resolve(empty as { recordset: DocRow[] }),
+
+        tipo === 'tramites' || tipo === 'todos'
+          ? pool.request()
+              .input('ftsQ', sql.NVarChar(200), ftsQ)
+              .input('like', sql.NVarChar(200), like)
+              .input('offset', sql.Int, offset)
+              .input('n', sql.Int, porPagina)
+              .query<TramRow>(`
+                SELECT t.id_seguimiento, t.id_documento, d.materia, t.observaciones,
+                       t.fecha_sistema, COUNT(*) OVER() AS total
+                FROM tramite t
+                LEFT JOIN documento d ON t.id_documento = d.id_documento
+                WHERE CONTAINS(d.materia, @ftsQ) OR t.observaciones LIKE @like
+                ORDER BY t.fecha_sistema DESC
+                OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
+              `)
+          : Promise.resolve(empty as { recordset: TramRow[] }),
+
+        tipo === 'funcionarios' || tipo === 'todos'
+          ? pool.request()
+              .input('ftsQ', sql.NVarChar(200), ftsQ)
+              .input('like', sql.NVarChar(200), like)
+              .query<FuncRow>(`
+                SELECT TOP 20 f.id_funcionario, f.nombres, f.apellidos, f.rut,
+                       d.desc_dependencia
+                FROM funcionario f
+                LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
+                WHERE CONTAINS((f.nombres, f.apellidos), @ftsQ) OR f.rut LIKE @like
+                ORDER BY f.apellidos, f.nombres
+              `)
+          : Promise.resolve(empty as { recordset: FuncRow[] }),
+      ]) as [{ recordset: DocRow[] }, { recordset: TramRow[] }, { recordset: FuncRow[] }];
+
+    } catch (ftsErr) {
+      // Si el índice full-text no está disponible, reintentamos con LIKE puro
+      if (!esFTSError(ftsErr)) throw ftsErr;
+
+      [docs, trams, funcs] = await Promise.all([
+        tipo === 'documentos' || tipo === 'todos'
+          ? pool.request()
+              .input('like', sql.NVarChar(200), like)
+              .input('offset', sql.Int, offset)
+              .input('n', sql.Int, porPagina)
+              .query<DocRow>(`
+                SELECT d.id_documento, d.materia, d.num_interno,
+                       td.desc_tipo_documento, ed.desc_estado_documento,
+                       d.fecha_sistema,
+                       COUNT(*) OVER() AS total
+                FROM documento d
+                LEFT JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
+                LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
+                WHERE d.materia LIKE @like
+                   OR CAST(d.num_interno AS NVARCHAR) LIKE @like
+                   OR CAST(d.num_oficial AS NVARCHAR) LIKE @like
+                ORDER BY d.fecha_sistema DESC
+                OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
+              `)
+          : Promise.resolve(empty as { recordset: DocRow[] }),
+
+        tipo === 'tramites' || tipo === 'todos'
+          ? pool.request()
+              .input('like', sql.NVarChar(200), like)
+              .input('offset', sql.Int, offset)
+              .input('n', sql.Int, porPagina)
+              .query<TramRow>(`
+                SELECT t.id_seguimiento, t.id_documento, d.materia, t.observaciones,
+                       t.fecha_sistema, COUNT(*) OVER() AS total
+                FROM tramite t
+                LEFT JOIN documento d ON t.id_documento = d.id_documento
+                WHERE d.materia LIKE @like OR t.observaciones LIKE @like
+                ORDER BY t.fecha_sistema DESC
+                OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
+              `)
+          : Promise.resolve(empty as { recordset: TramRow[] }),
+
+        tipo === 'funcionarios' || tipo === 'todos'
+          ? pool.request()
+              .input('like', sql.NVarChar(200), like)
+              .query<FuncRow>(`
+                SELECT TOP 20 f.id_funcionario, f.nombres, f.apellidos, f.rut,
+                       d.desc_dependencia
+                FROM funcionario f
+                LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
+                WHERE f.nombres LIKE @like
+                   OR f.apellidos LIKE @like
+                   OR f.rut LIKE @like
+                ORDER BY f.apellidos, f.nombres
+              `)
+          : Promise.resolve(empty as { recordset: FuncRow[] }),
+      ]) as [{ recordset: DocRow[] }, { recordset: TramRow[] }, { recordset: FuncRow[] }];
+    }
 
     const totalDocs = (docs.recordset[0] as { total?: number } | undefined)?.total ?? 0;
     sendSuccess(res, {
       documentos: docs.recordset,
-      tramites: trams.recordset,
+      tramites:   trams.recordset,
       funcionarios: funcs.recordset,
       total: totalDocs,
       pagina,

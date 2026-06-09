@@ -1,7 +1,31 @@
 # DOC360 — Sistema de Gestión Documental
-### Hospital de Asistencia Pública Alejandro Del Río (HUAP)
+### Hospital de Urgencia Asistencia Pública (HUAP)
 
-Sistema de gestión documental institucional moderno. Plataforma SaaS enterprise que reemplaza el sistema legacy SISDOC (Windows Server 2003 / ASP clásico / SQL Server 2005), manteniendo compatibilidad total con la base de datos y los datos históricos.
+Plataforma documental institucional moderna que reemplaza el sistema legacy SISDOC (Windows Server 2003 / ASP clásico / SQL Server 2005), manteniendo compatibilidad total con la base de datos y los datos históricos.
+
+**Estado:** Operativo en producción · Versión 2.0.0 · Auditado 2026-06-09
+
+---
+
+## Arquitectura
+
+```
+┌─────────────────────────────────────────────────┐
+│  Browser / Cliente                              │
+│  React 18 + Vite + TypeScript + Tailwind        │
+└────────────────────┬────────────────────────────┘
+                     │ HTTPS / JWT Bearer
+┌────────────────────▼────────────────────────────┐
+│  API Backend                                    │
+│  Node.js 20 + Express + TypeScript              │
+│  Puerto 3001 (dev) · Nginx proxy (prod)         │
+└────────────────────┬────────────────────────────┘
+                     │ mssql driver (doc360_app)
+┌────────────────────▼────────────────────────────┐
+│  SQL Server 2022                                │
+│  Docker · Puerto 11433 (host) · BD: SISDOC     │
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -9,98 +33,153 @@ Sistema de gestión documental institucional moderno. Plataforma SaaS enterprise
 
 | Capa | Tecnología | Versión |
 |---|---|---|
-| Backend | Node.js + Express + TypeScript | 20 LTS |
-| Base de datos | SQL Server 2022 | Docker |
-| ORM/Driver | mssql (queries directas) | 12.5.4 |
-| Frontend | React + Vite + TypeScript | 18 / 6 |
+| Frontend | React + Vite + TypeScript | 18 / 6 / 5.7 |
 | UI | Tailwind CSS + shadcn/ui (Radix) | 3 |
-| Estado global | Zustand + TanStack Query | 5 |
-| Auth | JWT access 15 min + refresh 7 días (httpOnly cookie) | — |
+| Estado / Data | Zustand + TanStack Query | 5 |
 | Formularios | react-hook-form + Zod | — |
+| Backend | Node.js + Express + TypeScript | 20 LTS |
+| ORM/Driver | mssql (queries directas) | 12.5.4 |
+| Auth | JWT (15 min) + Refresh Token (7 días, httpOnly) | — |
+| Base de datos | SQL Server 2022 | Docker |
 | Contenedor | Docker + Docker Compose | 27+ |
+| Proxy (prod) | Nginx | Alpine |
 
 ---
 
-## Inicio rápido
+## Módulos operativos
 
-### Prerrequisitos
-- Node.js 20+
+| Módulo | Ruta | Roles con acceso | Estado |
+|---|---|---|---|
+| Dashboard | `/dashboard` | Todos | ✅ Operativo |
+| Documentos | `/documentos` | Todos | ✅ Operativo |
+| Bandeja de entrada | `/bandeja` | Todos | ✅ Operativo |
+| Documentos enviados | `/enviados` | Todos | ✅ Operativo |
+| Mis trámites | `/tramites` | Todos | ✅ Operativo |
+| Trazabilidad | `/trazabilidad` | Todos | ✅ Operativo |
+| Búsqueda global | `/busqueda` | Todos + of.partes | ✅ Operativo |
+| Gestión de archivos | `/archivos` | admin | ✅ Operativo |
+| Reportes + CSV | `/reportes` | admin | ✅ Operativo |
+| Memorándum | (integrado en documentos) | Todos | ✅ Operativo* |
+| Usuarios | `/admin/usuarios` | admin | ✅ Operativo |
+| Roles | `/admin/roles` | admin | ✅ Operativo |
+| Jefaturas | `/admin/jefaturas` | admin | ✅ Operativo |
+| Alertas | `/admin/alertas` | admin | ✅ Operativo |
+| Firma electrónica | `/admin/firma-gob` | admin | ⚙️ Sin configurar |
+| Configuración | `/admin/configuracion` | admin | ✅ Operativo |
+
+> *Memorándum requiere imagen de firma/timbre configurada en Jefaturas para generar PDF.
+
+---
+
+## Requisitos
+
+### Desarrollo
+- Node.js 20 LTS
 - Docker Desktop (corriendo)
 - Git
 
-### Setup inicial (una sola vez)
+### Producción (servidor Linux)
+- Docker Engine 24+
+- Docker Compose v2+
+- 4 GB RAM mínimo · 20 GB disco
+- Puertos 80, 3001 y 11433 (o 1433 en red interna)
 
-```powershell
-# 1. Ubicarse en el proyecto
-cd c:\sisdoc-modernizado
+---
 
-# 2. Levantar SQL Server
-docker compose up -d sqlserver
+## Instalación y puesta en marcha
 
-# 3. Restaurar base de datos (si es primera vez)
-.\scripts\restore-db.ps1
+### 1. Clonar el repositorio
 
-# 4. Instalar dependencias
-cd backend  && npm install && cd ..
-cd frontend && npm install && cd ..
+```bash
+git clone https://github.com/lmoyag-max/sisdoc-modernizado.git
+cd sisdoc-modernizado
 ```
 
-### Desarrollo diario (3 terminales)
+### 2. Configurar variables de entorno
+
+```bash
+cp backend/.env.example backend/.env
+# Editar backend/.env con los valores reales
+```
+
+Ver [backend/.env.example](backend/.env.example) para referencia completa.
+
+### 3. Levantar SQL Server
 
 ```powershell
-# Terminal 1: SQL Server
 docker compose up -d sqlserver
+# Esperar ~15 segundos para que SQL Server termine de iniciar
+```
 
-# Terminal 2: Backend — hot reload en :3001
-cd backend && npm run dev
+### 4. Restaurar base de datos (primera vez)
 
-# Terminal 3: Frontend — hot reload en :5173
-cd frontend && npm run dev
+```powershell
+.\scripts\restore-db.ps1
+```
+
+### 5. Instalar dependencias
+
+```powershell
+cd backend  ; npm install ; cd ..
+cd frontend ; npm install ; cd ..
+```
+
+---
+
+## Ejecución en desarrollo
+
+Requiere 2 terminales además de Docker:
+
+```powershell
+# Terminal 1: Backend — hot reload en :3001
+cd backend
+npm run dev
+
+# Terminal 2: Frontend — hot reload en :5173
+cd frontend
+npm run dev
+```
+
+---
+
+## Despliegue en producción
+
+```bash
+# Build y arranque completo con Docker Compose
+docker compose --profile prod up -d --build
+
+# Verificar estado
+docker compose ps
+docker compose logs -f backend
+
+# Health check
+curl http://localhost:3001/api/health
 ```
 
 ---
 
 ## URLs de acceso
 
-| Servicio | Local | Red local |
+| Servicio | Desarrollo | Producción |
 |---|---|---|
-| Frontend | http://localhost:5173 | http://TU-IP:5173 |
-| Backend API | http://localhost:3001/api/v1 | http://TU-IP:3001/api/v1 |
+| Frontend | http://localhost:5173 | https://dominio.hospital.cl |
+| Backend API | http://localhost:3001/api/v1 | https://dominio.hospital.cl/api/v1 |
 | Health check | http://localhost:3001/api/health | — |
-| API Docs (Swagger) | http://localhost:3001/api-docs | — |
+| API Docs | http://localhost:3001/api-docs | (deshabilitado en prod) |
 
-> **¿Cuál es tu IP?** `ipconfig` en Windows → IPv4 de tu adaptador de red.
+> **Puerto SQL Server:** `11433` en el host (no 1433 — reservado por Windows/Hyper-V). Mapeado como `127.0.0.1:11433:1433` — solo accesible desde localhost.
 
 ---
 
 ## Usuarios del sistema
 
-| Usuario | Contraseña | Rol |
-|---------|-----------|-----|
-| `admin` | `Huap.2025` | Administrador |
-| `ti` | `Huap.2025` | Funcionario |
-| `aba` | `Huap.2025` | Funcionario |
-| `contrato` | `Huap.2025` | Funcionario |
-| `ofparte` | `Huap.2025` | Of. de Partes |
+Las contraseñas reales se gestionan internamente. Contactar al administrador del sistema para credenciales de acceso.
 
----
-
-## Módulos operativos
-
-| Módulo | Ruta | Estado |
-|---|---|---|
-| Dashboard | `/dashboard` | ✅ Operativo |
-| Documentos (listado + detalle + crear) | `/documentos` | ✅ Operativo |
-| Bandeja de entrada | `/bandeja` | ✅ Operativo |
-| Documentos enviados | `/enviados` | ✅ Operativo |
-| Mis trámites | `/tramites` | ✅ Operativo |
-| Trazabilidad documental | `/trazabilidad` | ✅ Operativo |
-| Búsqueda global | `/busqueda` | ✅ Operativo |
-| Gestión de archivos | `/archivos` | ✅ Operativo |
-| Expedientes | `/expedientes` | ✅ Operativo |
-| Administración de usuarios | `/admin/usuarios` | ✅ Operativo |
-| Reportes y exportación CSV | `/reportes` | ✅ Operativo |
-| Configuración del sistema | `/admin/configuracion` | ✅ Operativo |
+| Usuario | Rol | Descripción |
+|---------|-----|-------------|
+| `admin` | Administrador | Acceso total al sistema |
+| `ofparte` | Of. de Partes | Búsqueda y gestión de entrada de documentos |
+| Funcionarios | Funcionario | Bandeja, documentos, trazabilidad |
 
 ---
 
@@ -108,7 +187,7 @@ cd frontend && npm run dev
 
 **Base URL:** `http://localhost:3001/api/v1`
 
-Todos los endpoints (excepto `/auth/login`, `/auth/refresh` y `/configuracion` GET) requieren `Authorization: Bearer <token>`.
+Todos los endpoints (excepto `/auth/login`, `/auth/refresh` y `GET /configuracion`) requieren `Authorization: Bearer <token>`.
 
 ```
 # Autenticación
@@ -134,13 +213,16 @@ POST   /archivos/upload         (multipart/form-data: archivo + idDocumento)
 GET    /archivos                (idDocumento?)
 DELETE /archivos/:id
 
-# Expedientes
-GET    /expedientes             (q, pagina)
-POST   /expedientes
-GET    /expedientes/:id/documentos
-PATCH  /expedientes/vincular
+# Memorándum
+GET    /memorandum/firmante-activo
+GET    /memorandum/firmantes-disponibles
+POST   /memorandum/confirmar    ({ idDocumento, materia?, referencia?, cuerpo? })
+PATCH  /memorandum/vincular-archivo
+GET    /memorandum/firmantes          (solo admin)
+POST   /memorandum/firmantes          (solo admin)
+POST   /memorandum/firmantes/:id/imagen (solo admin)
 
-# Usuarios
+# Usuarios (solo admin)
 GET    /usuarios                (q, pagina)
 GET    /usuarios/:id
 POST   /usuarios
@@ -148,81 +230,129 @@ PATCH  /usuarios/:id
 DELETE /usuarios/:id
 GET    /usuarios/meta/roles
 
+# Roles (solo admin)
+GET    /roles
+
+# Jefaturas
+GET    /jefaturas
+
+# Alertas (solo admin)
+GET    /alertas/configuracion
+PUT    /alertas/configuracion
+GET    /alertas/pendientes
+GET    /alertas/logs
+POST   /alertas/enviar-manual
+
+# Firma Electrónica (solo admin)
+GET    /firma-gob/config
+PATCH  /firma-gob/config/:ambiente
+GET    /firma-gob/historial
+POST   /firma-gob/test-conexion
+POST   /firma-gob/solicitar
+
 # Reportes
-GET    /reportes/dashboard
-GET    /reportes/actividad-reciente
-GET    /reportes/exportar       (→ CSV con BOM para Excel)
+GET    /reportes/dashboard      (requireModule 'dashboard')
+GET    /reportes/actividad-reciente (requireModule 'dashboard')
+GET    /reportes/exportar       (requireModule 'reportes' → CSV con BOM)
 
 # Búsqueda
 GET    /busqueda                (q, tipo: documentos|tramites|funcionarios|todos, pagina)
 
 # Catálogos
 GET    /catalogos/tipos-documento
-GET    /catalogos/estados-documento
+GET    /catalogos/estados
+GET    /catalogos/prioridades
 GET    /catalogos/dependencias
+GET    /catalogos/tipos-distribucion
+GET    /catalogos/tipos-compromiso
 
 # Configuración
 GET    /configuracion           (pública)
-PATCH  /configuracion
-POST   /configuracion/logo      (multipart/form-data)
-POST   /configuracion/background (multipart/form-data)
-PATCH  /configuracion/upload-rules
+PATCH  /configuracion           (solo admin)
+POST   /configuracion/logo      (solo admin — multipart/form-data)
+POST   /configuracion/background (solo admin — multipart/form-data)
+PATCH  /configuracion/upload-rules (solo admin)
 ```
 
 ---
 
 ## Docker Compose
 
-```powershell
-# Solo SQL Server (desarrollo)
+```bash
+# Desarrollo — solo SQL Server
 docker compose up -d sqlserver
 
-# Producción completa (build + arranque)
+# Producción completa
 docker compose --profile prod up -d --build
 
-# Ver estado de contenedores
+# Estado de contenedores
 docker compose ps
 
 # Logs en tiempo real
 docker compose logs -f backend
 docker compose logs -f nginx
 
-# Detener todo
+# Detener (conserva datos)
 docker compose down
 
-# Detener y eliminar volúmenes — ¡BORRA LA BD!
+# Detener y eliminar volúmenes — ¡ELIMINA LA BASE DE DATOS!
 docker compose down -v
 
-# Reconstruir imagen del backend
+# Reconstruir imagen backend
 docker compose --profile prod build backend --no-cache
 ```
 
-### Backup automático de la base de datos
+---
 
-El script `scripts/backup-db.ps1` está programado en Task Scheduler para ejecutarse **todos los domingos a las 2:00 AM**.
-Los backups se guardan en `database/backups/` con retención de 30 días.
+## Backup de base de datos
+
+El script `scripts/backup-db.ps1` ejecuta backup semanal automático cada **domingo a las 2:00 AM** (Task Scheduler de Windows). Retención: 30 días. Destino: `database/backups/`.
 
 ```powershell
-# Ejecutar backup manual
+# Backup manual
 .\scripts\backup-db.ps1 -SaPassword "CONTRASENA_SA"
 
 # Ver backups disponibles
 Get-ChildItem database\backups\
 ```
 
-### Si la base de datos se pierde
+### Restaurar base de datos
 
 ```powershell
-# Restaurar desde backup automáticamente
+# Restaurar automáticamente desde el backup más reciente
 .\scripts\restore-db.ps1
 
-# O manualmente desde un backup
+# Restaurar manualmente desde un backup específico
 docker exec sisdoc_sqlserver /opt/mssql-tools18/bin/sqlcmd `
-  -S localhost -U sa -P "<SA_PASSWORD>" -C `
-  -Q "RESTORE DATABASE [SISDOC] FROM DISK='/var/opt/mssql/backup/SISDOC_backup_FECHA.bak' WITH MOVE 'sisdoc_Data' TO '/var/opt/mssql/data/SISDOC.mdf', MOVE 'sisdoc_Log' TO '/var/opt/mssql/data/SISDOC_log.ldf', REPLACE"
+  -S localhost -U sa -P "CONTRASENA_SA" -C `
+  -Q "RESTORE DATABASE [SISDOC] FROM DISK='/var/opt/mssql/backup/SISDOC_backup_FECHA.bak'
+      WITH MOVE 'sisdoc_Data' TO '/var/opt/mssql/data/SISDOC.mdf',
+           MOVE 'sisdoc_Log'  TO '/var/opt/mssql/data/SISDOC_log.ldf', REPLACE"
 ```
 
-> **Nota de puerto:** SQL Server corre en el puerto `11433` del host (no 1433 — reservado por Windows/Hyper-V). Se mapea como `127.0.0.1:11433:1433` — accesible solo desde localhost.
+### Rollback a commit anterior
+
+```bash
+git log --oneline          # identificar el commit objetivo
+git checkout <commit_hash> -- backend/src/
+git checkout <commit_hash> -- frontend/src/
+# Reiniciar backend
+```
+
+---
+
+## Seguridad
+
+- **Login de BD:** `doc360_app` (no `sa`) — permisos limitados a la base SISDOC
+- **Contraseñas:** bcrypt $2b$12 — columna legacy `clave` sin texto plano
+- **JWT:** Access token 15 min + Refresh token 7 días (httpOnly cookie, revocable)
+- **CORS:** Lista explícita de orígenes permitidos
+- **Rate limiting:** 20 intentos de login por 15 minutos en producción
+- **Uploads:** Validación de extensión y tamaño en servidor + cliente
+- **SQL:** `Page Verify = CHECKSUM` activo — detección de corrupción
+- **Puerto SQL:** `127.0.0.1:11433` — no accesible desde red externa
+- El `.env` **nunca** debe subirse a Git (listado en `.gitignore`)
+- En producción: `DB_ENCRYPT=true`, `DB_TRUST_CERT=false`, certificado TLS válido
 
 ---
 
@@ -230,34 +360,70 @@ docker exec sisdoc_sqlserver /opt/mssql-tools18/bin/sqlcmd `
 
 ```
 sisdoc-modernizado/
-├── legacy/                  ← Sistema original ASP clásico (NUNCA MODIFICAR)
-├── database/
-│   ├── scripts/             ← Scripts SQL de migración y setup
-│   └── respaldo anterior.bak
-├── backend/                 ← API Node.js + TypeScript
+├── backend/
 │   ├── src/
-│   │   ├── config/          # env.ts, database.ts, swagger.ts
-│   │   ├── middleware/      # auth, errores, validación, logs
-│   │   ├── modules/         # auth | documentos | tramites | archivos
-│   │   │                      expedientes | usuarios | catalogos
-│   │   │                      busqueda | reportes | configuracion
-│   │   ├── shared/          # types, utils (sendSuccess/sendError)
-│   │   └── types/           # mssql.d.ts (declaraciones manuales)
-│   ├── uploads/             # Archivos subidos + config/ (logo, fondo)
-│   ├── .env                 # Variables de entorno (no commitear)
+│   │   ├── app.ts                    # Express: CORS, middlewares, rutas
+│   │   ├── server.ts                 # Entry point — bind 0.0.0.0:3001
+│   │   ├── config/                   # env.ts, database.ts, swagger.ts
+│   │   ├── middleware/               # auth, validate, error, logger
+│   │   ├── modules/
+│   │   │   ├── auth/                 # Login, refresh, logout, /me, reset
+│   │   │   ├── documentos/           # CRUD + derivar + historial
+│   │   │   ├── tramites/             # Bandeja + recibir + cerrar
+│   │   │   ├── archivos/             # Upload multer + lista + delete
+│   │   │   ├── memorandum/           # Generación PDF + correlativos + firmantes
+│   │   │   ├── jefaturas/            # Titular/subrogante + firma/timbre
+│   │   │   ├── firma-gob/            # Integración FirmaGOB (ClaveÚnica)
+│   │   │   ├── alertas/              # Alertas SMTP configurables
+│   │   │   ├── usuarios/             # CRUD + roles
+│   │   │   ├── roles/                # Gestión de módulos por rol
+│   │   │   ├── catalogos/            # Tipos, estados, dependencias
+│   │   │   ├── busqueda/             # Búsqueda global
+│   │   │   ├── reportes/             # Dashboard + actividad + CSV
+│   │   │   └── configuracion/        # Logo, fondo, nombres, upload-rules
+│   │   ├── shared/
+│   │   │   ├── types/api.types.ts
+│   │   │   └── utils/response.ts
+│   │   └── types/mssql.d.ts
+│   ├── uploads/                      # Archivos subidos (NO en git)
+│   │   └── config/                   # Logo, fondo, sistema.json
+│   ├── .env                          # Variables reales (NO en git)
+│   ├── .env.example                  # Plantilla sin secretos
 │   └── package.json
-├── frontend/                ← React 18 + TypeScript + Vite
+├── frontend/
 │   └── src/
-│       ├── app/             # router.tsx + providers.tsx
-│       ├── components/      # ui | layout | shared | dashboard | documentos
-│       ├── pages/           # auth | dashboard | documentos | tramites
-│       │                      bandeja | enviados | trazabilidad | busqueda
-│       │                      archivos | expedientes | reportes | admin
-│       ├── lib/api/         # Axios client + módulos de API
-│       ├── stores/          # Zustand (auth)
-│       └── hooks/           # useDebounce, useUploadRules
+│       ├── app/                      # router.tsx + providers.tsx
+│       ├── components/               # ui | layout | shared | documentos
+│       ├── pages/
+│       │   ├── auth/                 # Login, ForgotPassword, ResetPassword
+│       │   ├── dashboard/
+│       │   ├── documentos/           # Listado, Detalle, Nuevo
+│       │   ├── bandeja/
+│       │   ├── enviados/
+│       │   ├── tramites/
+│       │   ├── trazabilidad/
+│       │   ├── busqueda/
+│       │   ├── archivos/
+│       │   ├── reportes/
+│       │   ├── alertas/
+│       │   └── admin/                # Usuarios, Roles, Jefaturas, FirmaGob, Config
+│       ├── lib/api/                  # Axios client + módulos API
+│       ├── stores/                   # Zustand (auth)
+│       └── hooks/                    # useDebounce, useUploadRules
+├── database/
+│   ├── scripts/                      # SQL de migración y setup
+│   ├── backups/                      # Backups automáticos (NO en git)
+│   └── sp_legacy_fase2_backup_20260609.sql
+├── scripts/
+│   ├── backup-db.ps1                 # Backup semanal automatizado
+│   ├── restore-db.ps1
+│   ├── setup.ps1
+│   └── dev.ps1
+├── docs/
+│   ├── analisis/                     # Análisis legacy (referencia histórica)
+│   └── analisis-claude/              # Documentos de planificación (referencia histórica)
 ├── docker-compose.yml
-├── CLAUDE.md                ← Guía completa para desarrollo
+├── CLAUDE.md                         # Guía técnica completa para desarrollo
 └── README.md
 ```
 
@@ -265,75 +431,56 @@ sisdoc-modernizado/
 
 ## Variables de entorno
 
-**`backend/.env`:**
+Ver [backend/.env.example](backend/.env.example) para la lista completa con descripción de cada variable.
 
-```env
-NODE_ENV=development
-PORT=3001
+Variables críticas que deben configurarse antes del primer arranque:
 
-# Base de datos — usuario de aplicación (no sa)
-DB_USER=doc360_app
-DB_PASSWORD=CONTRASENA_APLICACION
-DB_SERVER=localhost
-DB_PORT=11433
-DB_DATABASE=SISDOC
-DB_TRUST_CERT=true
-DB_ENCRYPT=false
-
-# JWT — generar con: [Convert]::ToBase64String((New-Object Security.Cryptography.RNGCryptoServiceProvider).GetBytes(64))
-JWT_SECRET=GENERAR_MINIMO_64_BYTES_BASE64
-JWT_REFRESH_SECRET=GENERAR_MINIMO_64_BYTES_BASE64
-JWT_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
-
-# CORS
-CORS_ORIGIN=http://localhost:5173
-
-# Archivos
-UPLOAD_DIR=./uploads
-MAX_FILE_SIZE=20971520       # 20 MB — hardcap absoluto de multer
-
-# SMTP — recuperación de contraseña
-SMTP_HOST=mail.dominio.cl
-SMTP_PORT=465
-SMTP_SECURE=true
-SMTP_USER=usuario@dominio.cl
-SMTP_PASS=CAMBIAR_EN_PRODUCCION
-SMTP_FROM=DOC360 <noreply@dominio.cl>
-FRONTEND_URL=http://localhost:5173
-RESET_TOKEN_EXPIRES_MINUTES=30
-```
+| Variable | Descripción |
+|---|---|
+| `DB_PASSWORD` | Contraseña del usuario `doc360_app` en SQL Server |
+| `MSSQL_SA_PASSWORD` | Contraseña del administrador SA (usado por Docker y backups) |
+| `JWT_SECRET` | Mínimo 64 bytes base64 aleatorios |
+| `JWT_REFRESH_SECRET` | Mínimo 64 bytes base64 aleatorios |
+| `CORS_ORIGIN` | URL del frontend (ej. `https://doc360.hospital.cl`) |
+| `SMTP_HOST` | Servidor de correo para alertas y recuperación de contraseña |
+| `SMTP_PASS` | Contraseña del servidor SMTP |
 
 ---
 
-## Seguridad
+## Checklist de despliegue
 
-- La aplicación conecta a SQL Server con usuario `doc360_app` (no `sa`) — permisos limitados a la BD `SISDOC`
-- `JWT_SECRET` y `JWT_REFRESH_SECRET` generados con 64 bytes aleatorios (512 bits) — nunca usar strings predecibles
-- Contraseñas de usuarios almacenadas con bcrypt $2b$12 — la columna `clave` (legacy) no contiene texto plano
-- El `.env` **nunca** debe subirse a Git (está en `.gitignore`)
-- Puerto SQL Server vinculado a `127.0.0.1:11433` — no accesible desde la red externa
-- En producción usar `DB_ENCRYPT=true` y `DB_TRUST_CERT=false` con certificado válido
-- Restringir `CORS_ORIGIN` a dominios específicos en producción
-- `Page Verify = CHECKSUM` activo — detecta corrupción de páginas en disco
-
----
-
-## Reglas del proyecto
-
-1. **NUNCA modificar** ningún archivo dentro de `/legacy`
-2. **NUNCA eliminar** archivos sin respaldo previo
-3. Código nuevo solo en `/backend` y `/frontend`
-4. No exponer datos productivos sin anonimizar
+- [ ] Variables de entorno configuradas en servidor
+- [ ] `JWT_SECRET` y `JWT_REFRESH_SECRET` generados con entropía real
+- [ ] `DB_ENCRYPT=true` y `DB_TRUST_CERT=false` configurados
+- [ ] `CORS_ORIGIN` apunta al dominio real de producción
+- [ ] `NODE_ENV=production` en `.env`
+- [ ] Backup inicial de BD ejecutado y verificado
+- [ ] Task Scheduler de backup semanal configurado
+- [ ] Imagen de firma/timbre subida en `/admin/jefaturas` (para memorándum)
+- [ ] FirmaGOB configurado en `/admin/firma-gob` (si se usará firma electrónica)
+- [ ] SMTP probado con `/alertas/probar-servicio/:id`
+- [ ] Health check responde: `GET /api/health`
 
 ---
 
 ## Roadmap
 
-- [x] Fase 0: Infraestructura (Docker, SQL Server, backup, JWT)
+- [x] Fase 0: Infraestructura (Docker, SQL Server, JWT, backup)
 - [x] Fase 1: Auth + Dashboard + Documentos
 - [x] Fase 2: Bandeja, Enviados, Trámites, Trazabilidad, Búsqueda, Archivos
-- [x] Fase 3: Expedientes, Usuarios CRUD, Reportes + CSV, Configuración
-- [ ] Fase 4: Derivación desde UI, notificaciones en tiempo real (WebSocket)
-- [ ] Fase 5: Firma digital, módulos OIRS / Gabinete, modo oscuro
-- [ ] Fase 6: CI/CD, monitoreo, tests automatizados (Vitest)
+- [x] Fase 3: Usuarios, Roles, Reportes, Configuración, Alertas, Jefaturas
+- [x] Fase 3b: Memorándum (PDF con firma/timbre), FirmaGOB (integración base)
+- [x] Fase 3c: Auditoría funcional y correcciones de seguridad (2026-06-09)
+- [ ] Fase 4: Notificaciones en tiempo real (WebSocket)
+- [ ] Fase 5: Tests automatizados (Vitest + Supertest)
+- [ ] Fase 6: CI/CD pipeline, modo oscuro, firma digital completa
+
+---
+
+## Reglas del proyecto
+
+1. **NUNCA modificar** archivos dentro de `/legacy` (sistema original — referencia histórica)
+2. **NUNCA eliminar** archivos sin respaldo previo
+3. Código nuevo solo en `/backend` y `/frontend`
+4. No exponer datos productivos sin anonimizar
+5. Cambios en BD requieren respaldo previo y autorización explícita

@@ -1,47 +1,79 @@
-# Dependencias
+# ══════════════════════════════════════════════════════
+# DOC360 v2 — .gitignore
+# ══════════════════════════════════════════════════════
+
+# ── Dependencias ───────────────────────────────────────
 node_modules/
 .pnp
 .pnp.js
 
-# Build outputs
+# ── Build outputs ──────────────────────────────────────
 dist/
 build/
 *.tsbuildinfo
 
-# Entorno — NUNCA commitear .env real
+# ── Entorno — NUNCA commitear .env real ───────────────
 .env
 .env.local
 .env.*.local
 !.env.example
 
-# Logs
+# ── Logs ───────────────────────────────────────────────
 logs/
 *.log
 npm-debug.log*
+backend-dev.log
+frontend-dev.log
 
-# Uploads (datos de usuario — no commitear)
+# ── Uploads (datos de usuario — persistir en volumen Docker) ──
 uploads/
 
-# OS
+# ── Base de datos — backups y dumps ───────────────────
+database/*.bak
+database/*.mdf
+database/*.ldf
+database/*.dump
+database/backups/
+
+# ── Respaldos temporales de sesión (generados por Claude Code / dev) ──
+_backups_*/
+_backup_*/
+respaldo*/
+respaldos*/
+
+# ── OS ─────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# Editor
+# ── Editores ───────────────────────────────────────────
 .vscode/settings.json
+.vscode/*.code-workspace
 .idea/
 *.swp
 *.swo
+*.suo
+*.user
 
-# Prisma migrations (gestionar por separado)
-# prisma/migrations/
+# ── Herramientas IA ────────────────────────────────────
+.claude/
 
-# Docker volumes locales / backups
-database/*.mdf
-database/*.ldf
-database/backups/
-
-# Archivos temporales legacy
-*.bak
-*.zip
+# ── Archivos temporales ────────────────────────────────
 *.tmp
 *.temp
+*.bak
+*.zip
+*.rar
+*.7z
+
+# ── Certificados y claves ──────────────────────────────
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.cer
+
+# ── Legacy — comprimidos internos ─────────────────────
+legacy/**/*.zip
+legacy/**/*.rar

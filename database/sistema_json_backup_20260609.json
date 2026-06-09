@@ -1,0 +1,27 @@
+{
+  "nombreSistema": "hackeado",
+  "nombreInstitucion": "Hospital Asistencia Publica Alejandro Del Rio",
+  "loginTituloPrincipal": "Gestion Documental HUAP",
+  "loginCard1": "Documentos digitales",
+  "loginFooter": "Hospital HUAP 2026  DOC 360       ✦Ing. Arturo Moya González ✦",
+  "loginNombreSistema": "DOC 360",
+  "loginSubtitulo": "Sistema de Gestión Documental",
+  "loginDescripcion": "Plataforma enterprise para la gestión, seguimiento y trazabilidad de documentos institucionales.",
+  "loginCard2": "Flujo de derivaciones",
+  "loginCard3": "Trazabilidad completa",
+  "loginCard4": "Historial documental",
+  "uploadExtensionesPermitidas": [
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "png",
+    "jpg",
+    "jpeg",
+    "webp",
+    "txt"
+  ],
+  "uploadMaxFileMB": 20,
+  "uploadMaxTotalMB": 40
+}

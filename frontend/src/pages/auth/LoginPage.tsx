@@ -302,7 +302,7 @@ export function LoginPage() {
           <p className="mt-6 text-center text-xs text-muted-foreground">
             ¿Problemas para acceder?{' '}
             <a
-              href="mailto:aca.operaciones@huap.online"
+              href="mailto:operaciones@huap.online"
               className="text-primary hover:underline"
             >
               Contacta a soporte

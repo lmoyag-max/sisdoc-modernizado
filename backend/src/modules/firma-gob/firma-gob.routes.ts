@@ -319,26 +319,26 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
     const checksum  = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
 
     // ── 3. Construir JWT para FirmaGov ───────────────────────
-    // El RUN se limpia (solo dígitos + guion + verificador)
-    const runLimpio = body.run.trim();
-    const nowSec    = Math.floor(Date.now() / 1000);
+    const runLimpio  = body.run.trim();
+    const nowSec     = Math.floor(Date.now() / 1000);
+    const expSec     = nowSec + 1800;
 
-    // FirmaGov espera el campo 'expiration' sin milisegundos ni sufijo de zona (no ISO completo).
-    // Formato correcto: "YYYY-MM-DDTHH:mm:ss" — se obtiene cortando ".mmmZ" del toISOString().
-    const expirationStr = new Date(Date.now() + 30 * 60 * 1000)
-      .toISOString()
-      .replace(/\.\d{3}Z$/, '');
-
+    // FirmaGov valida el campo 'expiration' como Unix timestamp (segundos).
+    // Enviar ISO string causaba "fecha vencida" porque parseInt("2026-...") = 2026 < nowSec.
     const jwtPayload = {
       run:         runLimpio,
       entity:      cfg.entity,
       purpose:     cfg.purpose,
-      expiration:  expirationStr,
+      expiration:  expSec,       // Unix timestamp numérico
       iat:         nowSec,
-      exp:         nowSec + 1800,
+      exp:         expSec,
     };
 
+    // LOG DIAGNÓSTICO — payload sin el secret
+    logger.debug(`[FirmaGov] JWT payload → run=${runLimpio} | entity=${cfg.entity} | purpose=${cfg.purpose} | expiration=${expSec} | iat=${nowSec}`);
+
     const firmaJwt = jwt.sign(jwtPayload, cfg.jwt_secret, { algorithm: 'HS256' });
+    logger.debug(`[FirmaGov] JWT (header.payload sin secret): ${firmaJwt.split('.').slice(0,2).join('.')}`);
 
     // ── 4. Registrar en historial (estado: Enviado) ───────────
     const histRes = await pool.request()
@@ -389,10 +389,7 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
 
       if (!firmResponse.ok) {
         const errText = await firmResponse.text().catch(() => '');
-        logger.warn('[FirmaGov] Error HTTP %d | doc=%d | ambiente=%s | respuesta: %s',
-          firmResponse.status, body.idDocumento, cfg.ambiente,
-          errText.substring(0, 300)
-        );
+        logger.warn(`[FirmaGov] Error HTTP ${firmResponse.status} | doc=${body.idDocumento} | ambiente=${cfg.ambiente} | respuesta: ${errText.substring(0, 400)}`);
         await pool.request()
           .input('id',  sql.Int,         idHistorial)
           .input('res', sql.VarChar(500), `HTTP ${firmResponse.status}: ${errText.substring(0, 400)}`)

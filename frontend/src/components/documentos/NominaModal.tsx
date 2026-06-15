@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Printer, Download, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { apiClient } from '@/lib/api/client';
+import { uploadUrl } from '@/lib/utils';
 import { generarNominaPDF, type NominaData } from '@/lib/utils/nomina.generator';
 
 interface NominaModalProps {
@@ -149,22 +151,26 @@ async function cargarImagenComoJpegRgb(url: string): Promise<string | null> {
 }
 
 /**
- * Resuelve el logo institucional con cadena de fallback:
- *   1. /uploads/config/logo.jpg  (siempre via canvas → JPEG RGB limpio)
- *   2. /uploads/config/logo.png  (idem)
- *   3. /logo-huap.png            (logo fijo en frontend/public)
- *   4. null                      (PDF se genera sin logo)
+ * Resuelve el logo institucional desde la configuración centralizada
+ * (misma fuente que usa el memorándum: GET /configuracion → logoUrl).
+ * Si no hay logo configurado o falla la carga, usa el crest institucional
+ * embebido en frontend/public como último respaldo.
  */
 async function resolveNominaLogo(): Promise<string | null> {
-  const candidatos = [
-    '/uploads/config/logo.jpg',
-    '/uploads/config/logo.png',
-    '/logo-huap.png',
-  ];
-  for (const url of candidatos) {
-    const result = await cargarImagenComoJpegRgb(url);
-    if (result) return result;
+  try {
+    const res = await apiClient.get<{ ok: boolean; data: { logoUrl: string | null } }>('/configuracion');
+    const url = uploadUrl(res.data.data.logoUrl);
+    if (url) {
+      const result = await cargarImagenComoJpegRgb(url);
+      if (result) return result;
+    }
+  } catch (err) {
+    console.warn('[NominaModal] No se pudo obtener /configuracion:', err);
   }
+
+  const fallback = await cargarImagenComoJpegRgb('/logo-huap.png');
+  if (fallback) return fallback;
+
   console.warn('[NominaModal] No se encontró logo institucional — PDF sin logo');
   return null;
 }

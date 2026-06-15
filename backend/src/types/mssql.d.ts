@@ -35,7 +35,7 @@ declare module 'mssql' {
 
   export class Request {
     input(name: string, type: DataType, value: unknown): this;
-    query<T = Record<string, unknown>>(sql: string): Promise<{ recordset: T[]; returnValue: number }>;
+    query<T = Record<string, unknown>>(sql: string): Promise<{ recordset: T[]; returnValue: number; rowsAffected: number[] }>;
     execute<T = Record<string, unknown>>(procedure: string): Promise<{ recordset: T[]; returnValue: number }>;
   }
 
@@ -49,6 +49,7 @@ declare module 'mssql' {
   export const DateTime: DataType;
   export const Date: DataType;
   export const Float: DataType;
+  export const MAX: number;
 
   export function connect(config: config): Promise<ConnectionPool>;
   export function close(): Promise<void>;

@@ -9,6 +9,7 @@ import { sendSuccess, sendError, sendPaginated, buildPaginationMeta } from '../.
 import { AuthenticatedRequest } from '../../shared/types/api.types';
 import { env } from '../../config/env';
 import { logger } from '../../shared/utils/logger';
+import { interpretarStatus, registrarLog, construirPdfPrueba, formatearExpirationChile, limpiarRunFirmaGov, ResultadoLog } from './firma-gob.utils';
 
 const router = Router();
 router.use(requireAuth);
@@ -201,51 +202,221 @@ router.get('/historial', ...soloAdmin, async (req: Request, res: Response, next:
 });
 
 // ── POST /firma-gob/test-conexion ─────────────────────────────────
-// Verifica alcanzabilidad del endpoint de Firma.gob
+// Diagnóstico en 3 niveles:
+//  - Sin "nivel" (uso normal del botón "Probar conexión"): ejecuta UNA
+//    petición HEAD y deriva de su resultado el Nivel 1 (conectividad básica)
+//    y el Nivel 2 (comportamiento del endpoint según el código HTTP).
+//  - "nivel: 3" (botón "Validar credenciales — envío real"): solo TEST,
+//    requiere "confirmar: true" y "runPrueba" — envía un POST real con un
+//    PDF de prueba para validar JWT/credenciales contra FirmaGov.
 router.post('/test-conexion', ...soloAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { ambiente } = req.body as { ambiente?: string };
-    const amb = (ambiente ?? 'TEST').toUpperCase() as Ambiente;
+    const user = (req as unknown as AuthenticatedRequest).user;
+    const body = req.body as { ambiente?: string; nivel?: number; runPrueba?: string; confirmar?: boolean };
+    const amb = (body.ambiente ?? 'TEST').toUpperCase() as Ambiente;
     if (!AMBIENTES.includes(amb)) { sendError(res, 'Ambiente inválido', 400); return; }
 
     const pool = await getPool();
+
+    // ── Nivel 3: validación real de credenciales (envío POST controlado) ──
+    if (body.nivel === 3) {
+      if (amb !== 'TEST') {
+        sendError(res, 'La validación de credenciales (Nivel 3) solo está disponible en ambiente TEST', 400);
+        return;
+      }
+      if (!body.confirmar) {
+        sendError(res, 'Debe confirmar la acción antes de enviar una prueba real a FirmaGov', 400);
+        return;
+      }
+      const runPrueba = (body.runPrueba ?? '').trim();
+      if (!runPrueba) {
+        sendError(res, 'runPrueba es requerido para la validación de Nivel 3', 400);
+        return;
+      }
+
+      const cfgRes = await pool.request()
+        .input('amb', sql.VarChar(20), amb)
+        .query<{
+          url_api: string | null; entity: string | null; purpose: string | null;
+          api_token_key: string | null; jwt_secret: string | null; activo: boolean;
+        }>('SELECT url_api, entity, purpose, api_token_key, jwt_secret, activo FROM firma_gob_config WHERE ambiente = @amb');
+
+      const cfg = cfgRes.recordset[0];
+      if (!cfg || !cfg.url_api || !cfg.api_token_key || !cfg.jwt_secret || !cfg.entity || !cfg.purpose) {
+        sendSuccess(res, { ok: false, ambiente: amb, nivel: 3, mensaje: 'Configuración incompleta para TEST (URL, entity, purpose, token o JWT secret faltantes)' });
+        return;
+      }
+      if (!cfg.activo) {
+        sendSuccess(res, { ok: false, ambiente: amb, nivel: 3, mensaje: 'El ambiente TEST está inactivo' });
+        return;
+      }
+
+      // Payload spec-compliant según manual oficial v18 (feb-2026): 'expiration'
+      // como string ISO en hora de Chile (no timestamp Unix), 'run' sin puntos,
+      // guión ni dígito verificador, y solo los 4 campos documentados (sin
+      // 'iat'/'exp' adicionales). Se prueba aislado aquí — /solicitar no se toca.
+      const runLimpio = limpiarRunFirmaGov(runPrueba);
+      const expirationChile = formatearExpirationChile(new Date(Date.now() + 25 * 60 * 1000));
+      const jwtPayload = { run: runLimpio, entity: cfg.entity, purpose: cfg.purpose, expiration: expirationChile };
+      const firmaJwt = jwt.sign(jwtPayload, cfg.jwt_secret, { algorithm: 'HS256', noTimestamp: true });
+
+      const pdfBuffer = construirPdfPrueba();
+      const pdfBase64 = pdfBuffer.toString('base64');
+      const checksum  = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
+
+      const requestBody = {
+        api_token_key: cfg.api_token_key,
+        token:         firmaJwt,
+        files: [
+          {
+            'content-type': 'application/pdf',
+            content:        pdfBase64,
+            description:    `VALIDACION-CREDENCIALES-${Date.now()}`,
+            checksum,
+          },
+        ],
+      };
+
+      const inicio = Date.now();
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60_000);
+        // Sin header 'Authorization' adicional: el manual solo documenta
+        // 'api_token_key' dentro del body JSON.
+        const response = await fetch(cfg.url_api, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal:  controller.signal,
+          body:    JSON.stringify(requestBody),
+        });
+        clearTimeout(timeout);
+        const tiempoMs = Date.now() - inicio;
+
+        const textoRespuesta = await response.text().catch(() => '');
+        let dataRespuesta: unknown = textoRespuesta;
+        try { dataRespuesta = JSON.parse(textoRespuesta); } catch { /* respuesta no-JSON, se conserva como texto */ }
+
+        const interpretacion = interpretarStatus(response.status);
+        // El esquema de respuesta documentado usa 'idSolicitud' como
+        // identificador de nivel superior (no 'id'); se mantienen
+        // 'session_token'/'id' como fallback por si la API real difiere.
+        const ticketFirmaGov = (() => {
+          if (!dataRespuesta || typeof dataRespuesta !== 'object') return null;
+          const d = dataRespuesta as Record<string, unknown>;
+          const valor = d.idSolicitud ?? d.session_token ?? d.id;
+          return valor != null ? String(valor) : null;
+        })();
+
+        const idLog = await registrarLog(pool, {
+          ambiente:         amb,
+          accion:           'test-conexion-nivel3',
+          metodoHttp:       'POST',
+          endpoint:         cfg.url_api,
+          codigoRespuesta:  response.status,
+          resultado:        interpretacion.resultado,
+          mensaje:          interpretacion.mensaje,
+          idUsuario:        user.idUsuario,
+          usuarioNombre:    user.usuario,
+          ticketFirmaGov,
+          requestPayload:   requestBody,
+          responsePayload:  dataRespuesta,
+          tiempoRespuestaMs: tiempoMs,
+          recomendacion:    interpretacion.recomendacion,
+        });
+
+        sendSuccess(res, {
+          ok: response.ok,
+          ambiente: amb,
+          nivel: 3,
+          status: response.status,
+          mensaje: interpretacion.mensaje,
+          recomendacion: interpretacion.recomendacion,
+          ticketFirmaGov,
+          idLog,
+        });
+      } catch (fetchErr: unknown) {
+        const tiempoMs = Date.now() - inicio;
+        const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        const idLog = await registrarLog(pool, {
+          ambiente:      amb,
+          accion:        'test-conexion-nivel3',
+          metodoHttp:    'POST',
+          endpoint:      cfg.url_api,
+          resultado:     'Error',
+          mensaje:       `No se pudo conectar a FirmaGov: ${msg}`,
+          idUsuario:     user.idUsuario,
+          usuarioNombre: user.usuario,
+          requestPayload: requestBody,
+          tiempoRespuestaMs: tiempoMs,
+          stackTrace:    fetchErr instanceof Error ? (fetchErr.stack ?? null) : null,
+          recomendacion: 'Verificar la URL configurada y la conectividad de red hacia FirmaGov.',
+        });
+        sendSuccess(res, { ok: false, ambiente: amb, nivel: 3, mensaje: `No se pudo conectar a FirmaGov: ${msg}`, idLog });
+      }
+      return;
+    }
+
+    // ── Niveles 1 y 2: comportamiento del botón "Probar conexión" ──────────
     const result = await pool.request()
       .input('amb', sql.VarChar(20), amb)
       .query<{ url_api: string | null; activo: boolean }>('SELECT url_api, activo FROM firma_gob_config WHERE ambiente = @amb');
 
     const cfg = result.recordset[0];
     if (!cfg || !cfg.url_api) {
-      sendSuccess(res, { ok: false, mensaje: 'URL de API no configurada para este ambiente' });
+      sendSuccess(res, { ok: false, ambiente: amb, mensaje: 'URL de API no configurada para este ambiente' });
       return;
     }
     if (!cfg.activo) {
-      sendSuccess(res, { ok: false, mensaje: 'El ambiente está inactivo' });
+      sendSuccess(res, { ok: false, ambiente: amb, mensaje: 'El ambiente está inactivo' });
       return;
     }
 
-    // Intento de conexión real (HEAD request — no envía datos)
+    type NivelResultado = { nivel: number; ok: boolean; resultado: ResultadoLog; status?: number; mensaje: string; recomendacion?: string; idLog: number | null };
+    const niveles: NivelResultado[] = [];
+
+    // Una sola petición HEAD — no envía datos. Su resultado alimenta Nivel 1 y Nivel 2.
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(cfg.url_api, {
-        method: 'HEAD',
-        signal: controller.signal,
-      });
+      const inicio = Date.now();
+      const response = await fetch(cfg.url_api, { method: 'HEAD', signal: controller.signal });
+      const tiempoMs = Date.now() - inicio;
       clearTimeout(timeout);
 
-      const reachable          = response.status < 500;
-      const isMethodNotAllowed = response.status === 405;
-      let mensaje: string;
-      if (response.ok) {
-        mensaje = 'Servidor alcanzable y respondiendo correctamente';
-      } else if (isMethodNotAllowed) {
-        mensaje = `Servidor alcanzable (status ${response.status} — el endpoint existe pero no acepta HEAD). La conectividad está OK; las credenciales y payload solo se validan en un envío real.`;
-      } else {
-        mensaje = `Servidor respondió con status ${response.status} — puede indicar error de URL o configuración`;
-      }
-      sendSuccess(res, { ok: reachable, status: response.status, mensaje });
+      // Nivel 1: conectividad básica — el servidor respondió (sea cual sea el código)
+      const idLog1 = await registrarLog(pool, {
+        ambiente: amb, accion: 'test-conexion-nivel1', metodoHttp: 'HEAD', endpoint: cfg.url_api,
+        codigoRespuesta: response.status, resultado: 'Exitoso',
+        mensaje: 'Servidor alcanzable a nivel de red', idUsuario: user.idUsuario, usuarioNombre: user.usuario,
+        tiempoRespuestaMs: tiempoMs, recomendacion: 'Ninguna acción requerida.',
+      });
+      niveles.push({ nivel: 1, ok: true, resultado: 'Exitoso', status: response.status, mensaje: 'Servidor alcanzable a nivel de red', idLog: idLog1 });
+
+      // Nivel 2: comportamiento del endpoint según el código HTTP recibido
+      const interpretacion = interpretarStatus(response.status);
+      const idLog2 = await registrarLog(pool, {
+        ambiente: amb, accion: 'test-conexion-nivel2', metodoHttp: 'HEAD', endpoint: cfg.url_api,
+        codigoRespuesta: response.status, resultado: interpretacion.resultado, mensaje: interpretacion.mensaje,
+        idUsuario: user.idUsuario, usuarioNombre: user.usuario,
+        tiempoRespuestaMs: tiempoMs, recomendacion: interpretacion.recomendacion,
+      });
+      niveles.push({
+        nivel: 2, ok: interpretacion.resultado !== 'Error', resultado: interpretacion.resultado, status: response.status,
+        mensaje: interpretacion.mensaje, recomendacion: interpretacion.recomendacion, idLog: idLog2,
+      });
+
+      sendSuccess(res, { ok: niveles.every((n) => n.ok), ambiente: amb, niveles });
     } catch (_err) {
-      sendSuccess(res, { ok: false, mensaje: 'No se pudo conectar al endpoint de Firma.gob' });
+      const msg = _err instanceof Error ? _err.message : String(_err);
+      const idLog1 = await registrarLog(pool, {
+        ambiente: amb, accion: 'test-conexion-nivel1', metodoHttp: 'HEAD', endpoint: cfg.url_api,
+        resultado: 'Error', mensaje: `Servidor no alcanzable: ${msg}`,
+        idUsuario: user.idUsuario, usuarioNombre: user.usuario,
+        recomendacion: 'Verificar la URL configurada (url_api) y la conectividad de red.',
+        stackTrace: _err instanceof Error ? (_err.stack ?? null) : null,
+      });
+      niveles.push({ nivel: 1, ok: false, resultado: 'Error', mensaje: `Servidor no alcanzable: ${msg}`, idLog: idLog1 });
+      sendSuccess(res, { ok: false, ambiente: amb, niveles });
     }
   } catch (e) { next(e); }
 });
@@ -319,25 +490,25 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
     const checksum  = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
 
     // ── 3. Construir JWT para FirmaGov ───────────────────────
-    const runLimpio  = body.run.trim();
-    const nowSec     = Math.floor(Date.now() / 1000);
-    const expSec     = nowSec + 1800;
+    // Formato según manual oficial v18 (feb-2026): 'expiration' como string
+    // ISO en hora de Chile (no timestamp Unix), 'run' sin puntos/guión/dígito
+    // verificador, y solo los 4 campos documentados (sin 'iat'/'exp' extra).
+    // Validado vía Nivel 3 (test-conexion): este formato pasa de un 500
+    // "Unhandled Error" a un 400 documentado por FirmaGov.
+    const runLimpio       = limpiarRunFirmaGov(body.run);
+    const expirationChile = formatearExpirationChile(new Date(Date.now() + 25 * 60 * 1000));
 
-    // FirmaGov valida el campo 'expiration' como Unix timestamp (segundos).
-    // Enviar ISO string causaba "fecha vencida" porque parseInt("2026-...") = 2026 < nowSec.
     const jwtPayload = {
       run:         runLimpio,
       entity:      cfg.entity,
       purpose:     cfg.purpose,
-      expiration:  expSec,       // Unix timestamp numérico
-      iat:         nowSec,
-      exp:         expSec,
+      expiration:  expirationChile,
     };
 
     // LOG DIAGNÓSTICO — payload sin el secret
-    logger.debug(`[FirmaGov] JWT payload → run=${runLimpio} | entity=${cfg.entity} | purpose=${cfg.purpose} | expiration=${expSec} | iat=${nowSec}`);
+    logger.debug(`[FirmaGov] JWT payload → run=${runLimpio} | entity=${cfg.entity} | purpose=${cfg.purpose} | expiration=${expirationChile}`);
 
-    const firmaJwt = jwt.sign(jwtPayload, cfg.jwt_secret, { algorithm: 'HS256' });
+    const firmaJwt = jwt.sign(jwtPayload, cfg.jwt_secret, { algorithm: 'HS256', noTimestamp: true });
     logger.debug(`[FirmaGov] JWT (header.payload sin secret): ${firmaJwt.split('.').slice(0,2).join('.')}`);
 
     // ── 4. Registrar en historial (estado: Enviado) ───────────
@@ -347,42 +518,52 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
       .input('nomFirm',   sql.VarChar(100), body.nombreFirmante ?? '')
       .input('tipoFirm',  sql.VarChar(30),  body.tipoFirmante   ?? '')
       .input('ambiente',  sql.VarChar(20),  cfg.ambiente)
+      .input('runFirm',   sql.VarChar(20),  runLimpio)
+      .input('entity',    sql.VarChar(100), cfg.entity)
+      .input('purpose',   sql.VarChar(255), cfg.purpose)
       .query<{ id: number }>(`
         INSERT INTO firma_gob_historial
           (id_documento, correlativo_memo, nombre_firmante, tipo_firmante,
-           ambiente, estado, intentos_realizados, fecha_creacion)
+           ambiente, estado, intentos_realizados, fecha_creacion,
+           run_firmante, entity, purpose)
         OUTPUT INSERTED.id AS id
         VALUES
           (@idDoc, @corrMemo, @nomFirm, @tipoFirm,
-           @ambiente, 'Enviado', 1, GETDATE())
+           @ambiente, 'Enviado', 1, GETDATE(),
+           @runFirm, @entity, @purpose)
       `);
     const idHistorial = histRes.recordset[0].id;
 
+    // Payload reutilizado para los logs técnicos (firma_gob_logs) — se enmascara al guardarse
+    const requestPayloadLog = {
+      api_token_key: cfg.api_token_key,
+      token:         firmaJwt,
+      files: [
+        {
+          'content-type': 'application/pdf',
+          content:        pdfBase64,
+          description:    body.correlativoMemo,
+          checksum:       checksum,
+        },
+      ],
+    };
+
     // ── 5. Llamar a FirmaGov ─────────────────────────────────
     let signedBase64: string;
+    const inicioFetch = Date.now();
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60_000);
 
+      // Sin header 'Authorization' adicional: el manual solo documenta
+      // 'api_token_key' dentro del body JSON.
       const firmResponse = await fetch(cfg.url_api, {
         method:  'POST',
         headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Token ${cfg.api_token_key}`,
+          'Content-Type': 'application/json',
         },
         signal: controller.signal,
-        body: JSON.stringify({
-          api_token_key: cfg.api_token_key,
-          token:         firmaJwt,
-          files: [
-            {
-              'content-type': 'application/pdf',
-              content:        pdfBase64,
-              description:    body.correlativoMemo,
-              checksum:       checksum,
-            },
-          ],
-        }),
+        body: JSON.stringify(requestPayloadLog),
       });
 
       clearTimeout(timeout);
@@ -394,6 +575,14 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
           .input('id',  sql.Int,         idHistorial)
           .input('res', sql.VarChar(500), `HTTP ${firmResponse.status}: ${errText.substring(0, 400)}`)
           .query(`UPDATE firma_gob_historial SET estado='Error', resultado=@res, fecha_firma=GETDATE() WHERE id=@id`);
+        const interpretacion = interpretarStatus(firmResponse.status);
+        await registrarLog(pool, {
+          ambiente: cfg.ambiente, accion: 'solicitar-firma', metodoHttp: 'POST', endpoint: cfg.url_api,
+          codigoRespuesta: firmResponse.status, resultado: interpretacion.resultado, mensaje: interpretacion.mensaje,
+          idUsuario: user.idUsuario, usuarioNombre: user.usuario, idDocumento: body.idDocumento, idHistorial,
+          requestPayload: requestPayloadLog, responsePayload: { status: firmResponse.status, body: errText.substring(0, 2000) },
+          tiempoRespuestaMs: Date.now() - inicioFetch, recomendacion: interpretacion.recomendacion,
+        });
         sendError(res, `FirmaGov respondió con error ${firmResponse.status}. Revisa la configuración.`, 502);
         return;
       }
@@ -408,17 +597,50 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
           .input('id',  sql.Int,         idHistorial)
           .input('res', sql.VarChar(500), firmData.error ?? 'Respuesta sin archivo firmado')
           .query(`UPDATE firma_gob_historial SET estado='Error', resultado=@res, fecha_firma=GETDATE() WHERE id=@id`);
+        await registrarLog(pool, {
+          ambiente: cfg.ambiente, accion: 'solicitar-firma', metodoHttp: 'POST', endpoint: cfg.url_api,
+          codigoRespuesta: firmResponse.status, resultado: 'Error',
+          mensaje: firmData.error ?? 'FirmaGov no devolvió el PDF firmado',
+          idUsuario: user.idUsuario, usuarioNombre: user.usuario, idDocumento: body.idDocumento, idHistorial,
+          requestPayload: requestPayloadLog, responsePayload: firmData,
+          tiempoRespuestaMs: Date.now() - inicioFetch,
+          recomendacion: 'Verificar que FirmaGov devuelva el campo files[0].content con el PDF firmado.',
+        });
         sendError(res, firmData.error ?? 'FirmaGov no devolvió el PDF firmado', 502);
         return;
       }
 
       signedBase64 = firmData.files[0].content;
+
+      // ── Log técnico de éxito (aditivo, no afecta el flujo) ──────
+      // El esquema documentado usa 'idSolicitud' como identificador de nivel
+      // superior (no 'id'); se mantienen 'session_token'/'id' como fallback.
+      const ticketFirmaGov = (() => {
+        const d = firmData as unknown as Record<string, unknown>;
+        const valor = d.idSolicitud ?? d.session_token ?? d.id;
+        return valor != null ? String(valor) : null;
+      })();
+      await registrarLog(pool, {
+        ambiente: cfg.ambiente, accion: 'solicitar-firma', metodoHttp: 'POST', endpoint: cfg.url_api,
+        codigoRespuesta: firmResponse.status, resultado: 'Exitoso', mensaje: 'Credenciales válidas y endpoint operativo',
+        idUsuario: user.idUsuario, usuarioNombre: user.usuario, idDocumento: body.idDocumento, idHistorial,
+        ticketFirmaGov, requestPayload: requestPayloadLog, responsePayload: firmData,
+        tiempoRespuestaMs: Date.now() - inicioFetch, recomendacion: 'Ninguna acción requerida.',
+      });
     } catch (fetchErr: unknown) {
       const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
       await pool.request()
         .input('id',  sql.Int,         idHistorial)
         .input('res', sql.VarChar(500), msg.substring(0, 400))
         .query(`UPDATE firma_gob_historial SET estado='Error', resultado=@res, fecha_firma=GETDATE() WHERE id=@id`);
+      await registrarLog(pool, {
+        ambiente: cfg.ambiente, accion: 'solicitar-firma', metodoHttp: 'POST', endpoint: cfg.url_api,
+        resultado: 'Error', mensaje: `No se pudo conectar a FirmaGov: ${msg}`,
+        idUsuario: user.idUsuario, usuarioNombre: user.usuario, idDocumento: body.idDocumento, idHistorial,
+        requestPayload: requestPayloadLog, tiempoRespuestaMs: Date.now() - inicioFetch,
+        stackTrace: fetchErr instanceof Error ? (fetchErr.stack ?? null) : null,
+        recomendacion: 'Verificar la URL configurada y la conectividad de red hacia FirmaGov.',
+      });
       sendError(res, `No se pudo conectar a FirmaGov: ${msg}`, 503);
       return;
     }
@@ -490,6 +712,344 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
       filename: signedFilename,
       ambiente: cfg.ambiente,
     }, 'Documento firmado y despachado correctamente');
+  } catch (e) { next(e); }
+});
+
+// ── GET /firma-gob/logs ─────────────────────────────────────────────
+// Lista paginada de logs técnicos (firma_gob_logs). Filtros opcionales
+// vía query string: ambiente, accion, codigoRespuesta, idUsuario,
+// fechaDesde, fechaHasta (sobre fecha_hora), soloErrores.
+router.get('/logs', ...soloAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pagina    = Math.max(1, parseInt(String(req.query.pagina ?? '1')));
+    const porPagina = 20;
+    const offset    = (pagina - 1) * porPagina;
+
+    const ambiente        = req.query.ambiente ? String(req.query.ambiente).toUpperCase() : null;
+    const accion          = req.query.accion   ? String(req.query.accion)                 : null;
+    const usuario         = req.query.usuario  ? String(req.query.usuario)                : null;
+    const fechaDesde      = req.query.fechaDesde ? String(req.query.fechaDesde)           : null;
+    const fechaHasta      = req.query.fechaHasta ? String(req.query.fechaHasta)           : null;
+    const soloErrores     = String(req.query.soloErrores ?? '') === 'true';
+
+    const codigoRespuestaNum = req.query.codigoRespuesta ? parseInt(String(req.query.codigoRespuesta), 10) : NaN;
+    const codigoRespuesta    = Number.isNaN(codigoRespuestaNum) ? null : codigoRespuestaNum;
+
+    const idUsuarioNum = req.query.idUsuario ? parseInt(String(req.query.idUsuario), 10) : NaN;
+    const idUsuario    = Number.isNaN(idUsuarioNum) ? null : idUsuarioNum;
+
+    const pool = await getPool();
+
+    const filtros = [
+      ambiente             ? 'AND ambiente = @amb'                          : '',
+      accion               ? 'AND accion = @accion'                        : '',
+      usuario              ? 'AND usuario_nombre LIKE @usuario'            : '',
+      codigoRespuesta != null ? 'AND codigo_respuesta = @cod'              : '',
+      idUsuario != null    ? 'AND id_usuario = @idUsr'                     : '',
+      fechaDesde           ? 'AND fecha_hora >= @fechaDesde'               : '',
+      fechaHasta           ? 'AND fecha_hora < DATEADD(DAY, 1, @fechaHasta)' : '',
+      soloErrores          ? "AND resultado = 'Error'"                     : '',
+    ].filter(Boolean).join(' ');
+
+    const buildReq = () => {
+      const r = pool.request();
+      if (ambiente)             r.input('amb', sql.VarChar(20), ambiente);
+      if (accion)               r.input('accion', sql.VarChar(50), accion);
+      if (usuario)              r.input('usuario', sql.VarChar(120), `%${usuario}%`);
+      if (codigoRespuesta != null) r.input('cod', sql.Int, codigoRespuesta);
+      if (idUsuario != null)    r.input('idUsr', sql.Int, idUsuario);
+      if (fechaDesde)           r.input('fechaDesde', sql.Date, new Date(fechaDesde));
+      if (fechaHasta)           r.input('fechaHasta', sql.Date, new Date(fechaHasta));
+      return r;
+    };
+
+    const [dataRes, countRes] = await Promise.all([
+      buildReq()
+        .input('offset',   sql.Int, offset)
+        .input('pageSize', sql.Int, porPagina)
+        .query<{
+          id: number; fecha_hora: string; ambiente: string | null; accion: string;
+          metodo_http: string | null; endpoint: string | null; codigo_respuesta: number | null;
+          resultado: string; mensaje: string | null; id_usuario: number | null;
+          usuario_nombre: string | null; id_documento: number | null; ticket_firmagov: string | null;
+          tiempo_respuesta_ms: number | null; recomendacion: string | null;
+          revisado: boolean; id_historial: number | null;
+        }>(`
+          SELECT TOP (@pageSize) *
+          FROM (
+            SELECT ROW_NUMBER() OVER (ORDER BY fecha_hora DESC) AS rn,
+              id, CONVERT(VARCHAR, fecha_hora, 120) AS fecha_hora, ambiente, accion,
+              metodo_http, endpoint, codigo_respuesta, resultado, mensaje,
+              id_usuario, usuario_nombre, id_documento, ticket_firmagov,
+              tiempo_respuesta_ms, recomendacion, revisado, id_historial
+            FROM firma_gob_logs
+            WHERE 1=1 ${filtros}
+          ) t
+          WHERE rn > @offset
+        `),
+      buildReq().query<{ total: number }>(`
+        SELECT COUNT(*) AS total FROM firma_gob_logs WHERE 1=1 ${filtros}
+      `),
+    ]);
+
+    const total = countRes.recordset[0].total;
+    sendPaginated(res, dataRes.recordset, buildPaginationMeta(total, pagina, porPagina));
+  } catch (e) { next(e); }
+});
+
+// ── GET /firma-gob/logs/exportar ────────────────────────────────────
+// CSV con BOM (compatible Excel). Mismos filtros que GET /logs, sin
+// paginar (cap MAX_EXPORT_ROWS_LOGS). Registrada ANTES de /logs/:id.
+const MAX_EXPORT_ROWS_LOGS = 5000;
+
+router.get('/logs/exportar', ...soloAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ambiente    = req.query.ambiente ? String(req.query.ambiente).toUpperCase() : null;
+    const accion      = req.query.accion   ? String(req.query.accion)                 : null;
+    const usuario     = req.query.usuario  ? String(req.query.usuario)                : null;
+    const fechaDesde  = req.query.fechaDesde ? String(req.query.fechaDesde)           : null;
+    const fechaHasta  = req.query.fechaHasta ? String(req.query.fechaHasta)           : null;
+    const soloErrores = String(req.query.soloErrores ?? '') === 'true';
+
+    const codigoRespuestaNum = req.query.codigoRespuesta ? parseInt(String(req.query.codigoRespuesta), 10) : NaN;
+    const codigoRespuesta    = Number.isNaN(codigoRespuestaNum) ? null : codigoRespuestaNum;
+
+    const idUsuarioNum = req.query.idUsuario ? parseInt(String(req.query.idUsuario), 10) : NaN;
+    const idUsuario    = Number.isNaN(idUsuarioNum) ? null : idUsuarioNum;
+
+    const pool = await getPool();
+
+    const filtros = [
+      ambiente             ? 'AND ambiente = @amb'                          : '',
+      accion               ? 'AND accion = @accion'                        : '',
+      usuario              ? 'AND usuario_nombre LIKE @usuario'            : '',
+      codigoRespuesta != null ? 'AND codigo_respuesta = @cod'              : '',
+      idUsuario != null    ? 'AND id_usuario = @idUsr'                     : '',
+      fechaDesde           ? 'AND fecha_hora >= @fechaDesde'               : '',
+      fechaHasta           ? 'AND fecha_hora < DATEADD(DAY, 1, @fechaHasta)' : '',
+      soloErrores          ? "AND resultado = 'Error'"                     : '',
+    ].filter(Boolean).join(' ');
+
+    const request = pool.request().input('maxRows', sql.Int, MAX_EXPORT_ROWS_LOGS);
+    if (ambiente)             request.input('amb', sql.VarChar(20), ambiente);
+    if (accion)               request.input('accion', sql.VarChar(50), accion);
+    if (usuario)              request.input('usuario', sql.VarChar(120), `%${usuario}%`);
+    if (codigoRespuesta != null) request.input('cod', sql.Int, codigoRespuesta);
+    if (idUsuario != null)    request.input('idUsr', sql.Int, idUsuario);
+    if (fechaDesde)           request.input('fechaDesde', sql.Date, new Date(fechaDesde));
+    if (fechaHasta)           request.input('fechaHasta', sql.Date, new Date(fechaHasta));
+
+    const result = await request.query<{
+      id: number; fecha_hora: string; ambiente: string | null; accion: string;
+      metodo_http: string | null; endpoint: string | null; codigo_respuesta: number | null;
+      resultado: string; mensaje: string | null; usuario_nombre: string | null;
+      id_documento: number | null; ticket_firmagov: string | null;
+      tiempo_respuesta_ms: number | null; revisado: boolean;
+    }>(`
+      SELECT TOP (@maxRows)
+        id, CONVERT(VARCHAR, fecha_hora, 120) AS fecha_hora, ambiente, accion,
+        metodo_http, endpoint, codigo_respuesta, resultado, mensaje, usuario_nombre,
+        id_documento, ticket_firmagov, tiempo_respuesta_ms, revisado
+      FROM firma_gob_logs
+      WHERE 1=1 ${filtros}
+      ORDER BY fecha_hora DESC
+    `);
+
+    const headers = ['ID','Fecha/Hora','Ambiente','Acción','Método','Endpoint','Código','Resultado','Mensaje','Usuario','Documento','Ticket FirmaGov','Tiempo (ms)','Revisado'];
+    const rows = result.recordset.map((r) => [
+      r.id,
+      r.fecha_hora,
+      r.ambiente ?? '',
+      r.accion,
+      r.metodo_http ?? '',
+      `"${(r.endpoint ?? '').replace(/"/g, '""')}"`,
+      r.codigo_respuesta ?? '',
+      r.resultado,
+      `"${(r.mensaje ?? '').replace(/"/g, '""')}"`,
+      r.usuario_nombre ?? '',
+      r.id_documento ?? '',
+      r.ticket_firmagov ?? '',
+      r.tiempo_respuesta_ms ?? '',
+      r.revisado ? 'Sí' : 'No',
+    ].join(','));
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="firma_gob_logs_${Date.now()}.csv"`);
+    if (result.recordset.length >= MAX_EXPORT_ROWS_LOGS) {
+      res.setHeader('X-Export-Truncated', 'true');
+      res.setHeader('X-Export-Limit', String(MAX_EXPORT_ROWS_LOGS));
+    }
+    res.send('﻿' + csv);
+  } catch (e) { next(e); }
+});
+
+// ── GET /firma-gob/logs/:id ──────────────────────────────────────────
+// Detalle completo de un log técnico (incluye payloads enmascarados,
+// stack trace y recomendación).
+router.get('/logs/:id', ...soloAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) { sendError(res, 'ID inválido', 400); return; }
+
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query<{
+        id: number; fecha_hora: string; ambiente: string | null; accion: string;
+        metodo_http: string | null; endpoint: string | null; codigo_respuesta: number | null;
+        resultado: string; mensaje: string | null; id_usuario: number | null;
+        usuario_nombre: string | null; id_documento: number | null; ticket_firmagov: string | null;
+        request_payload: string | null; response_payload: string | null;
+        tiempo_respuesta_ms: number | null; stack_trace: string | null; recomendacion: string | null;
+        revisado: boolean; fecha_revisado: string | null; id_usuario_revisor: number | null;
+        id_historial: number | null;
+      }>(`
+        SELECT id, CONVERT(VARCHAR, fecha_hora, 120) AS fecha_hora, ambiente, accion,
+          metodo_http, endpoint, codigo_respuesta, resultado, mensaje,
+          id_usuario, usuario_nombre, id_documento, ticket_firmagov,
+          request_payload, response_payload, tiempo_respuesta_ms, stack_trace, recomendacion,
+          revisado, CONVERT(VARCHAR, fecha_revisado, 120) AS fecha_revisado, id_usuario_revisor, id_historial
+        FROM firma_gob_logs
+        WHERE id = @id
+      `);
+
+    const log = result.recordset[0];
+    if (!log) { sendError(res, 'Log no encontrado', 404); return; }
+
+    const parseJson = (val: string | null): unknown => {
+      if (!val) return null;
+      try { return JSON.parse(val); } catch { return val; }
+    };
+
+    sendSuccess(res, {
+      ...log,
+      request_payload:  parseJson(log.request_payload),
+      response_payload: parseJson(log.response_payload),
+    });
+  } catch (e) { next(e); }
+});
+
+// ── PATCH /firma-gob/logs/:id/revisado ───────────────────────────────
+// Marca/desmarca un log como revisado. Body: { revisado: boolean }
+router.patch('/logs/:id/revisado', ...soloAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as unknown as AuthenticatedRequest).user;
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) { sendError(res, 'ID inválido', 400); return; }
+
+    const { revisado } = req.body as { revisado?: boolean };
+    if (typeof revisado !== 'boolean') { sendError(res, 'revisado (boolean) es requerido', 400); return; }
+
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('id',       sql.Int, id)
+      .input('revisado', sql.Bit, revisado ? 1 : 0)
+      .input('idUsr',    sql.Int, revisado ? user.idUsuario : null)
+      .query(`
+        UPDATE firma_gob_logs
+        SET revisado = @revisado,
+            fecha_revisado = CASE WHEN @revisado = 1 THEN GETDATE() ELSE NULL END,
+            id_usuario_revisor = @idUsr
+        WHERE id = @id
+      `);
+
+    if (result.rowsAffected[0] === 0) { sendError(res, 'Log no encontrado', 404); return; }
+    sendSuccess(res, null, revisado ? 'Log marcado como revisado' : 'Log marcado como pendiente');
+  } catch (e) { next(e); }
+});
+
+// ── POST /firma-gob/logs/:id/reintentar ──────────────────────────────
+// Solo para logs de diagnóstico (accion empieza con 'test-conexion-').
+// Crea una NUEVA fila de log con el resultado actual — no muta la original.
+// Para 'solicitar-firma' devuelve indicación de usar el flujo del documento.
+router.post('/logs/:id/reintentar', ...soloAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as unknown as AuthenticatedRequest).user;
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) { sendError(res, 'ID inválido', 400); return; }
+
+    const pool = await getPool();
+    const logRes = await pool.request()
+      .input('id', sql.Int, id)
+      .query<{ id: number; accion: string; ambiente: string | null }>(
+        'SELECT id, accion, ambiente FROM firma_gob_logs WHERE id = @id'
+      );
+    const log = logRes.recordset[0];
+    if (!log) { sendError(res, 'Log no encontrado', 404); return; }
+
+    if (!log.accion.startsWith('test-conexion-')) {
+      sendError(res, 'Para reintentar una firma, ve al documento y vuelve a solicitar la firma desde el flujo de memorándum', 400);
+      return;
+    }
+
+    const amb = (log.ambiente ?? 'TEST').toUpperCase() as Ambiente;
+    if (!AMBIENTES.includes(amb)) { sendError(res, 'Ambiente inválido en el log original', 400); return; }
+
+    if (log.accion === 'test-conexion-nivel3') {
+      sendError(res, 'Para repetir la validación de credenciales (Nivel 3), use el botón "Validar credenciales (envío real)" en la pestaña Configuración — requiere confirmación y RUT de prueba.', 400);
+      return;
+    }
+
+    // Niveles 1/2 — re-ejecuta una petición HEAD con la configuración actual del ambiente
+    const cfgRes = await pool.request()
+      .input('amb', sql.VarChar(20), amb)
+      .query<{ url_api: string | null; activo: boolean }>('SELECT url_api, activo FROM firma_gob_config WHERE ambiente = @amb');
+
+    const cfg = cfgRes.recordset[0];
+    if (!cfg || !cfg.url_api) {
+      sendSuccess(res, { ok: false, ambiente: amb, mensaje: 'URL de API no configurada para este ambiente' });
+      return;
+    }
+    if (!cfg.activo) {
+      sendSuccess(res, { ok: false, ambiente: amb, mensaje: 'El ambiente está inactivo' });
+      return;
+    }
+
+    type NivelResultado = { nivel: number; ok: boolean; resultado: ResultadoLog; status?: number; mensaje: string; recomendacion?: string; idLog: number | null };
+    const niveles: NivelResultado[] = [];
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const inicio = Date.now();
+      const response = await fetch(cfg.url_api, { method: 'HEAD', signal: controller.signal });
+      const tiempoMs = Date.now() - inicio;
+      clearTimeout(timeout);
+
+      const idLog1 = await registrarLog(pool, {
+        ambiente: amb, accion: 'test-conexion-nivel1', metodoHttp: 'HEAD', endpoint: cfg.url_api,
+        codigoRespuesta: response.status, resultado: 'Exitoso',
+        mensaje: 'Servidor alcanzable a nivel de red', idUsuario: user.idUsuario, usuarioNombre: user.usuario,
+        tiempoRespuestaMs: tiempoMs, recomendacion: 'Ninguna acción requerida.',
+      });
+      niveles.push({ nivel: 1, ok: true, resultado: 'Exitoso', status: response.status, mensaje: 'Servidor alcanzable a nivel de red', idLog: idLog1 });
+
+      const interpretacion = interpretarStatus(response.status);
+      const idLog2 = await registrarLog(pool, {
+        ambiente: amb, accion: 'test-conexion-nivel2', metodoHttp: 'HEAD', endpoint: cfg.url_api,
+        codigoRespuesta: response.status, resultado: interpretacion.resultado, mensaje: interpretacion.mensaje,
+        idUsuario: user.idUsuario, usuarioNombre: user.usuario,
+        tiempoRespuestaMs: tiempoMs, recomendacion: interpretacion.recomendacion,
+      });
+      niveles.push({
+        nivel: 2, ok: interpretacion.resultado !== 'Error', resultado: interpretacion.resultado, status: response.status,
+        mensaje: interpretacion.mensaje, recomendacion: interpretacion.recomendacion, idLog: idLog2,
+      });
+
+      sendSuccess(res, { ok: niveles.every((n) => n.ok), ambiente: amb, niveles });
+    } catch (_err) {
+      const msg = _err instanceof Error ? _err.message : String(_err);
+      const idLog1 = await registrarLog(pool, {
+        ambiente: amb, accion: 'test-conexion-nivel1', metodoHttp: 'HEAD', endpoint: cfg.url_api,
+        resultado: 'Error', mensaje: `Servidor no alcanzable: ${msg}`,
+        idUsuario: user.idUsuario, usuarioNombre: user.usuario,
+        recomendacion: 'Verificar la URL configurada (url_api) y la conectividad de red.',
+        stackTrace: _err instanceof Error ? (_err.stack ?? null) : null,
+      });
+      niveles.push({ nivel: 1, ok: false, resultado: 'Error', mensaje: `Servidor no alcanzable: ${msg}`, idLog: idLog1 });
+      sendSuccess(res, { ok: false, ambiente: amb, niveles });
+    }
   } catch (e) { next(e); }
 });
 

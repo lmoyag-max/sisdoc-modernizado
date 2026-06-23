@@ -27,6 +27,8 @@ export interface MemorandumData {
   firmaTimbreNatH?:   number;
   /** Logo institucional */
   logoBase64:         string | null;
+  /** Servicio/dependencia del firmante — si no viene, se usa `origen` */
+  servicioFirmante?:  string | null;
 }
 
 // ── Helpers internos ──────────────────────────────────────────
@@ -36,6 +38,109 @@ function fmtFecha(val: string | null | undefined): string {
   try {
     return new Date(val).toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' });
   } catch { return val; }
+}
+
+/** Formatea fecha/hora actual en horario de Chile: "DD-MM-AAAA HH:MM CLT". */
+function fmtFechaFirma(d: Date): string {
+  const formatter = new Intl.DateTimeFormat('es-CL', {
+    timeZone: 'America/Santiago',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const parts = formatter.formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  const hora = get('hour') === '24' ? '00' : get('hour');
+  return `${get('day')}-${get('month')}-${get('year')} ${hora}:${get('minute')} CLT`;
+}
+
+/**
+ * Dibuja texto curvo a lo largo de un arco de circunferencia, con espaciado
+ * proporcional al ancho real de cada caracter (evita que letras anchas
+ * queden apretadas). `flip=true` orienta el texto para el arco inferior de
+ * forma que se lea normal (no al revés) — usado para "GOBIERNO DE CHILE".
+ */
+function drawArcText(
+  doc: jsPDF, text: string, cx: number, cy: number, radius: number,
+  centerAngleDeg: number, fontSize: number, color: [number, number, number], flip: boolean,
+): void {
+  doc.setFontSize(fontSize);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...color);
+
+  const chars  = text.split('');
+  const widths = chars.map((ch) => doc.getTextWidth(ch));
+  const totalWidth = widths.reduce((a, b) => a + b, 0);
+  const totalAngle = (totalWidth / radius) * (180 / Math.PI);
+
+  const dir = flip ? 1 : -1;
+  let angleDeg = centerAngleDeg - dir * (totalAngle / 2);
+
+  chars.forEach((ch, i) => {
+    const halfCharAngle = (widths[i] / radius) * (180 / Math.PI) / 2;
+    const charAngle = angleDeg + dir * halfCharAngle;
+    const angleRad  = (charAngle * Math.PI) / 180;
+    const x = cx + radius * Math.cos(angleRad);
+    const y = cy - radius * Math.sin(angleRad);
+    const rotation = flip ? charAngle + 90 : charAngle - 90;
+    doc.text(ch, x, y, { angle: rotation, align: 'center' });
+    angleDeg += dir * halfCharAngle * 2;
+  });
+}
+
+/**
+ * Dibuja el sello "Firma Electrónica Avanzada — Gobierno de Chile" (círculo
+ * con texto curvo + icono) y, a su derecha, los datos del firmante. Se usa
+ * cuando el documento se firma vía FirmaGov (sin imagen de firma+timbre
+ * escaneada) — la firma criptográfica real va embebida en el PDF por
+ * FirmaGov; este sello es la representación visual equivalente.
+ */
+function drawSelloFirmaElectronica(
+  doc: jsPDF, cx: number, cyTop: number, nombreFirmante: string, cargoFirmante: string,
+  servicio: string | null, textX: number,
+): number {
+  const azulGob: [number, number, number] = [70, 110, 165];
+  const r = 13;
+  const cy = cyTop + r;
+
+  doc.setDrawColor(...azulGob);
+  doc.setLineWidth(0.5);
+  doc.circle(cx, cy, r, 'S');
+  doc.setLineWidth(0.3);
+  doc.circle(cx, cy, r - 1.4, 'S');
+
+  drawArcText(doc, 'FIRMA ELECTRÓNICA AVANZADA', cx, cy, r - 4, 90, 4.3, azulGob, false);
+  drawArcText(doc, 'GOBIERNO DE CHILE', cx, cy, r - 4, -90, 4.5, azulGob, true);
+
+  // Icono: documento con líneas
+  doc.setDrawColor(...azulGob);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(cx - 3.7, cy - 5, 7.4, 9.3, 1, 1, 'S');
+  doc.setLineWidth(0.25);
+  doc.line(cx - 1.9, cy - 2.3, cx + 1.9, cy - 2.3);
+  doc.line(cx - 1.9, cy - 0.5, cx + 1.9, cy - 0.5);
+  doc.line(cx - 1.9, cy + 1.3, cx + 0.4, cy + 1.3);
+  doc.setFillColor(...azulGob);
+  doc.circle(cx + 2.1, cy + 3.1, 1, 'F');
+
+  // Datos del firmante a la derecha del sello
+  let ty = cy - 9;
+  doc.setTextColor(40, 40, 40);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('Firmado por:', textX, ty);
+  ty += 4.3;
+  doc.setFontSize(8.5);
+  doc.text(nombreFirmante, textX, ty);
+  ty += 4.3;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(cargoFirmante, textX, ty);
+  ty += 4.3;
+  doc.text(`Fecha: ${fmtFechaFirma(new Date())}`, textX, ty);
+  ty += 4.3;
+  if (servicio) doc.text(servicio, textX, ty);
+
+  return cy + r; // y final ocupado por el sello (borde inferior del círculo)
 }
 
 /** Carga una URL de imagen (pública o con credenciales) como data URL JPEG.
@@ -333,29 +438,68 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
       console.warn('[memoPDF] addImage firma+timbre falló:', e);
       y += 8;
     }
+
+    // Línea de firma
+    doc.setDrawColor(...negro);
+    doc.setLineWidth(0.4);
+    doc.line(firmaX + 5, y, firmaX + firmaW - 5, y);
+    y += 4;
+
+    // Nombre y cargo centrados en la zona de firma
+    doc.setTextColor(...negro);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(data.nombreFirmante, firmaX + firmaW / 2, y, { align: 'center' });
+    y += 5;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...grisLabel);
+    doc.text(data.cargoFirmante, firmaX + firmaW / 2, y, { align: 'center' });
+    y += 5;
+  } else if (!data.esBorrador) {
+    // Definitivo, sin imagen escaneada: firma vía FirmaGov — sello "Firma
+    // Electrónica Avanzada" + datos del firmante. Este PDF es el que se
+    // envía a FirmaGov para firmar; la firma criptográfica real (PAdES/
+    // PKCS#7) queda embebida por FirmaGov al momento de procesarlo.
+    // IMPORTANTE: nunca se dibuja en la vista previa (esBorrador=true) —
+    // mostrar el sello antes de tener una respuesta real de FirmaGov
+    // implicaría visualmente que el documento ya está firmado sin estarlo.
+    const selloCx   = firmaX + 17;
+    const selloTextX = selloCx + 13 + 6;
+    const yFinSello = drawSelloFirmaElectronica(
+      doc, selloCx, y, data.nombreFirmante, data.cargoFirmante,
+      data.servicioFirmante ?? data.origen ?? null, selloTextX,
+    );
+    y = yFinSello + 4;
   } else {
-    console.warn('[memoPDF] firmaTimbreBase64 es null — imagen no disponible.');
+    // Vista previa (borrador): solo nombre y cargo, sin sello — la firma
+    // electrónica todavía no existe en esta etapa.
     y += 8;
+
+    doc.setDrawColor(...negro);
+    doc.setLineWidth(0.4);
+    doc.line(firmaX + 5, y, firmaX + firmaW - 5, y);
+    y += 4;
+
+    doc.setTextColor(...negro);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(data.nombreFirmante, firmaX + firmaW / 2, y, { align: 'center' });
+    y += 5;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...grisLabel);
+    doc.text(data.cargoFirmante, firmaX + firmaW / 2, y, { align: 'center' });
+    y += 5;
+
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...grisLabel);
+    doc.text('(Pendiente de firma electrónica — se aplicará al confirmar con FirmaGov)', firmaX + firmaW / 2, y, { align: 'center' });
+    y += 5;
   }
-
-  // Línea de firma
-  doc.setDrawColor(...negro);
-  doc.setLineWidth(0.4);
-  doc.line(firmaX + 5, y, firmaX + firmaW - 5, y);
-  y += 4;
-
-  // Nombre y cargo centrados en la zona de firma
-  doc.setTextColor(...negro);
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.nombreFirmante, firmaX + firmaW / 2, y, { align: 'center' });
-  y += 5;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...grisLabel);
-  doc.text(data.cargoFirmante, firmaX + firmaW / 2, y, { align: 'center' });
-  y += 5;
 
   // ── 8. Línea separadora inferior ─────────────────────────────
   y += 4;

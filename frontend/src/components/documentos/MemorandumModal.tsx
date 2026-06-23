@@ -110,6 +110,7 @@ export function MemorandumModal({
           firmaTimbreNatW:   0,
           firmaTimbreNatH:   0,
           logoBase64:        logoB64,
+          servicioFirmante:  firmante.dependencia ?? origenNombre,
         };
 
         const doc  = generarMemorandumPDF(memoData);
@@ -182,6 +183,7 @@ export function MemorandumModal({
         firmaTimbreNatW:   0,
         firmaTimbreNatH:   0,
         logoBase64:        logoB64,
+        servicioFirmante:  firmante.dependencia ?? origenNombre,
       };
 
       const docPdf  = generarMemorandumPDF(memoDefin);

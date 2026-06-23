@@ -6,7 +6,7 @@ export async function getTiposDocumento() {
     SELECT id_tipo_documento AS id, desc_tipo_documento AS descripcion
     FROM tipo_documento
     WHERE ISNULL(vigencia, 'S') = 'S'
-    ORDER BY desc_tipo_documento
+    ORDER BY CASE WHEN desc_tipo_documento = 'Memorandum' THEN 0 ELSE 1 END, desc_tipo_documento
   `);
   return r.recordset;
 }

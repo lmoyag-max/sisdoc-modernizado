@@ -15,6 +15,7 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+      TZ: "America/Santiago"
     # Dev: 1433 expuesto solo a localhost para que el backend en el host pueda conectar
     # En prod (perfil prod) el backend corre en Docker y accede por la red interna
     ports:

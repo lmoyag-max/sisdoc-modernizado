@@ -114,6 +114,8 @@ interface ArchivoItem {
   preview_url: string | null;
   download_url: string | null;
   subido_por?: string | null;
+  es_firmado_firmagov?: boolean;
+  es_borrador_de_memo?: boolean;
 }
 
 // ── Icono según extensión del archivo ────────────────────────
@@ -516,12 +518,24 @@ export function DocumentoDetallePage() {
                           }}
                           title="Ver archivo"
                         >
-                          <p className={cn(
-                            'text-sm font-medium truncate transition-colors',
-                            canPreview && 'group-hover:text-primary cursor-pointer'
-                          )}>
-                            {nombre}
-                          </p>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className={cn(
+                              'text-sm font-medium truncate transition-colors',
+                              canPreview && 'group-hover:text-primary cursor-pointer'
+                            )}>
+                              {nombre}
+                            </p>
+                            {a.es_firmado_firmagov && (
+                              <Badge variant="outline" className="shrink-0 text-[10px] border-emerald-300 text-emerald-700 dark:text-emerald-400">
+                                Firmado digitalmente
+                              </Badge>
+                            )}
+                            {a.es_borrador_de_memo && (
+                              <Badge variant="outline" className="shrink-0 text-[10px] border-amber-300 text-amber-700 dark:text-amber-400">
+                                Borrador sin firma
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             {a.fecha_subida ? formatRelativo(a.fecha_subida) : ''}
                             {a.subido_por ? ` · ${a.subido_por}` : ''}

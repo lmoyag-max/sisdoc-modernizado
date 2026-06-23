@@ -338,16 +338,19 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
       tamano: number | null; tipo_mime: string | null;
       fecha_sistema: Date | null; materia: string | null;
       usuario_upload: string | null; nombre_upload: string | null;
+      id_archivo_firmado: number | null; correlativo_memo: string | null;
     }>(`
       SELECT a.id_archivo_digital, a.id_documento, a.archivo, a.ruta,
              a.tamano, a.tipo_mime,
              a.fecha_sistema, d.materia,
              u.usuario AS usuario_upload,
-             LTRIM(RTRIM(ISNULL(f.nombres, '') + ' ' + ISNULL(f.apellidos, ''))) AS nombre_upload
+             LTRIM(RTRIM(ISNULL(f.nombres, '') + ' ' + ISNULL(f.apellidos, ''))) AS nombre_upload,
+             mg.id_archivo_firmado, mg.correlativo AS correlativo_memo
       FROM archivo_digital a
-      LEFT JOIN documento   d ON a.id_documento  = d.id_documento
-      LEFT JOIN usuario     u ON a.id_usuario    = u.id_usuario
-      LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
+      LEFT JOIN documento   d  ON a.id_documento  = d.id_documento
+      LEFT JOIN usuario     u  ON a.id_usuario    = u.id_usuario
+      LEFT JOIN funcionario f  ON u.id_funcionario = f.id_funcionario
+      LEFT JOIN memo_generado mg ON mg.id_documento = a.id_documento
       WHERE ${where}
       ORDER BY a.fecha_sistema DESC
     `);
@@ -365,6 +368,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
       url:            r.ruta ? `/uploads/${r.ruta}` : null,
       preview_url:    `/api/v1/archivos/${r.id_archivo_digital}/preview`,
       download_url:   `/api/v1/archivos/${r.id_archivo_digital}/download`,
+      // Distingue el PDF realmente firmado por FirmaGov del borrador original
+      // subido antes de firmar — ambos quedan en archivo_digital con el mismo id_documento.
+      es_firmado_firmagov: r.id_archivo_firmado != null && r.id_archivo_firmado === r.id_archivo_digital,
+      es_borrador_de_memo: r.correlativo_memo != null && r.id_archivo_firmado != null && r.id_archivo_firmado !== r.id_archivo_digital,
     })));
   } catch (e) { next(e); }
 });

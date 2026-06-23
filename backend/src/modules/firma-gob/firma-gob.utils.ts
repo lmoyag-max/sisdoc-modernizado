@@ -91,7 +91,11 @@ export function enmascarar(valor: string | null | undefined): string {
   return `${valor.slice(0, 4)}...${valor.slice(-4)} (${valor.length} caracteres)`;
 }
 
-const CLAVES_SENSIBLES = new Set(['api_token_key', 'token', 'jwt_secret', 'authorization', 'Authorization']);
+// 'token' (el JWT firmado) queda fuera de este set deliberadamente: expira en
+// minutos, no contiene jwt_secret ni api_token_key, y sus claims (run/entity/
+// purpose/expiration) no son confidenciales — verlo completo en los logs es
+// necesario para diagnóstico con FirmaGov/Gobierno Digital.
+const CLAVES_SENSIBLES = new Set(['api_token_key', 'jwt_secret', 'authorization', 'Authorization']);
 
 /** Clona un payload (request/response) ocultando credenciales y contenido binario antes de persistirlo. */
 export function enmascararPayload(valor: unknown): unknown {

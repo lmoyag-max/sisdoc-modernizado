@@ -417,7 +417,7 @@ router.post('/confirmar', async (req: Request, res: Response, next: NextFunction
       .input('cuerpo',        sql.VarChar(8000), (body.cuerpo ?? '').substring(0, 8000) || null)
       .input('nomFirm',       sql.VarChar(100), body.nombreFirmante ?? null)
       .input('cargoFirm',     sql.VarChar(100), body.cargoFirmante ?? null)
-      .input('tipoFirm',      sql.VarChar(10),  body.tipoFirmante ?? null)
+      .input('tipoFirm',      sql.VarChar(20),  body.tipoFirmante ?? null)
       .input('ftRuta',        sql.VarChar(100), ftBase)
       .query(`
         INSERT INTO memo_generado

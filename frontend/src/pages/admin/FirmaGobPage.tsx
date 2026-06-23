@@ -967,6 +967,29 @@ function LogDetailModal({ logId, onClose }: { logId: number; onClose: () => void
                 {data.recomendacion && <p className="text-xs text-muted-foreground">{data.recomendacion}</p>}
               </div>
 
+              {/* Token completo (JWT) — extraído de la solicitud enviada */}
+              {data.request_payload != null && typeof (data.request_payload as Record<string, unknown>).token === 'string' && (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Token utilizado</p>
+                  <textarea
+                    readOnly
+                    value={(data.request_payload as Record<string, unknown>).token as string}
+                    rows={3}
+                    className="w-full text-xs font-mono bg-muted/30 rounded-lg p-3 overflow-x-auto resize-none border border-border"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <Button
+                    variant="outline" size="sm" className="gap-1.5"
+                    onClick={() => {
+                      navigator.clipboard.writeText((data.request_payload as Record<string, unknown>).token as string);
+                      toast.success('Token copiado al portapapeles');
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copiar Token
+                  </Button>
+                </div>
+              )}
+
               {/* Request/Response payloads */}
               {data.request_payload != null && (
                 <div className="space-y-1">

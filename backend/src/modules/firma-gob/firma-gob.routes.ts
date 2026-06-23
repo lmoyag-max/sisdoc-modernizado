@@ -515,8 +515,12 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
     const histRes = await pool.request()
       .input('idDoc',     sql.Int,          body.idDocumento)
       .input('corrMemo',  sql.VarChar(30),  body.correlativoMemo)
-      .input('nomFirm',   sql.VarChar(100), body.nombreFirmante ?? '')
-      .input('tipoFirm',  sql.VarChar(30),  body.tipoFirmante   ?? '')
+      // String vacío ('') en parámetros VarChar dispara un bug conocido del
+      // driver mssql/tedious: "Data type 0xA7 has an invalid data length or
+      // metadata length" (TDS RPC). Usar null evita el bug y es semánticamente
+      // correcto — ambas columnas son nullable.
+      .input('nomFirm',   sql.VarChar(100), body.nombreFirmante || null)
+      .input('tipoFirm',  sql.VarChar(30),  body.tipoFirmante   || null)
       .input('ambiente',  sql.VarChar(20),  cfg.ambiente)
       .input('runFirm',   sql.VarChar(20),  runLimpio)
       .input('entity',    sql.VarChar(100), cfg.entity)

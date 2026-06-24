@@ -1,0 +1,108 @@
+# ══════════════════════════════════════════════════════════════
+# DOC360 — Docker Compose de PREPRODUCCIÓN
+# Uso (ver README_PREPROD.md para el detalle completo):
+#   docker compose -f docker-compose.preprod.yml up -d --build
+#   docker compose -f docker-compose.preprod.yml down
+#   docker compose -f docker-compose.preprod.yml logs -f backend
+#
+# Requiere antes de levantar:
+#   1. cp backend/.env.example backend/.env   (y completar valores reales)
+#   2. export MSSQL_SA_PASSWORD=...           (o agregarlo a un .env en la raíz)
+#   3. Carpetas uploads/ y logs/ deben existir en la raíz (ya están en el repo)
+#
+# IMPORTANTE: el "name:" de abajo aísla este stack del docker-compose.yml de
+# desarrollo (que también define un servicio "sqlserver"). Sin esto, Docker
+# Compose puede confundir ambos proyectos si se ejecutan desde la misma
+# carpeta y terminar recreando/destruyendo el contenedor equivocado.
+# ══════════════════════════════════════════════════════════════
+
+name: sisdoc_preprod
+
+services:
+
+  # ────────────────────────────────────────
+  # SQL Server 2022
+  # ────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sisdoc_preprod_sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+      TZ: "America/Santiago"
+    ports:
+      - "127.0.0.1:11433:1433"
+    volumes:
+      - sisdoc_preprod_sqlserver_data:/var/opt/mssql/data
+      - ./database:/var/opt/mssql/backup
+    restart: unless-stopped
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${MSSQL_SA_PASSWORD}" -C -Q "SELECT 1" -b || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - sisdoc_preprod_net
+
+  # ────────────────────────────────────────
+  # Backend Node.js / Express
+  # ────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: sisdoc_preprod_backend
+    image: sisdoc-backend:preprod
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      DB_SERVER: sqlserver
+      DB_PORT: "1433"
+      PORT: "3001"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - sisdoc_preprod_net
+
+  # ────────────────────────────────────────
+  # Nginx + Frontend (build 100% en Docker)
+  # ────────────────────────────────────────
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: sisdoc_preprod_nginx
+    image: sisdoc-frontend:preprod
+    ports:
+      - "80:80"
+    volumes:
+      - ./uploads:/usr/share/nginx/uploads:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sisdoc_preprod_net
+
+networks:
+  sisdoc_preprod_net:
+    name: sisdoc_preprod_network
+    driver: bridge
+
+volumes:
+  sisdoc_preprod_sqlserver_data:
+    name: sisdoc_preprod_sqlserver_data

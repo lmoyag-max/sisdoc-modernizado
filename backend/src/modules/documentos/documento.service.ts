@@ -5,6 +5,7 @@ import {
   DerivarDto, TerminarDto, ReabrirDto, FiltrosDocumentoDto,
 } from './documento.schema';
 import { buildPaginationMeta } from '../../shared/utils/response';
+import { logger } from '../../shared/utils/logger';
 
 // ── Listar ───────────────────────────────────────────────────
 
@@ -430,7 +431,20 @@ export async function reabrirDocumento(idDocumento: number, dto: ReabrirDto, idU
 export async function eliminarDocumento(idDocumento: number, idUsuario: number) {
   const doc = await repo.findById(idDocumento);
   if (!doc) throw { statusCode: 404, message: 'Documento no encontrado' };
-  await repo.softDelete(idDocumento, idUsuario);
+  try {
+    await repo.softDelete(idDocumento, idUsuario);
+  } catch (e) {
+    // Diagnóstico claro: distinguir restricción de base de datos (FK) de
+    // cualquier otro fallo — ayuda a detectar rápido si en el futuro se
+    // agrega una tabla nueva con FK hacia documento sin actualizar softDelete.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/REFERENCE constraint|FOREIGN KEY/i.test(msg)) {
+      logger.error(`[documentos] Eliminación de documento ${idDocumento} bloqueada por restricción de base de datos (FK): ${msg}`);
+    } else {
+      logger.error(`[documentos] Error inesperado al eliminar documento ${idDocumento}: ${msg}`);
+    }
+    throw e;
+  }
 }
 
 // ── Mappers ───────────────────────────────────────────────────
@@ -459,6 +473,8 @@ function mapDocumento(row: repo.DocumentoRow) {
     // Campos Oficina de Partes (null-safe: docs legados no tienen estos campos)
     tipoSoporte: row.medio === 'F' ? 'F' : 'D',
     reservado:   row.resuelto === 'S',
+    // Correlativo de memorándum (solo aplica si el documento es un Memorándum confirmado)
+    numeroMemo: row.correlativo_memo ?? null,
   };
 }
 

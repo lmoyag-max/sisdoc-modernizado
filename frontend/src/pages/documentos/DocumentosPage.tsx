@@ -166,15 +166,16 @@ export function DocumentosPage() {
       {/* Tabla desktop */}
       <Card className="hidden md:block">
         <div className="overflow-x-auto">
-          <div className="min-w-[680px]">
+          <div className="min-w-[780px]">
             <CardHeader className="px-6 py-4 border-b bg-muted/20">
               <div className="grid grid-cols-12 gap-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-1">N°</div>
-                <div className="col-span-4 flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors">
+                <div className="col-span-3 flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors">
                   Asunto <ArrowUpDown className="h-3 w-3" />
                 </div>
                 <div className="col-span-2">Tipo</div>
-                <div className="col-span-2">Ingresado por</div>
+                <div className="col-span-2">N° Memorándum</div>
+                <div className="col-span-1">Ingresado por</div>
                 <div className="col-span-2">Estado</div>
                 <div className="col-span-1">Fecha</div>
               </div>
@@ -185,9 +186,10 @@ export function DocumentosPage() {
                   {Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="grid grid-cols-12 gap-4 px-6 py-4 items-center">
                       <Skeleton className="col-span-1 h-4 w-16" />
-                      <Skeleton className="col-span-4 h-4" />
+                      <Skeleton className="col-span-3 h-4" />
                       <Skeleton className="col-span-2 h-4 w-20" />
                       <Skeleton className="col-span-2 h-4 w-24" />
+                      <Skeleton className="col-span-1 h-4 w-16" />
                       <Skeleton className="col-span-2 h-5 w-20 rounded-full" />
                       <Skeleton className="col-span-1 h-4 w-16" />
                     </div>
@@ -217,7 +219,7 @@ export function DocumentosPage() {
                             {doc.numDocumento ?? `#${doc.idDocumento}`}
                           </span>
                         </div>
-                        <div className="col-span-4 min-w-0">
+                        <div className="col-span-3 min-w-0">
                           <div className="flex items-center gap-1.5 mb-0.5">
                             {doc.reservado && <Lock className="h-3 w-3 text-violet-500 shrink-0" aria-label="Reservado" />}
                             {doc.tipoSoporte === 'F' && <Paperclip className="h-3 w-3 text-slate-400 shrink-0" aria-label="Documento físico" />}
@@ -232,6 +234,13 @@ export function DocumentosPage() {
                           </span>
                         </div>
                         <div className="col-span-2">
+                          {doc.tipoDocumento?.descripcion === 'Memorandum' && doc.numeroMemo && (
+                            <span className="text-xs font-mono text-muted-foreground line-clamp-1">
+                              {doc.numeroMemo}
+                            </span>
+                          )}
+                        </div>
+                        <div className="col-span-1">
                           <span className="text-xs text-muted-foreground line-clamp-1">
                             {doc.ingresadoPor.nombre || doc.ingresadoPor.usuario || '—'}
                           </span>

@@ -1,5 +1,6 @@
 import { getPool, sql } from '../../config/database';
 import { FiltrosDocumentoDto } from './documento.schema';
+import { logger } from '../../shared/utils/logger';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -23,6 +24,8 @@ export interface DocumentoRow {
   // Reservado: 'S'=sí (columna resuelto legacy reutilizada)
   resuelto: string | null;
   total: number;
+  // Correlativo de memorándum (poblado en findMany y findById; ausente en findByNumero)
+  correlativo_memo?: string | null;
 }
 
 export interface TramiteRow {
@@ -103,12 +106,14 @@ export async function findMany(filtros: FiltrosDocumentoDto, filtroServicio?: Fi
       f.nombres, f.apellidos,
       d.fecha_documento, d.fecha_sistema,
       d.medio, d.resuelto,
+      mg.correlativo AS correlativo_memo,
       COUNT(*) OVER() AS total
     FROM documento d
     LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
     LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
     LEFT JOIN usuario u           ON d.id_usuario          = u.id_usuario
     LEFT JOIN funcionario f       ON u.id_funcionario      = f.id_funcionario
+    LEFT JOIN memo_generado mg    ON mg.id_documento       = d.id_documento
     WHERE ${where}
     ORDER BY d.fecha_sistema DESC
     OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
@@ -156,12 +161,14 @@ export async function findById(idDocumento: number): Promise<DocumentoRow | null
       f.nombres, f.apellidos,
       d.fecha_documento, d.fecha_sistema,
       d.medio, d.resuelto,
+      mg.correlativo AS correlativo_memo,
       0 AS total
     FROM documento d
     LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
     LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
     LEFT JOIN usuario u           ON d.id_usuario          = u.id_usuario
     LEFT JOIN funcionario f       ON u.id_funcionario      = f.id_funcionario
+    LEFT JOIN memo_generado mg    ON mg.id_documento       = d.id_documento
     WHERE d.id_documento = @id
   `);
   return result.recordset[0] ?? null;
@@ -643,8 +650,19 @@ export async function softDelete(idDocumento: number, _idUsuario: number): Promi
     `);
   } catch { /* si falla el backup, continuar igual */ }
 
-  // Eliminar en orden para respetar FK
-  // documento_destino tiene FK_docdest_documento → debe borrarse antes que documento
+  // Eliminar en orden para respetar FK:
+  // 1. firma_gob_historial.id_documento es nullable → se desvincula (no se
+  //    borra) para conservar la auditoría de intentos de firma electrónica.
+  // 2. memo_generado.id_documento es NOT NULL → debe borrarse antes que
+  //    documento. Además memo_generado.id_archivo_digital referencia
+  //    archivo_digital, así que debe borrarse ANTES que archivo_digital.
+  // 3. documento_destino.id_documento es NOT NULL → antes que documento.
+  // 4. archivo_digital y tramite no tienen FK hacia documento, pero se
+  //    borran antes por prolijidad (no quedan huérfanos).
+  await pool.request().input('id', sql.Int, idDocumento)
+    .query('UPDATE firma_gob_historial SET id_documento = NULL WHERE id_documento = @id');
+  await pool.request().input('id', sql.Int, idDocumento)
+    .query('DELETE FROM memo_generado WHERE id_documento = @id');
   await pool.request().input('id', sql.Int, idDocumento)
     .query('DELETE FROM archivo_digital WHERE id_documento = @id');
   await pool.request().input('id', sql.Int, idDocumento)
@@ -653,4 +671,6 @@ export async function softDelete(idDocumento: number, _idUsuario: number): Promi
     .query('DELETE FROM documento_destino WHERE id_documento = @id');
   await pool.request().input('id', sql.Int, idDocumento)
     .query('DELETE FROM documento WHERE id_documento = @id');
+
+  logger.info(`[documentos] Documento ${idDocumento} eliminado por usuario ${_idUsuario} (memo_generado, archivo_digital, tramite y documento_destino asociados también eliminados; firma_gob_historial desvinculado).`);
 }

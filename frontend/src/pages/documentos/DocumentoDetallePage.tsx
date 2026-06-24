@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FilePreviewModal, type PreviewFile } from '@/components/shared/FilePreviewModal';
@@ -73,6 +73,8 @@ interface Documento {
   // Campos Oficina de Partes
   tipoSoporte?: 'D' | 'F';
   reservado?: boolean;
+  // Correlativo de memorándum (solo presente si el documento es un Memorándum confirmado)
+  numeroMemo?: string | null;
 }
 
 interface TramiteEvento {
@@ -164,6 +166,15 @@ export function DocumentoDetallePage() {
     enabled: !isNaN(idDocumento),
     retry: 1,
   });
+
+  // Diagnóstico: un documento Memorándum sin numeroMemo es un caso anómalo
+  // (debería venir siempre que el memo fue confirmado) — no rompe la
+  // pantalla, solo se registra para investigar.
+  useEffect(() => {
+    if (doc?.tipoDocumento?.descripcion === 'Memorandum' && !doc.numeroMemo) {
+      console.warn(`[DocumentoDetallePage] Documento ${doc.idDocumento} es Memorándum pero no tiene numeroMemo (correlativo no encontrado).`);
+    }
+  }, [doc]);
 
   // Trazabilidad (usa el endpoint correcto)
   const { data: trazabilidad, isLoading: loadingTraz } = useQuery({
@@ -375,6 +386,9 @@ export function DocumentoDetallePage() {
                 <>
                   <InfoRow icon={Hash}       label="Número"      value={doc?.numDocumento ? `N° ${doc.numDocumento}` : `ID ${doc?.idDocumento}`} />
                   <InfoRow icon={Tag}        label="Tipo"        value={safeStr(doc?.tipoDocumento?.descripcion)} />
+                  {doc?.tipoDocumento?.descripcion === 'Memorandum' && doc?.numeroMemo && (
+                    <InfoRow icon={Hash} label="N° Memorándum" value={doc.numeroMemo} />
+                  )}
                   <InfoRow icon={CheckCircle2} label="Estado"    value={estadoCfg?.label ?? safeStr(doc?.estadoDocumento?.descripcion)} />
                   <InfoRow icon={User}       label="Ingresado por" value={safeStr(doc?.ingresadoPor)} />
                   <InfoRow icon={Calendar}   label="Fecha documento" value={doc?.fechaDocumento ? formatFechaHora(doc.fechaDocumento) : '—'} />

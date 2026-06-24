@@ -14,6 +14,8 @@ export interface Documento {
   fechaIngreso: string | null;
   fechaCierre: string | null;
   observacion: string | null;
+  // Correlativo de memorándum (solo presente si el documento es un Memorándum confirmado)
+  numeroMemo?: string | null;
 }
 
 export interface FiltrosDocumento {

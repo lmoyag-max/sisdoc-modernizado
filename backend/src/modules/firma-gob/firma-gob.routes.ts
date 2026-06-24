@@ -9,7 +9,7 @@ import { sendSuccess, sendError, sendPaginated, buildPaginationMeta } from '../.
 import { AuthenticatedRequest } from '../../shared/types/api.types';
 import { env } from '../../config/env';
 import { logger } from '../../shared/utils/logger';
-import { interpretarStatus, registrarLog, construirPdfPrueba, formatearExpirationChile, limpiarRunFirmaGov, ResultadoLog } from './firma-gob.utils';
+import { interpretarStatus, registrarLog, construirPdfPrueba, formatearExpirationChile, limpiarRunFirmaGov, revertirDocumentoSinFirmar, ResultadoLog } from './firma-gob.utils';
 
 const router = Router();
 router.use(requireAuth);
@@ -587,6 +587,7 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
           requestPayload: requestPayloadLog, responsePayload: { status: firmResponse.status, body: errText.substring(0, 2000) },
           tiempoRespuestaMs: Date.now() - inicioFetch, recomendacion: interpretacion.recomendacion,
         });
+        await revertirDocumentoSinFirmar(pool, body.idDocumento, uploadDir);
         sendError(res, `FirmaGov respondió con error ${firmResponse.status}. Revisa la configuración.`, 502);
         return;
       }
@@ -610,6 +611,7 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
           tiempoRespuestaMs: Date.now() - inicioFetch,
           recomendacion: 'Verificar que FirmaGov devuelva el campo files[0].content con el PDF firmado.',
         });
+        await revertirDocumentoSinFirmar(pool, body.idDocumento, uploadDir);
         sendError(res, firmData.error ?? 'FirmaGov no devolvió el PDF firmado', 502);
         return;
       }
@@ -645,32 +647,39 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
         stackTrace: fetchErr instanceof Error ? (fetchErr.stack ?? null) : null,
         recomendacion: 'Verificar la URL configurada y la conectividad de red hacia FirmaGov.',
       });
+      await revertirDocumentoSinFirmar(pool, body.idDocumento, uploadDir);
       sendError(res, `No se pudo conectar a FirmaGov: ${msg}`, 503);
       return;
     }
 
-    // ── 6. Guardar PDF firmado en disco ───────────────────────
-    const signedBuffer   = Buffer.from(signedBase64, 'base64');
-    const ts             = Date.now().toString().slice(-8);
-    const signedFilename = `${ts}f.pdf`;                 // sufijo 'f' indica firmado
-    const signedPath     = path.join(uploadDir, signedFilename);
+    // ── 6. Guardar PDF firmado en disco con el nombre oficial del memo ─
+    // Se reemplaza el archivo físico del borrador (mismo registro de BD,
+    // ver paso 7) en vez de crear un archivo nuevo — evita dejar dos
+    // adjuntos (borrador + firmado) asociados al mismo documento.
+    const signedBuffer = Buffer.from(signedBase64, 'base64');
+    const nombreFinal   = `${body.correlativoMemo.replace(/[^A-Za-z0-9_-]/g, '_')}.pdf`.slice(0, 50);
+    const signedPath    = path.join(uploadDir, nombreFinal);
     fs.writeFileSync(signedPath, signedBuffer);
 
-    // ── 7. Registrar en archivo_digital ──────────────────────
-    const insertArqRes = await pool.request()
-      .input('idDoc',  sql.Int,          body.idDocumento)
-      .input('idUsr',  sql.Int,          user.idUsuario)
-      .input('arq',    sql.VarChar(50),  signedFilename)
-      .input('ruta',   sql.VarChar(50),  signedFilename)
-      .input('tam',    sql.Int,          signedBuffer.length)
-      .query<{ id_archivo_digital: number }>(`
-        INSERT INTO archivo_digital
-          (id_documento, id_usuario, archivo, ruta, tamano, tipo_mime, fecha_sistema, fecha_update)
-        OUTPUT INSERTED.id_archivo_digital
-        VALUES
-          (@idDoc, @idUsr, @arq, @ruta, @tam, 'application/pdf', GETDATE(), GETDATE())
+    if (arq.ruta !== nombreFinal) {
+      try { fs.unlinkSync(pdfPath); } catch (e) {
+        logger.warn(`[FirmaGov] No se pudo eliminar el archivo físico del borrador (${pdfPath}): ${e}`);
+      }
+    }
+
+    // ── 7. Reemplazar el archivo_digital del borrador por el firmado ──
+    // Mismo id_archivo_digital que el borrador — queda un único adjunto.
+    await pool.request()
+      .input('id',   sql.Int,          body.idArchivoOriginal)
+      .input('arq',  sql.VarChar(50),  nombreFinal)
+      .input('ruta', sql.VarChar(50),  nombreFinal)
+      .input('tam',  sql.Int,          signedBuffer.length)
+      .query(`
+        UPDATE archivo_digital
+        SET    archivo = @arq, ruta = @ruta, tamano = @tam, fecha_update = GETDATE()
+        WHERE  id_archivo_digital = @id
       `);
-    const idArchivoFirmado = insertArqRes.recordset[0].id_archivo_digital;
+    const idArchivoFirmado = body.idArchivoOriginal;
 
     // ── 8. Vincular PDF firmado a memo_generado ───────────────
     await pool.request()
@@ -713,7 +722,7 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
 
     sendSuccess(res, {
       idArchivoFirmado,
-      filename: signedFilename,
+      filename: nombreFinal,
       ambiente: cfg.ambiente,
     }, 'Documento firmado y despachado correctamente');
   } catch (e) { next(e); }

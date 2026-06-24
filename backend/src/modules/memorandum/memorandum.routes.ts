@@ -7,9 +7,24 @@ import { getPool, sql } from '../../config/database';
 import { sendSuccess, sendCreated, sendError } from '../../shared/utils/response';
 import { AuthenticatedRequest } from '../../shared/types/api.types';
 import { env } from '../../config/env';
+import { logger } from '../../shared/utils/logger';
 
 const router = Router();
 router.use(requireAuth);
+
+// ── Código corto de dependencia para el correlativo (MEMO-AÑO-COD-NNNNNN) ──
+// Determinístico: 3 letras del nombre (sin tildes) + 3 dígitos del id —
+// garantiza unicidad sin colisiones entre dependencias de nombre similar.
+function generarCodigoDependencia(desc: string, idDependencia: number): string {
+  const limpio = desc
+    .toUpperCase()
+    .replace(/[ÁÀÄÂ]/g, 'A').replace(/[ÉÈËÊ]/g, 'E').replace(/[ÍÌÏÎ]/g, 'I')
+    .replace(/[ÓÒÖÔ]/g, 'O').replace(/[ÚÙÜÛ]/g, 'U').replace(/Ñ/g, 'N')
+    .replace(/[^A-Z]/g, '');
+  const prefijo = limpio.slice(0, 3) || 'DEP';
+  const sufijo  = String(idDependencia).padStart(3, '0').slice(-3);
+  return `${prefijo}${sufijo}`;
+}
 
 // ── Directorio para imágenes de firma/timbre ──────────────────
 const MEMO_IMG_DIR = path.resolve(env.UPLOAD_DIR, 'config', 'memo');
@@ -376,42 +391,63 @@ router.post('/confirmar', async (req: Request, res: Response, next: NextFunction
     const pool = await getPool();
     const anio = new Date().getFullYear();
 
-    // ── Asignación atómica de correlativo ─────────────────────
-    // MERGE garantiza upsert; UPDLOCK+SERIALIZABLE evitan race conditions.
-    const corrResult = await pool.request()
-      .input('anio', sql.Int, anio)
-      .query<{ ultimo_numero: number }>(`
-        BEGIN TRANSACTION;
+    // ── Código de dependencia (cada servicio numera su propia secuencia) ──
+    // Sin dependencia conocida → bucket "GEN" (general), comparte el
+    // contador legado (anio, id_dependencia=NULL) que ya existía antes de
+    // este cambio — no rompe los correlativos previamente emitidos.
+    const idDepKey = body.idDependencia ?? null;
+    let codigoDep = 'GEN';
+    if (idDepKey != null) {
+      const depRes = await pool.request()
+        .input('id', sql.Int, idDepKey)
+        .query<{ desc_dependencia: string; cod_dependencia: string | null }>(
+          'SELECT desc_dependencia, cod_dependencia FROM dependencia WHERE id_dependencia = @id'
+        );
+      const dep = depRes.recordset[0];
+      if (dep) {
+        codigoDep = dep.cod_dependencia ?? generarCodigoDependencia(dep.desc_dependencia, idDepKey);
+        if (!dep.cod_dependencia) {
+          await pool.request()
+            .input('id',  sql.Int,         idDepKey)
+            .input('cod', sql.VarChar(6),  codigoDep)
+            .query('UPDATE dependencia SET cod_dependencia = @cod WHERE id_dependencia = @id');
+        }
+      }
+    }
 
-        MERGE memo_correlativo WITH (HOLDLOCK) AS target
-        USING (SELECT @anio AS anio) AS source ON target.anio = source.anio
-        WHEN MATCHED THEN
-          UPDATE SET ultimo_numero = ultimo_numero + 1, fecha_update = GETDATE()
-        WHEN NOT MATCHED THEN
-          INSERT (anio, ultimo_numero, fecha_update)
-          VALUES (@anio, 1, GETDATE());
-
-        SELECT ultimo_numero FROM memo_correlativo WHERE anio = @anio;
-
-        COMMIT TRANSACTION;
-      `);
-
-    const numero     = corrResult.recordset[0].ultimo_numero;
-    const correlativo = `MEMO-${anio}-${String(numero).padStart(6, '0')}`;
-
-    // ── Insertar en memo_generado ─────────────────────────────
-    // Prioriza firmaTimbreRuta (imagen combinada); cae en firmaRuta legado si no viene.
+    // ── Asignación de correlativo: MAX(numero) + 1 sobre memos ACTIVOS ──
+    // "Activo" = su documento todavía existe (el borrado es físico — ver
+    // documento.repository.ts softDelete()). Si se borran todos los memos
+    // de un año+servicio, el siguiente vuelve a partir en 1; si se borra uno
+    // intermedio, ese número queda libre para el próximo memo nuevo (no
+    // necesariamente el siguiente cronológico) — decisión de negocio
+    // explícita: se prioriza no dejar números "huérfanos" por sobre la
+    // garantía de unicidad histórica del correlativo entre documentos
+    // distintos. TABLOCKX+HOLDLOCK: el cálculo del MAX y el INSERT ocurren
+    // en una sola transacción para que dos confirmaciones concurrentes no
+    // puedan calcular el mismo número.
     const ftBase = body.firmaTimbreRuta
       ? path.basename(body.firmaTimbreRuta)
       : (body.firmaRuta ? path.basename(body.firmaRuta) : null);
 
-    await pool.request()
+    const ultimoActivoRes = await pool.request()
+      .input('anio',  sql.Int, anio)
+      .input('idDep', sql.Int, idDepKey)
+      .query<{ ultimo_activo: number | null }>(`
+        SELECT MAX(mg.numero) AS ultimo_activo
+        FROM memo_generado mg
+        INNER JOIN documento d ON d.id_documento = mg.id_documento
+        WHERE mg.anio = @anio AND ISNULL(mg.id_dependencia_origen, -1) = ISNULL(@idDep, -1)
+      `);
+    const ultimoActivo = ultimoActivoRes.recordset[0].ultimo_activo;
+    logger.info(`[memorandum] Calculando correlativo — año=${anio} servicio=${codigoDep} (idDependencia=${idDepKey ?? 'GEN'}) último número activo encontrado=${ultimoActivo ?? '(ninguno)'}; se excluyen memos cuyo documento fue eliminado.`);
+
+    const insertResult = await pool.request()
       .input('idDoc',         sql.Int,          body.idDocumento)
-      .input('corr',          sql.VarChar(20),  correlativo)
       .input('anio',          sql.Int,          anio)
-      .input('numero',        sql.Int,          numero)
       .input('idUsr',         sql.Int,          user.idUsuario)
-      .input('idDep',         sql.Int,          body.idDependencia ?? null)
+      .input('idDep',         sql.Int,          idDepKey)
+      .input('codigoDep',     sql.VarChar(6),   codigoDep)
       .input('materia',       sql.VarChar(250), (body.materia ?? '').substring(0, 250))
       .input('referencia',    sql.VarChar(250), (body.referencia ?? '').substring(0, 250) || null)
       .input('cuerpo',        sql.VarChar(8000), (body.cuerpo ?? '').substring(0, 8000) || null)
@@ -419,18 +455,36 @@ router.post('/confirmar', async (req: Request, res: Response, next: NextFunction
       .input('cargoFirm',     sql.VarChar(100), body.cargoFirmante ?? null)
       .input('tipoFirm',      sql.VarChar(20),  body.tipoFirmante ?? null)
       .input('ftRuta',        sql.VarChar(100), ftBase)
-      .query(`
+      .query<{ correlativo: string; numero: number }>(`
+        BEGIN TRANSACTION;
+
+        DECLARE @sigNumero INT;
+        SELECT @sigNumero = ISNULL(MAX(mg.numero), 0) + 1
+        FROM memo_generado mg WITH (TABLOCKX, HOLDLOCK)
+        INNER JOIN documento d ON d.id_documento = mg.id_documento
+        WHERE mg.anio = @anio AND ISNULL(mg.id_dependencia_origen, -1) = ISNULL(@idDep, -1);
+
+        DECLARE @corr VARCHAR(30) = 'MEMO-' + CAST(@anio AS VARCHAR(4)) + '-' + @codigoDep + '-'
+          + RIGHT('000000' + CAST(@sigNumero AS VARCHAR(6)), 6);
+
         INSERT INTO memo_generado
           (id_documento, correlativo, anio, numero, id_usuario_creador,
            id_dependencia_origen, materia, referencia, cuerpo,
            nombre_firmante, cargo_firmante, tipo_firmante,
            firma_timbre_ruta, generado_por_sistema, fecha_creacion)
         VALUES
-          (@idDoc, @corr, @anio, @numero, @idUsr,
+          (@idDoc, @corr, @anio, @sigNumero, @idUsr,
            @idDep, @materia, @referencia, @cuerpo,
            @nomFirm, @cargoFirm, @tipoFirm,
-           @ftRuta, 1, GETDATE())
+           @ftRuta, 1, GETDATE());
+
+        SELECT @corr AS correlativo, @sigNumero AS numero;
+
+        COMMIT TRANSACTION;
       `);
+
+    const { correlativo, numero } = insertResult.recordset[0];
+    logger.info(`[memorandum] Correlativo asignado: ${correlativo} (documento ${body.idDocumento}).`);
 
     sendCreated(res, { correlativo, numero, anio }, 'Correlativo asignado');
   } catch (e) { next(e); }
@@ -446,7 +500,7 @@ router.patch('/vincular-archivo', async (req: Request, res: Response, next: Next
 
     const pool = await getPool();
     await pool.request()
-      .input('corr',       sql.VarChar(20), correlativo)
+      .input('corr',       sql.VarChar(30), correlativo)
       .input('idArchivo',  sql.Int,         idArchivo)
       .query('UPDATE memo_generado SET id_archivo_digital = @idArchivo WHERE correlativo = @corr');
 

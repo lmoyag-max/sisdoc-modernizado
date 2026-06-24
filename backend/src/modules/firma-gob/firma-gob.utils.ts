@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { sql } from '../../config/database';
 import { logger } from '../../shared/utils/logger';
 
@@ -236,4 +238,63 @@ export function construirPdfPrueba(): Buffer {
   pdf += `trailer\n<< /Size ${totalObjetos} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
 
   return Buffer.from(pdf, 'latin1');
+}
+
+// ── Reversión de documento cuando FirmaGov no firma exitosamente ──────────
+// El documento/memo/correlativo se crean ANTES de llamar a FirmaGov (porque
+// el PDF que se envía a firmar necesita el correlativo definitivo). Si
+// FirmaGov falla, ese documento no debe quedar a medio camino — sin firma,
+// sin despachar, con un PDF con el sello visual de firma electrónica ya
+// grabado (aunque nunca se firmó realmente). Esta función deshace esa
+// creación por completo. El correlativo se calcula como MAX(numero de memos
+// con documento activo)+1 (ver memorandum.routes.ts /confirmar) — al borrar
+// memo_generado y documento más abajo, el número queda libre automáticamente
+// para el siguiente intento, sin necesidad de tocar ningún contador. Los
+// logs técnicos (firma_gob_historial/firma_gob_logs) se conservan para
+// auditoría, solo se desvincula la referencia al documento eliminado.
+export async function revertirDocumentoSinFirmar(pool: Pool, idDocumento: number, uploadDir: string): Promise<void> {
+  try {
+    const archivosRes = await pool.request()
+      .input('idDoc', sql.Int, idDocumento)
+      .query<{ ruta: string | null }>('SELECT ruta FROM archivo_digital WHERE id_documento = @idDoc');
+
+    for (const fila of archivosRes.recordset) {
+      if (!fila.ruta) continue;
+      try { fs.unlinkSync(path.join(uploadDir, fila.ruta)); } catch { /* best-effort */ }
+    }
+
+    const memoRes = await pool.request()
+      .input('idDoc', sql.Int, idDocumento)
+      .query<{ anio: number; numero: number; id_dependencia_origen: number | null }>(
+        'SELECT anio, numero, id_dependencia_origen FROM memo_generado WHERE id_documento = @idDoc'
+      );
+    const memo = memoRes.recordset[0];
+
+    await pool.request()
+      .input('idDoc', sql.Int, idDocumento)
+      .query('UPDATE firma_gob_historial SET id_documento = NULL WHERE id_documento = @idDoc');
+
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM documento_destino WHERE id_documento = @idDoc');
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM tramite WHERE id_documento = @idDoc');
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM memo_generado WHERE id_documento = @idDoc');
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM archivo_digital WHERE id_documento = @idDoc');
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM documento WHERE id_documento = @idDoc');
+
+    if (memo) {
+      // El correlativo se calcula como MAX(numero activo)+1 (ver
+      // memorandum.routes.ts /confirmar) — al borrar memo_generado y
+      // documento arriba, este número queda automáticamente libre para el
+      // próximo memo del mismo año+servicio. No requiere ningún paso extra.
+      logger.info(`[FirmaGov] Documento ${idDocumento} revertido tras fallo de firma. Número ${memo.numero} (año ${memo.anio}, servicio ${memo.id_dependencia_origen ?? 'GEN'}) liberado para reuso.`);
+    } else {
+      logger.info(`[FirmaGov] Documento ${idDocumento} revertido tras fallo de firma (sin memo_generado asociado).`);
+    }
+  } catch (e) {
+    logger.error(`[FirmaGov] No se pudo revertir el documento ${idDocumento} tras fallo de firma: ${e}`);
+  }
 }

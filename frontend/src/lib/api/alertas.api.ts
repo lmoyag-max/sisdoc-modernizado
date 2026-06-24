@@ -63,7 +63,7 @@ export interface ResultadoServicio {
 
 const BASE = '/alertas';
 
-const unwrap = async <T>(promise: ReturnType<typeof apiClient.get>): Promise<T> => {
+const unwrap = async <T>(promise: Promise<{ data: unknown }>): Promise<T> => {
   const { data } = await promise;
   return (data as { ok: boolean; data: T }).data;
 };

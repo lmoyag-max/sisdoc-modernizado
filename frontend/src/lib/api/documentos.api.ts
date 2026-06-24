@@ -16,6 +16,9 @@ export interface Documento {
   observacion: string | null;
   // Correlativo de memorándum (solo presente si el documento es un Memorándum confirmado)
   numeroMemo?: string | null;
+  // Campos Oficina de Partes (null-safe: docs legados no tienen estos campos)
+  tipoSoporte?: 'D' | 'F';
+  reservado?: boolean;
 }
 
 export interface FiltrosDocumento {

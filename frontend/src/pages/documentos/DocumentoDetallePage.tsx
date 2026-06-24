@@ -79,6 +79,7 @@ interface Documento {
 
 interface TramiteEvento {
   idSeguimiento: number;
+  idDocumento: number;
   estadoTramite: { id: number | null; descripcion: string | null };
   procedencia: { id: number | null; descripcion: string | null; tipo: string | null };
   destino: { id: number | null; descripcion: string | null; tipo: string | null };

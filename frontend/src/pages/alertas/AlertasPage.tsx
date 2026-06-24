@@ -155,7 +155,7 @@ function DestinatariosPanel({ serviciosConDocs }: { serviciosConDocs: Set<number
 
   const { data: destinatarios = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['alertas-destinatarios'],
-    queryFn:  alertasApi.getDestinatarios,
+    queryFn:  () => alertasApi.getDestinatarios(),
   });
 
   const toggle = (id: number) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
@@ -283,7 +283,7 @@ function PendientesPanel({
 }) {
   const { data: pendientes = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['alertas-pendientes'],
-    queryFn:  alertasApi.getPendientes,
+    queryFn:  () => alertasApi.getPendientes(),
   });
 
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
@@ -538,7 +538,7 @@ export function AlertasPage() {
   // Pre-carga pendientes para el panel de destinatarios (saber qué servicios tienen docs)
   const { data: pendientesAll = [] } = useQuery({
     queryKey: ['alertas-pendientes'],
-    queryFn:  alertasApi.getPendientes,
+    queryFn:  () => alertasApi.getPendientes(),
   });
   const serviciosConDocs = new Set(pendientesAll.map((d) => d.idDestino));
 

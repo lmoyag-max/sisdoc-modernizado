@@ -65,8 +65,14 @@ const UPLOAD_RULES_DEFAULT: UploadRulesConfig = {
 
 // ─── helpers de módulo ───────────────────────────────────────────────────────
 const inputCls = 'w-full h-9 px-3 text-sm rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring';
-const apiErr   = (e) =>
-  e?.response?.data?.error ?? 'Error al guardar';
+const apiErr   = (e: unknown): string =>
+  (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al guardar';
+
+interface TipoDocumento {
+  id: number;
+  descripcion: string;
+  vigencia: string;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Mantenedor de Tipos de Documento — búsqueda-primero + tarjeta de detalle
@@ -75,18 +81,18 @@ const apiErr   = (e) =>
 function MantenedorTiposDocumento() {
   const qc = useQueryClient();
   const [busqueda,    setBusqueda]    = useState('');
-  const [selectedId,  setSelectedId]  = useState(null);
+  const [selectedId,  setSelectedId]  = useState<number | null>(null);
   const [modalCrear,  setModalCrear]  = useState(false);
   const [descNuevo,   setDescNuevo]   = useState('');
-  const [modalEditar, setModalEditar] = useState(null);
+  const [modalEditar, setModalEditar] = useState<TipoDocumento | null>(null);
   const [descEditar,  setDescEditar]  = useState('');
-  const [confirmVig,  setConfirmVig]  = useState(null);
+  const [confirmVig,  setConfirmVig]  = useState<TipoDocumento | null>(null);
 
   const debouncedQ = useDebounce(busqueda, 300);
 
   const { data: resultados = [], isFetching } = useQuery({
     queryKey:  ['admin-tipos-documento', debouncedQ],
-    queryFn:   async () => {
+    queryFn:   async (): Promise<TipoDocumento[]> => {
       const res = await apiClient.get(
         `/configuracion/tipos-documento?q=${encodeURIComponent(debouncedQ)}`
       );
@@ -94,7 +100,7 @@ function MantenedorTiposDocumento() {
     },
     enabled:         debouncedQ.length > 0,
     staleTime:       30_000,
-    placeholderData: [],
+    placeholderData: [] as TipoDocumento[],
   });
 
   useEffect(() => {
@@ -104,20 +110,20 @@ function MantenedorTiposDocumento() {
   }, [resultados, selectedId]);
 
   const createMut = useMutation({
-    mutationFn: (d) => apiClient.post('/configuracion/tipos-documento', { descripcion: d }),
+    mutationFn: (d: string) => apiClient.post('/configuracion/tipos-documento', { descripcion: d }),
     onSuccess:  () => { toast.success('Tipo de documento creado'); qc.invalidateQueries({ queryKey: ['admin-tipos-documento'] }); setModalCrear(false); setDescNuevo(''); },
     onError:    (e) => toast.error(apiErr(e)),
   });
 
   const editMut = useMutation({
-    mutationFn: ({ id, d }) =>
+    mutationFn: ({ id, d }: { id: number; d: string }) =>
       apiClient.put(`/configuracion/tipos-documento/${id}`, { descripcion: d }),
     onSuccess: () => { toast.success('Tipo actualizado'); qc.invalidateQueries({ queryKey: ['admin-tipos-documento'] }); setModalEditar(null); },
     onError:   (e) => toast.error(apiErr(e)),
   });
 
   const vigMut = useMutation({
-    mutationFn: ({ id, vigencia }) =>
+    mutationFn: ({ id, vigencia }: { id: number; vigencia: string }) =>
       apiClient.patch(`/configuracion/tipos-documento/${id}/vigencia`, { vigencia }),
     onSuccess: (_d, vars) => {
       toast.success(vars.vigencia === 'S' ? 'Tipo activado' : 'Tipo desactivado');
@@ -339,9 +345,27 @@ function MantenedorTiposDocumento() {
 // Mantenedor de Dependencias / Servicios — búsqueda-primero + tarjeta
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DEP_FORM_EMPTY = { descripcion: '', codigo: '', codInterno: '', ofpartes: 'N', codigoNuevo: '' };
+interface DepForm {
+  descripcion: string;
+  codigo: string;
+  codInterno: string;
+  ofpartes: string;
+  codigoNuevo: string;
+}
 
-function depFormInputs(form, setF) {
+interface Dependencia {
+  id: number;
+  descripcion: string;
+  codigo: string | null;
+  codInterno: number | null;
+  ofpartes: string | null;
+  vigencia: string;
+  codigoNuevo: string | null;
+}
+
+const DEP_FORM_EMPTY: DepForm = { descripcion: '', codigo: '', codInterno: '', ofpartes: 'N', codigoNuevo: '' };
+
+function depFormInputs(form: DepForm, setF: (k: keyof DepForm, v: string) => void) {
   return (
     <>
       <div className="space-y-1.5">
@@ -385,18 +409,18 @@ function depFormInputs(form, setF) {
 function MantenedorDependencias() {
   const qc = useQueryClient();
   const [busqueda,    setBusqueda]    = useState('');
-  const [selectedId,  setSelectedId]  = useState(null);
+  const [selectedId,  setSelectedId]  = useState<number | null>(null);
   const [modalCrear,  setModalCrear]  = useState(false);
-  const [formCrear,   setFormCrear]   = useState(DEP_FORM_EMPTY);
-  const [modalEditar, setModalEditar] = useState(null);
-  const [formEditar,  setFormEditar]  = useState(DEP_FORM_EMPTY);
-  const [confirmVig,  setConfirmVig]  = useState(null);
+  const [formCrear,   setFormCrear]   = useState<DepForm>(DEP_FORM_EMPTY);
+  const [modalEditar, setModalEditar] = useState<Dependencia | null>(null);
+  const [formEditar,  setFormEditar]  = useState<DepForm>(DEP_FORM_EMPTY);
+  const [confirmVig,  setConfirmVig]  = useState<Dependencia | null>(null);
 
   const debouncedQ = useDebounce(busqueda, 300);
 
   const { data: resultados = [], isFetching } = useQuery({
     queryKey:  ['admin-dependencias', debouncedQ],
-    queryFn:   async () => {
+    queryFn:   async (): Promise<Dependencia[]> => {
       const res = await apiClient.get(
         `/configuracion/dependencias?q=${encodeURIComponent(debouncedQ)}`
       );
@@ -404,7 +428,7 @@ function MantenedorDependencias() {
     },
     enabled:         debouncedQ.length > 0,
     staleTime:       30_000,
-    placeholderData: [],
+    placeholderData: [] as Dependencia[],
   });
 
   useEffect(() => {
@@ -414,7 +438,7 @@ function MantenedorDependencias() {
   }, [resultados, selectedId]);
 
   const createMut = useMutation({
-    mutationFn: (f) => apiClient.post('/configuracion/dependencias', {
+    mutationFn: (f: DepForm) => apiClient.post('/configuracion/dependencias', {
       descripcion: f.descripcion, codigo: f.codigo || null,
       codInterno: f.codInterno ? Number(f.codInterno) : null,
       ofpartes: f.ofpartes, codigoNuevo: f.codigoNuevo || null,
@@ -424,7 +448,7 @@ function MantenedorDependencias() {
   });
 
   const editMut = useMutation({
-    mutationFn: ({ id, f }) =>
+    mutationFn: ({ id, f }: { id: number; f: DepForm }) =>
       apiClient.put(`/configuracion/dependencias/${id}`, {
         descripcion: f.descripcion, codigo: f.codigo || null,
         codInterno: f.codInterno ? Number(f.codInterno) : null,
@@ -435,7 +459,7 @@ function MantenedorDependencias() {
   });
 
   const vigMut = useMutation({
-    mutationFn: ({ id, vigencia }) =>
+    mutationFn: ({ id, vigencia }: { id: number; vigencia: string }) =>
       apiClient.patch(`/configuracion/dependencias/${id}/vigencia`, { vigencia }),
     onSuccess: (_d, vars) => {
       toast.success(vars.vigencia === 'S' ? 'Servicio activado' : 'Servicio desactivado');
@@ -445,7 +469,7 @@ function MantenedorDependencias() {
     onError: () => toast.error('Error al cambiar vigencia'),
   });
 
-  const abrirEditar = (dep) => {
+  const abrirEditar = (dep: Dependencia) => {
     setFormEditar({
       descripcion: dep.descripcion, codigo: dep.codigo ?? '',
       codInterno: dep.codInterno != null ? String(dep.codInterno) : '',
@@ -454,8 +478,8 @@ function MantenedorDependencias() {
     setModalEditar(dep);
   };
 
-  const setFC = (k, v) => setFormCrear((p) => ({ ...p, [k]: v }));
-  const setFE = (k, v) => setFormEditar((p) => ({ ...p, [k]: v }));
+  const setFC = (k: keyof DepForm, v: string) => setFormCrear((p) => ({ ...p, [k]: v }));
+  const setFE = (k: keyof DepForm, v: string) => setFormEditar((p) => ({ ...p, [k]: v }));
 
   return (
     <>

@@ -114,6 +114,15 @@ router.post('/', validate(crearUsuarioSchema), async (req: Request, res: Respons
       idDependencia?: number; todos_servicios?: boolean; roles?: string[]; email?: string;
     };
 
+    // Mismo control que PATCH /:id: solo administradores pueden asignar roles
+    // (incluido 'admin') a un usuario nuevo. El gate del router es por módulo
+    // ('usuarios'), no por rol, así que esta validación es la única barrera
+    // real contra que un futuro rol no-admin con ese módulo cree otros admins.
+    const actorCreador = (req as unknown as import('../../shared/types/api.types').AuthenticatedRequest).user;
+    if (roles !== undefined && !actorCreador.roles.includes('admin')) {
+      sendError(res, 'Solo administradores pueden asignar roles', 403); return;
+    }
+
     const pool = await getPool();
 
     // Verificar que el usuario no exista
@@ -325,6 +334,24 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const { esAdmin, totalAdmins } = adminCheck.recordset[0] ?? { esAdmin: 0, totalAdmins: 0 };
     if (esAdmin > 0 && totalAdmins <= 1) {
       sendError(res, 'No se puede eliminar el único administrador del sistema', 400); return;
+    }
+
+    // No existe FK entre documento.id_usuario / memo_generado.id_usuario_creador
+    // y usuario, así que un DELETE no fallaría — dejaría esas filas con una
+    // referencia a un usuario inexistente (mismo tipo de huérfano que ya se
+    // corrigió para documento↔memo_generado). Se bloquea explícitamente en
+    // vez de permitir el borrado silencioso.
+    const refsCheck = await pool.request()
+      .input('id', sql.Int, idUsuario)
+      .query<{ docs: number; memos: number }>(`
+        SELECT
+          (SELECT COUNT(*) FROM documento WHERE id_usuario = @id) AS docs,
+          (SELECT COUNT(*) FROM memo_generado WHERE id_usuario_creador = @id) AS memos
+      `);
+    const { docs, memos } = refsCheck.recordset[0] ?? { docs: 0, memos: 0 };
+    if (docs > 0 || memos > 0) {
+      sendError(res, `No se puede eliminar: el usuario tiene ${docs} documento(s) y ${memos} memorándum(s) creados. Reasigna o conserva el usuario.`, 400);
+      return;
     }
 
     await pool.request().input('id', sql.Int, idUsuario)

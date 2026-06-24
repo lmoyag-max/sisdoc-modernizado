@@ -216,10 +216,13 @@ router.post('/background', requireAuth, upload.single('archivo'), (req, res) => 
 // ═══════════════════════════════════════════════════════════════════════════
 
 const soloPropietarios = [requireAuth, requireRole('admin', 'of.partes')];
+// Tipos de documento: catálogo estructural que afecta a todo el sistema —
+// solo admin lo gestiona (a diferencia de dependencias, que sí comparte con of.partes).
+const soloAdminTipos = [requireAuth, requireRole('admin')];
 
 // ── Tipos de documento ────────────────────────────────────────────────────
 
-router.get('/tipos-documento', ...soloPropietarios, async (req, res, next) => {
+router.get('/tipos-documento', ...soloAdminTipos, async (req, res, next) => {
   try {
     const q    = String(req.query.q ?? '').trim();
     const pool = await getPool();
@@ -243,7 +246,7 @@ router.get('/tipos-documento', ...soloPropietarios, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/tipos-documento', ...soloPropietarios, async (req, res, next) => {
+router.post('/tipos-documento', ...soloAdminTipos, async (req, res, next) => {
   try {
     const desc = String(req.body?.descripcion ?? '').trim();
     if (!desc)       { sendError(res, 'La descripción es requerida', 400); return; }
@@ -266,7 +269,7 @@ router.post('/tipos-documento', ...soloPropietarios, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.patch('/tipos-documento/:id/vigencia', ...soloPropietarios, async (req, res, next) => {
+router.patch('/tipos-documento/:id/vigencia', ...soloAdminTipos, async (req, res, next) => {
   try {
     const id      = Number(req.params.id);
     const vigencia = String(req.body?.vigencia ?? '').trim().toUpperCase();
@@ -281,7 +284,7 @@ router.patch('/tipos-documento/:id/vigencia', ...soloPropietarios, async (req, r
   } catch (e) { next(e); }
 });
 
-router.put('/tipos-documento/:id', ...soloPropietarios, async (req, res, next) => {
+router.put('/tipos-documento/:id', ...soloAdminTipos, async (req, res, next) => {
   try {
     const id   = Number(req.params.id);
     const desc = String(req.body?.descripcion ?? '').trim();

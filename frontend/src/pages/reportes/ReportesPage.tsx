@@ -52,6 +52,47 @@ const ACCION_BADGE: Record<string, string> = {
   MOVIMIENTO:  'bg-muted text-muted-foreground',
 };
 
+const ACCION_ACCENT: Record<string, string> = {
+  DERIVADO: 'amber', RECEPCIONADO: 'sky', CERRADO: 'emerald', MOVIMIENTO: 'slate',
+};
+
+function MesTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg">
+      <p className="text-xs font-semibold text-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+        <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" />
+        {payload[0].value?.toLocaleString('es-CL')} documentos
+      </p>
+    </div>
+  );
+}
+
+function EstadoTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; color?: string }> }) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0];
+  return (
+    <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg">
+      <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+        <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: item.color ?? 'hsl(var(--primary))' }} />
+        {item.name}
+      </p>
+      <p className="text-xs text-muted-foreground mt-0.5">{item.value?.toLocaleString('es-CL')} docs</p>
+    </div>
+  );
+}
+
+function TipoTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg">
+      <p className="text-xs font-semibold text-foreground line-clamp-1">{label}</p>
+      <p className="text-xs text-muted-foreground mt-0.5">{payload[0].value?.toLocaleString('es-CL')} documentos</p>
+    </div>
+  );
+}
+
 
 export function ReportesPage() {
   const { puedeVerReservados } = useRole();
@@ -112,9 +153,9 @@ export function ReportesPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <TrendingUp className="h-5 w-5 text-primary" />
-          </div>
+          <span className="icon-3d icon-3d-emerald flex h-11 w-11 shrink-0 items-center justify-center">
+            <TrendingUp className="h-5 w-5 text-white" />
+          </span>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">Reportes</h1>
             <p className="text-sm text-muted-foreground">Métricas y estadísticas del sistema</p>
@@ -174,10 +215,7 @@ export function ReportesPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                    cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }}
-                  />
+                  <Tooltip content={<MesTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }} />
                   <Area dataKey="cantidad" name="Documentos" type="monotone" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#reportGrad)" dot={false} activeDot={{ r: 4, fill: 'hsl(var(--primary))' }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -212,7 +250,7 @@ export function ReportesPage() {
                         <Cell key={i} fill={ESTADO_COLORS[i % ESTADO_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => [v, 'Docs']} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                    <Tooltip content={<EstadoTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-2 mt-2">
@@ -254,7 +292,7 @@ export function ReportesPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
                 <YAxis type="category" dataKey="desc_tipo_documento" width={160} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }} />
+                <Tooltip content={<TipoTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.4)' }} />
                 <Bar dataKey="cantidad" name="Documentos" radius={[0,4,4,0]} fill="hsl(var(--accent))" />
               </BarChart>
             </ResponsiveContainer>
@@ -282,12 +320,18 @@ export function ReportesPage() {
           ) : (actividad ?? []).length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Sin actividad registrada</p>
           ) : (
-            <div className="space-y-3">
-              {(actividad ?? []).map((item) => (
-                <div key={item.id_historial} className="flex items-start gap-3 group">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold transition-transform duration-200 group-hover:scale-105">
-                    {(item.nombres_fun ?? item.usuario ?? '?')[0]?.toUpperCase()}
-                  </div>
+            <div className="timeline-rail space-y-1">
+              {(actividad ?? []).map((item, i) => (
+                <div
+                  key={item.id_historial}
+                  className="relative flex items-start gap-3 py-2 pl-7 rounded-lg transition-colors duration-150 hover:bg-muted/40 group animate-fade-in-up"
+                  style={{ animationDelay: `${i * 50}ms` }}
+                >
+                  <span className={`icon-3d-sm absolute left-0 top-2 flex h-7 w-7 shrink-0 items-center justify-center ring-4 ring-card icon-3d-${ACCION_ACCENT[item.accion] ?? 'slate'} transition-transform duration-200 group-hover:scale-105`}>
+                    <span className="text-[10px] font-bold text-white">
+                      {(item.nombres_fun ?? item.usuario ?? '?')[0]?.toUpperCase()}
+                    </span>
+                  </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">{item.asunto ?? 'Sin materia'}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">

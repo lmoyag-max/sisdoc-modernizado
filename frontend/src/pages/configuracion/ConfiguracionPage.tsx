@@ -249,9 +249,9 @@ function MantenedorTiposDocumento() {
       </Card>
 
       {modalCrear && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) { setModalCrear(false); setDescNuevo(''); } }}>
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-md">
+          <div className="modal-panel bg-background w-full max-w-md">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <h3 className="font-semibold text-sm">Nuevo tipo de documento</h3>
               <button onClick={() => { setModalCrear(false); setDescNuevo(''); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
@@ -277,9 +277,9 @@ function MantenedorTiposDocumento() {
       )}
 
       {modalEditar && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setModalEditar(null); }}>
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-md">
+          <div className="modal-panel bg-background w-full max-w-md">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <h3 className="font-semibold text-sm">Editar tipo #{modalEditar.id}</h3>
               <button onClick={() => setModalEditar(null)} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
@@ -305,9 +305,9 @@ function MantenedorTiposDocumento() {
       )}
 
       {confirmVig && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setConfirmVig(null); }}>
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-sm">
+          <div className="modal-panel bg-background w-full max-w-sm">
             <div className="px-5 py-5 space-y-3">
               <div className="flex items-center gap-3">
                 <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl shrink-0',
@@ -613,9 +613,9 @@ function MantenedorDependencias() {
       </Card>
 
       {modalCrear && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) { setModalCrear(false); setFormCrear(DEP_FORM_EMPTY); } }}>
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-lg">
+          <div className="modal-panel bg-background w-full max-w-lg">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <h3 className="font-semibold text-sm">Nuevo servicio / dependencia</h3>
               <button onClick={() => { setModalCrear(false); setFormCrear(DEP_FORM_EMPTY); }} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
@@ -632,9 +632,9 @@ function MantenedorDependencias() {
       )}
 
       {modalEditar && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setModalEditar(null); }}>
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-lg">
+          <div className="modal-panel bg-background w-full max-w-lg">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <h3 className="font-semibold text-sm">Editar servicio #{modalEditar.id}</h3>
               <button onClick={() => setModalEditar(null)} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
@@ -651,9 +651,9 @@ function MantenedorDependencias() {
       )}
 
       {confirmVig && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setConfirmVig(null); }}>
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-sm">
+          <div className="modal-panel bg-background w-full max-w-sm">
             <div className="px-5 py-5 space-y-3">
               <div className="flex items-center gap-3">
                 <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl shrink-0',
@@ -963,9 +963,9 @@ function MantenedorFirmantes() {
 
       {/* Modal crear/editar firmante */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) cerrarModal(); }}>
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+          <div className="modal-panel bg-background w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-background z-10">
               <h3 className="font-semibold text-sm">{editItem ? 'Editar firmante' : 'Nuevo firmante'}</h3>
               <button onClick={cerrarModal} className="text-muted-foreground hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
@@ -1384,9 +1384,9 @@ export function ConfiguracionPage() {
     <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-          <Settings className="h-5 w-5 text-primary" />
-        </div>
+        <span className="icon-3d icon-3d-slate flex h-10 w-10 shrink-0 items-center justify-center">
+          <Settings className="h-5 w-5 text-white" />
+        </span>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Configuración del Sistema</h1>
           <p className="text-sm text-muted-foreground">Personaliza la apariencia e identidad del sistema</p>

@@ -90,26 +90,36 @@ export function ArchivosPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-          <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-          Gestión de Archivos
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Sube y gestiona los archivos digitales del sistema documental
-        </p>
+      <div className="flex items-center gap-3">
+        <span className="icon-3d icon-3d-emerald hidden sm:flex h-11 w-11 shrink-0 items-center justify-center">
+          <Upload className="h-5 w-5 text-white" />
+        </span>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Upload className="h-5 w-5 sm:hidden text-primary" />
+            Gestión de Archivos
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Sube y gestiona los archivos digitales del sistema documental
+          </p>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { label: 'Total archivos',  value: archivos?.length ?? '—',         mono: false },
-          { label: 'Espacio usado',   value: formatBytes(totalSize),           mono: true  },
-          { label: 'Tipos admitidos', value: uploadRules.extensionesPermitidas.map((e) => e.toUpperCase()).join(', '), mono: false },
-        ].map(({ label, value, mono }) => (
-          <div key={label} className="rounded-xl border bg-card px-4 py-3 card-executive">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className={`text-sm font-semibold text-foreground mt-1 truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
+          { label: 'Total archivos',  value: archivos?.length ?? '—',         mono: false, accent: 'indigo',  icon: FileText },
+          { label: 'Espacio usado',   value: formatBytes(totalSize),           mono: true,  accent: 'sky',     icon: CloudUpload },
+          { label: 'Tipos admitidos', value: uploadRules.extensionesPermitidas.map((e) => e.toUpperCase()).join(', '), mono: false, accent: 'emerald', icon: File },
+        ].map(({ label, value, mono, accent, icon: Icon }) => (
+          <div key={label} className="kpi-premium px-4 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`icon-3d-sm icon-3d-${accent} flex h-7 w-7 shrink-0 items-center justify-center`}>
+                <Icon className="h-3.5 w-3.5 text-white" />
+              </span>
+              <p className="text-xs text-muted-foreground">{label}</p>
+            </div>
+            <p className={`text-sm font-semibold text-foreground truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
           </div>
         ))}
       </div>
@@ -134,9 +144,9 @@ export function ArchivosPage() {
                 : 'border-border hover:border-primary/50 hover:bg-muted/40'
             }`}
           >
-            <div className={`flex h-16 w-16 items-center justify-center rounded-2xl transition-colors ${isDragOver ? 'bg-primary/20' : 'bg-muted'}`}>
-              <CloudUpload className={`h-8 w-8 ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`} />
-            </div>
+            <span className={`icon-3d flex h-16 w-16 items-center justify-center transition-transform ${isDragOver ? 'icon-3d-indigo scale-105' : 'icon-3d-slate'}`}>
+              <CloudUpload className="h-7 w-7 text-white" />
+            </span>
             <div>
               <p className="text-sm font-semibold text-foreground">
                 {isDragOver ? 'Suelta el archivo aquí' : 'Arrastra archivos o haz clic'}

@@ -139,9 +139,9 @@ function InfoRow({ icon: Icon, label, value }: {
 }) {
   return (
     <div className="flex items-start gap-3 py-2.5">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted mt-0.5">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-      </div>
+      <span className="icon-3d-sm icon-3d-slate flex h-7 w-7 shrink-0 items-center justify-center mt-0.5">
+        <Icon className="h-3.5 w-3.5 text-white" />
+      </span>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
         <div className="text-sm text-foreground font-medium mt-0.5">{value}</div>
@@ -372,7 +372,10 @@ export function DocumentoDetallePage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />Información del Documento
+                <span className="icon-3d-sm icon-3d-indigo flex h-7 w-7 shrink-0 items-center justify-center">
+                  <FileText className="h-3.5 w-3.5 text-white" />
+                </span>
+                Información del Documento
               </CardTitle>
             </CardHeader>
             <CardContent className="divide-y">
@@ -407,7 +410,10 @@ export function DocumentoDetallePage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="h-4 w-4 text-primary" />Servicios destinatarios
+                  <span className="icon-3d-sm icon-3d-violet flex h-7 w-7 shrink-0 items-center justify-center">
+                    <Users className="h-3.5 w-3.5 text-white" />
+                  </span>
+                  Servicios destinatarios
                 </CardTitle>
                 <CardDescription>
                   {loadingDestinos ? 'Cargando...' : `${destinos?.length ?? 0} servicio(s) — gestión independiente por destino`}
@@ -480,7 +486,10 @@ export function DocumentoDetallePage() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Paperclip className="h-4 w-4 text-primary" />Archivos adjuntos
+                  <span className="icon-3d-sm icon-3d-slate flex h-7 w-7 shrink-0 items-center justify-center">
+                    <Paperclip className="h-3.5 w-3.5 text-white" />
+                  </span>
+                  Archivos adjuntos
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   {doc?.tipoSoporte === 'F' && (
@@ -704,7 +713,10 @@ export function DocumentoDetallePage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <GitBranch className="h-4 w-4 text-primary" />Historial completo
+                <span className="icon-3d-sm icon-3d-sky flex h-7 w-7 shrink-0 items-center justify-center">
+                  <GitBranch className="h-3.5 w-3.5 text-white" />
+                </span>
+                Historial completo
               </CardTitle>
               <CardDescription>
                 {loadingTraz
@@ -732,12 +744,12 @@ export function DocumentoDetallePage() {
       {/* Modal confirmar eliminación */}
       {confirmDeleteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmDeleteOpen(false)} />
-          <div className="relative w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl animate-scale-in">
+          <div className="absolute inset-0 modal-overlay" onClick={() => setConfirmDeleteOpen(false)} />
+          <div className="modal-panel relative w-full max-w-sm">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-destructive/10">
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </div>
+              <span className="icon-3d icon-3d-red flex h-9 w-9 shrink-0 items-center justify-center">
+                <Trash2 className="h-4 w-4 text-white" />
+              </span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">Eliminar documento</p>
                 <p className="text-xs text-muted-foreground truncate">{materia}</p>
@@ -774,12 +786,12 @@ export function DocumentoDetallePage() {
       {/* Modal reabrir documento */}
       {reabrirOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setReopenOpen(false)} />
-          <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl animate-fade-in">
+          <div className="absolute inset-0 modal-overlay" onClick={() => setReopenOpen(false)} />
+          <div className="modal-panel relative w-full max-w-md">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
-                <RefreshCw className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
+              <span className="icon-3d icon-3d-amber flex h-9 w-9 shrink-0 items-center justify-center">
+                <RefreshCw className="h-4 w-4 text-white" />
+              </span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">Reabrir documento</p>
                 <p className="text-xs text-muted-foreground truncate">{materia}</p>

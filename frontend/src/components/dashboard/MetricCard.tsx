@@ -28,7 +28,7 @@ export function MetricCard({
 
   if (loading) {
     return (
-      <Card className="card-executive">
+      <Card className={cn(variant === 'compact' ? 'kpi-premium border-0' : 'card-executive')}>
         <CardContent className={cn('p-5', variant === 'compact' && 'pt-5 pb-4 px-4')}>
           {variant === 'default' ? (
             <>
@@ -55,11 +55,11 @@ export function MetricCard({
 
   if (variant === 'compact') {
     return (
-      <Card className="card-executive group cursor-default">
+      <Card className="kpi-premium border-0 group cursor-default">
         <CardContent className="pt-4 pb-4 px-4">
           <div className="flex items-center gap-3">
             <div className={cn(
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105',
+              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm transition-transform duration-200 group-hover:scale-105',
               colorClass,
             )}>
               <Icon className="h-4.5 w-4.5" aria-hidden="true" style={{ width: '1.1rem', height: '1.1rem' }} />

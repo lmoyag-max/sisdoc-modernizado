@@ -375,7 +375,7 @@ function PendientesPanel({
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="bg-muted/20 border-b border-border">
+                          <tr className="table-head-modern">
                             <th className="px-4 py-2 text-left font-medium text-muted-foreground">N°</th>
                             <th className="px-4 py-2 text-left font-medium text-muted-foreground">Materia</th>
                             <th className="px-4 py-2 text-left font-medium text-muted-foreground">Tipo</th>
@@ -452,7 +452,7 @@ function LogsPanel() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-border">
+                    <tr className="table-head-modern">
                       <th className="px-3 py-2 text-left font-medium text-muted-foreground">Fecha</th>
                       <th className="px-3 py-2 text-left font-medium text-muted-foreground">Servicio</th>
                       <th className="px-3 py-2 text-center font-medium text-muted-foreground">Tipo</th>
@@ -595,9 +595,9 @@ export function AlertasPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-center gap-3 flex-1">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Bell className="h-5 w-5 text-primary" />
-          </div>
+          <span className="icon-3d icon-3d-red flex h-10 w-10 shrink-0 items-center justify-center">
+            <Bell className="h-5 w-5 text-white" />
+          </span>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Alertas por correo</h1>
             <p className="text-sm text-muted-foreground">
@@ -608,7 +608,7 @@ export function AlertasPage() {
         <Button
           onClick={() => { enviarTodos.mutate(); setResultadoPrueba(null); }}
           disabled={enviarTodos.isPending}
-          className="gap-2 shrink-0"
+          className="btn-premium gap-2 shrink-0 border-0 text-primary-foreground"
         >
           {enviarTodos.isPending
             ? <RefreshCw className="h-4 w-4 animate-spin" />

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { truncate } from '@/lib/utils';
+import { truncate, cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 
 type TipoBusqueda = 'todos' | 'documentos' | 'tramites' | 'funcionarios';
@@ -61,14 +61,19 @@ export function BusquedaPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-          <Search className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-          Búsqueda Avanzada
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Busca en documentos, trámites y funcionarios del sistema
-        </p>
+      <div className="flex items-center gap-3">
+        <span className="icon-3d icon-3d-sky hidden sm:flex h-11 w-11 shrink-0 items-center justify-center">
+          <Search className="h-5 w-5 text-white" />
+        </span>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Search className="h-5 w-5 sm:hidden text-primary" />
+            Búsqueda Avanzada
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Busca en documentos, trámites y funcionarios del sistema
+          </p>
+        </div>
       </div>
 
       {/* Buscador principal */}
@@ -100,11 +105,7 @@ export function BusquedaPage() {
               <button
                 key={value}
                 onClick={() => { setTipo(value); setPagina(1); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  tipo === value
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
-                }`}
+                className={cn('filter-pill', tipo === value && 'filter-pill-active')}
               >
                 <Icon className="h-3.5 w-3.5" />
                 {label}
@@ -237,13 +238,13 @@ export function BusquedaPage() {
           {/* Paginación documentos */}
           {tipo === 'documentos' && data && data.totalPaginas > 1 && (
             <div className="flex items-center justify-center gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
+              <button type="button" className="pagination-pill" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
               <span className="text-sm text-muted-foreground">{pagina} / {data.totalPaginas}</span>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina >= data.totalPaginas} onClick={() => setPagina((p) => p + 1)}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <button type="button" className="pagination-pill" disabled={pagina >= data.totalPaginas} onClick={() => setPagina((p) => p + 1)}>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
         </div>

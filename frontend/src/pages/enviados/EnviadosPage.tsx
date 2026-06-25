@@ -37,6 +37,13 @@ const ESTADO_BADGE: Record<number, { label: string; variant: 'info' | 'warning' 
   6: { label: 'Entregado',      variant: 'success' },
 };
 
+const KPI_GLOW: Record<string, { glow: string; border: string }> = {
+  sky:     { glow: 'rgba(2, 132, 199, .30)',  border: 'hsl(199 89% 48% / .35)' },
+  amber:   { glow: 'rgba(217, 119, 6, .30)',  border: 'hsl(38 92% 50% / .35)' },
+  indigo:  { glow: 'rgba(79, 70, 229, .35)',  border: 'hsl(239 84% 60% / .35)' },
+  emerald: { glow: 'rgba(5, 150, 105, .30)',  border: 'hsl(160 84% 39% / .35)' },
+};
+
 export function EnviadosPage() {
   const [pagina, setPagina] = useState(1);
   const user = useAuthStore((s) => s.user);
@@ -61,9 +68,13 @@ export function EnviadosPage() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="icon-3d icon-3d-sky hidden sm:flex h-11 w-11 shrink-0 items-center justify-center">
+            <Send className="h-5 w-5 text-white" />
+          </span>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-            <Send className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            <Send className="h-5 w-5 sm:hidden text-primary" />
             Documentos Enviados
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -81,6 +92,7 @@ export function EnviadosPage() {
             </div>
           )}
         </div>
+        </div>
         <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['enviados'] })} className="gap-2 shrink-0">
           <RefreshCw className="h-4 w-4" />
           Actualizar
@@ -90,14 +102,19 @@ export function EnviadosPage() {
       {/* Estadísticas rápidas */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total enviados', value: meta?.total ?? '—',                                           color: 'text-foreground' },
-          { label: 'Despachados',    value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 2).length, color: 'text-amber-600' },
-          { label: 'Recepcionados',  value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 3).length, color: 'text-sky-600' },
-          { label: 'Cerrados',       value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 5).length, color: 'text-emerald-600' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-xl border bg-card px-4 py-3 card-executive">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className={cn('text-2xl font-bold mt-1 tabular-nums animate-number', color)}>{value}</p>
+          { label: 'Total enviados', value: meta?.total ?? '—',                                           accent: 'indigo', icon: Send },
+          { label: 'Despachados',    value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 2).length, accent: 'amber',   icon: Clock },
+          { label: 'Recepcionados',  value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 3).length, accent: 'sky',      icon: CheckCircle2 },
+          { label: 'Cerrados',       value: isLoading ? '—' : tramites.filter((t) => t.id_estado_tramite === 5).length, accent: 'emerald',  icon: CheckCircle2 },
+        ].map(({ label, value, accent, icon: Icon }) => (
+          <div key={label} className="kpi-premium px-4 py-3" style={{ '--kpi-glow': KPI_GLOW[accent].glow, '--kpi-border': KPI_GLOW[accent].border } as React.CSSProperties}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={cn('icon-3d-sm flex h-7 w-7 shrink-0 items-center justify-center', `icon-3d-${accent}`)}>
+                <Icon className="h-3.5 w-3.5 text-white" />
+              </span>
+              <p className="text-xs text-muted-foreground">{label}</p>
+            </div>
+            <p className="text-2xl font-bold tabular-nums animate-number text-foreground">{value}</p>
           </div>
         ))}
       </div>
@@ -144,12 +161,12 @@ export function EnviadosPage() {
                     )}
                   >
                     <div className={cn(
-                      'flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl',
-                      isCompleto ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-primary/10',
+                      'icon-3d-sm flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center',
+                      isCompleto ? 'icon-3d-emerald' : 'icon-3d-indigo',
                     )}>
                       {isCompleto
-                        ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
-                        : <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                        ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                        : <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                       }
                     </div>
                     <div className="flex-1 min-w-0">
@@ -183,12 +200,12 @@ export function EnviadosPage() {
           <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/10">
             <p className="text-xs text-muted-foreground">Página {meta.pagina} de {meta.totalPaginas} · {meta.total} enviados</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <button type="button" className="pagination-pill" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior">
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" className="pagination-pill" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente">
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         )}

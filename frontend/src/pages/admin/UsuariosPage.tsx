@@ -104,8 +104,8 @@ function UsuarioModal({ usuario, roles, dependencias, onClose, onSaved }: ModalP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl animate-fade-in overflow-y-auto max-h-[90vh]">
+      <div className="absolute inset-0 modal-overlay" onClick={onClose} />
+      <div className="modal-panel relative w-full max-w-lg overflow-y-auto max-h-[90vh]">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
@@ -305,9 +305,9 @@ export function UsuariosPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Users className="h-5 w-5 text-primary" />
-          </div>
+          <span className="icon-3d icon-3d-amber flex h-11 w-11 shrink-0 items-center justify-center">
+            <Users className="h-5 w-5 text-white" />
+          </span>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Usuarios</h1>
             <p className="text-sm text-muted-foreground">
@@ -315,7 +315,7 @@ export function UsuariosPage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => setModal('nuevo')} className="gap-2">
+        <Button onClick={() => setModal('nuevo')} className="btn-premium gap-2 border-0 text-primary-foreground">
           <Plus className="h-4 w-4" />Nuevo usuario
         </Button>
       </div>
@@ -423,12 +423,12 @@ export function UsuariosPage() {
               Página {meta.pagina} de {meta.totalPaginas} · {meta.total} usuarios
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <button type="button" className="pagination-pill" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior">
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" className="pagination-pill" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente">
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         )}

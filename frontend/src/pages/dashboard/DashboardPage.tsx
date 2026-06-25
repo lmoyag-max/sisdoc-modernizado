@@ -1,23 +1,24 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  FileText, Clock, CheckCircle2, AlertTriangle, Activity, ArrowRight,
+  FileText, Clock, CheckCircle2, Activity, ArrowRight,
   Lock, Send, Inbox, Plus, TrendingUp, Zap, ChevronRight,
   PieChart as PieIcon,
+  Sparkles, CalendarDays,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { reportesApi } from '@/lib/api/reportes.api';
 import { useAuthStore, displayName } from '@/stores/auth.store';
 import { useRole } from '@/hooks/useRole';
-import { formatRelativo, truncate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatRelativo, truncate, cn, iniciales } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -40,6 +41,22 @@ const ACCION_BADGE: Record<string, { label: string; variant: 'info' | 'warning' 
   MOVIMIENTO:   { label: 'Movimiento',   variant: 'secondary' },
 };
 
+// Acento visual (icono 3D + glow) asociado a cada variante de badge
+const ACCION_ACCENT: Record<string, string> = {
+  info: 'sky', warning: 'amber', success: 'emerald', secondary: 'slate',
+};
+
+// ── Paleta de acentos para iconos 3D / glow de tarjetas ─────────
+const ACCENTS: Record<string, { icon3d: string; glow: string; border: string }> = {
+  indigo:  { icon3d: 'icon-3d-indigo',  glow: 'rgba(79, 70, 229, .35)',  border: 'hsl(239 84% 60% / .35)' },
+  amber:   { icon3d: 'icon-3d-amber',   glow: 'rgba(217, 119, 6, .30)',  border: 'hsl(38 92% 50% / .35)' },
+  red:     { icon3d: 'icon-3d-red',     glow: 'rgba(220, 38, 38, .30)',  border: 'hsl(0 84% 60% / .35)' },
+  emerald: { icon3d: 'icon-3d-emerald', glow: 'rgba(5, 150, 105, .30)',  border: 'hsl(160 84% 39% / .35)' },
+  violet:  { icon3d: 'icon-3d-violet',  glow: 'rgba(124, 58, 237, .30)', border: 'hsl(265 89% 62% / .35)' },
+  sky:     { icon3d: 'icon-3d-sky',     glow: 'rgba(2, 132, 199, .30)',  border: 'hsl(199 89% 48% / .35)' },
+  slate:   { icon3d: 'icon-3d-slate',   glow: 'rgba(100, 116, 139, .25)', border: 'hsl(220 13% 60% / .3)' },
+};
+
 // ── Semáforo ejecutivo ──────────────────────────────────────────
 type NivelSemaforo = 'normal' | 'atencion' | 'critico';
 
@@ -60,7 +77,7 @@ function SemaforoEjecutivo({ nivel, loading }: { nivel: NivelSemaforo; loading?:
   }
   const cfg = SEMAFORO[nivel];
   return (
-    <div className={cn('flex items-center gap-3 rounded-xl border px-4 py-3 transition-all', cfg.borderClass, cfg.bgClass)}>
+    <div className={cn('flex items-center gap-3 rounded-xl border px-4 py-3 backdrop-blur-sm transition-all', cfg.borderClass, cfg.bgClass)}>
       <div className="flex items-center gap-1.5 shrink-0">
         <div className={cn('h-3 w-3 rounded-full transition-all duration-300', nivel === 'critico' ? 'bg-red-500 semaforo-rojo' : 'bg-red-200 dark:bg-red-900/40')} />
         <div className={cn('h-3 w-3 rounded-full transition-all duration-300', nivel === 'atencion' ? 'bg-amber-500 semaforo-amarillo' : 'bg-amber-200 dark:bg-amber-900/40')} />
@@ -74,33 +91,127 @@ function SemaforoEjecutivo({ nivel, loading }: { nivel: NivelSemaforo; loading?:
   );
 }
 
+// ── Tarjeta KPI premium (exclusiva del Dashboard) ───────────────
+interface KpiDelta { label: string; tone: 'up' | 'warn'; }
+
+interface DashboardKpiCardProps {
+  title: string;
+  value: number | string;
+  icon: React.ComponentType<{ className?: string }>;
+  description?: string;
+  accent: string;
+  delta?: KpiDelta;
+  loading?: boolean;
+  style?: React.CSSProperties;
+}
+
+function DashboardKpiCard({ title, value, icon: Icon, description, accent, delta, loading, style }: DashboardKpiCardProps) {
+  const a = ACCENTS[accent] ?? ACCENTS.slate;
+
+  if (loading) {
+    return (
+      <Card className="kpi-premium border-0">
+        <CardContent className="pt-4 pb-4 px-4 sm:px-5">
+          <div className="flex items-start justify-between mb-3">
+            <div className="h-11 w-11 animate-pulse rounded-2xl bg-muted" />
+          </div>
+          <div className="h-7 w-16 animate-pulse rounded bg-muted mb-2" />
+          <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div
+      className="kpi-premium p-4 sm:p-5 animate-fade-in-up"
+      style={{ '--kpi-glow': a.glow, '--kpi-border': a.border, ...style } as React.CSSProperties}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className={cn('icon-3d h-11 w-11 sm:h-12 sm:w-12 shrink-0', a.icon3d)}>
+          <Icon className="h-5 w-5 text-white drop-shadow-sm relative z-10" aria-hidden="true" />
+        </div>
+        {delta && (
+          <span className={cn(
+            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap',
+            delta.tone === 'up'
+              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400'
+              : 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400',
+          )}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current shrink-0" />
+            {delta.label}
+          </span>
+        )}
+      </div>
+      <p className="mt-3 text-2xl sm:text-[1.7rem] font-bold tracking-tight text-foreground tabular-nums animate-number leading-none">
+        {typeof value === 'number' ? value.toLocaleString('es-CL') : value}
+      </p>
+      <p className="mt-1.5 text-sm font-semibold text-foreground/85 truncate">{title}</p>
+      {description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>}
+    </div>
+  );
+}
+
 // ── Pipeline documental ─────────────────────────────────────────
 interface PipelineStageProps {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   count: number;
-  colorClass: string;
-  bgClass: string;
+  accent: string;
   isLast?: boolean;
   loading?: boolean;
 }
 
-function PipelineStage({ icon: Icon, label, count, colorClass, bgClass, isLast, loading }: PipelineStageProps) {
+function PipelineStage({ icon: Icon, label, count, accent, isLast, loading }: PipelineStageProps) {
+  const a = ACCENTS[accent] ?? ACCENTS.slate;
   return (
     <div className="flex items-center flex-1 min-w-0">
-      <div className="flex-1 min-w-0 flex flex-col items-center gap-2 p-3 sm:p-4">
-        <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl shrink-0', bgClass)}>
-          <Icon className={cn('h-5 w-5', colorClass)} />
+      <div className="flex-1 min-w-0 flex flex-col items-center gap-2.5 p-3 sm:p-4 group">
+        <div className={cn('icon-3d h-12 w-12 sm:h-14 sm:w-14 shrink-0 transition-transform duration-300 group-hover:-translate-y-1', a.icon3d)}>
+          <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white drop-shadow relative z-10" />
         </div>
         <div className="text-center min-w-0">
           {loading
             ? <Skeleton className="h-6 w-10 mx-auto mb-1" />
-            : <p className={cn('text-xl font-bold tabular-nums animate-number', colorClass)}>{count.toLocaleString('es-CL')}</p>
+            : <p className="text-xl sm:text-2xl font-bold tabular-nums animate-number text-foreground">{count.toLocaleString('es-CL')}</p>
           }
           <p className="text-xs text-muted-foreground font-medium truncate">{label}</p>
         </div>
       </div>
-      {!isLast && <ChevronRight className="h-4 w-4 text-border shrink-0 pipeline-arrow" />}
+      {!isLast && (
+        <div className="hidden sm:flex items-center px-1 shrink-0 pipeline-arrow">
+          <ChevronRight className="h-5 w-5 animate-arrow-float" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tooltips ejecutivos para gráficos ───────────────────────────
+function AreaChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg">
+      <p className="text-xs font-semibold text-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+        <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" />
+        {payload[0].value?.toLocaleString('es-CL')} documentos
+      </p>
+    </div>
+  );
+}
+
+function PieChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { id_estado_documento: number } }> }) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0];
+  const color = ESTADO_COLORES[item.payload.id_estado_documento] ?? '#94a3b8';
+  return (
+    <div className="rounded-xl border border-border bg-card/95 backdrop-blur-sm px-3 py-2 shadow-lg">
+      <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+        <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        {item.name}
+      </p>
+      <p className="text-xs text-muted-foreground mt-0.5">{item.value?.toLocaleString('es-CL')} docs</p>
     </div>
   );
 }
@@ -131,6 +242,13 @@ export function DashboardPage() {
   const fecha            = format(now, "EEEE, d 'de' MMMM yyyy", { locale: es });
   const fechaCapitalizada = fecha.charAt(0).toUpperCase() + fecha.slice(1);
 
+  // Reloj en vivo del header — puramente decorativo, no afecta ninguna query ni regla de negocio
+  const [horaActual, setHoraActual] = useState(() => format(new Date(), 'HH:mm'));
+  useEffect(() => {
+    const id = setInterval(() => setHoraActual(format(new Date(), 'HH:mm')), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Semáforo
   const urgentes  = dashboard?.totales.urgentes  ?? 0;
   const pendientes = dashboard?.totales.pendientes ?? 0;
@@ -145,44 +263,88 @@ export function DashboardPage() {
     dashboard?.porEstado?.filter(e => ids.includes(e.id_estado_documento)).reduce((s, e) => s + e.cantidad, 0) ?? 0;
 
   const pipelineStages = [
-    { ids: [1, 2], label: 'Despachados',  icon: Send,         colorClass: 'text-indigo-600 dark:text-indigo-400', bgClass: 'bg-indigo-100 dark:bg-indigo-900/30' },
-    { ids: [3],    label: 'Recepcionados',icon: Inbox,        colorClass: 'text-sky-600 dark:text-sky-400',       bgClass: 'bg-sky-100 dark:bg-sky-900/30' },
-    { ids: [4],    label: 'En Proceso',   icon: Activity,     colorClass: 'text-amber-600 dark:text-amber-400',   bgClass: 'bg-amber-100 dark:bg-amber-900/30' },
-    { ids: [5],    label: 'Terminados',   icon: CheckCircle2, colorClass: 'text-emerald-600 dark:text-emerald-400', bgClass: 'bg-emerald-100 dark:bg-emerald-900/30' },
+    { ids: [1, 2], label: 'Despachados',   icon: Send,         accent: 'indigo' },
+    { ids: [3],    label: 'Recepcionados', icon: Inbox,        accent: 'sky' },
+    { ids: [4],    label: 'En Proceso',    icon: Activity,     accent: 'amber' },
+    { ids: [5],    label: 'Terminados',    icon: CheckCircle2, accent: 'emerald' },
   ];
+
+  const creadosHoy  = dashboard?.totales.creadosHoy  ?? 0;
+  const cerradosHoy = dashboard?.totales.cerradosHoy ?? 0;
 
   // KPI metrics — Reservados solo visible para admin y of.partes
   const allMetrics = [
-    { title: 'Documentos',   value: dashboard?.totales.total      ?? 0, icon: FileText,     description: `${dashboard?.totales.creadosHoy ?? 0} creados hoy`,   colorClass: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',   visible: true },
-    { title: 'Pendientes',   value: dashboard?.totales.pendientes  ?? 0, icon: Clock,        description: 'Sin resolución',                                     colorClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',     visible: true },
-    { title: 'Urgentes',     value: urgentes,                             icon: Zap,          description: 'Prioridad alta',                                     colorClass: urgentes > 0 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-muted text-muted-foreground', visible: true },
-    { title: 'Cerrados hoy', value: dashboard?.totales.cerradosHoy ?? 0, icon: CheckCircle2, description: 'Completados hoy',                                    colorClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400', visible: true },
-    { title: 'Reservados',   value: (dashboard?.totales.reservados ?? 0), icon: Lock,          description: 'Confidenciales',                                    colorClass: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400',   visible: puedeVerReservados },
-    { title: 'Movimientos',  value: dashboard?.totales.tramites    ?? 0, icon: Activity,     description: 'En trazabilidad',                                    colorClass: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400',             visible: true },
+    {
+      key: 'documentos', title: 'Documentos', value: dashboard?.totales.total ?? 0, icon: FileText,
+      description: `${creadosHoy} creados hoy`, accent: 'indigo',
+      delta: creadosHoy > 0 ? { label: `+${creadosHoy} hoy`, tone: 'up' as const } : undefined,
+      visible: true,
+    },
+    {
+      key: 'pendientes', title: 'Pendientes', value: dashboard?.totales.pendientes ?? 0, icon: Clock,
+      description: 'Sin resolución', accent: 'amber', delta: undefined, visible: true,
+    },
+    {
+      key: 'urgentes', title: 'Urgentes', value: urgentes, icon: Zap,
+      description: 'Prioridad alta', accent: urgentes > 0 ? 'red' : 'slate',
+      delta: urgentes > 0 ? { label: 'Atención', tone: 'warn' as const } : { label: 'Bajo control', tone: 'up' as const },
+      visible: true,
+    },
+    {
+      key: 'cerrados', title: 'Cerrados hoy', value: cerradosHoy, icon: CheckCircle2,
+      description: 'Completados hoy', accent: 'emerald',
+      delta: cerradosHoy > 0 ? { label: `+${cerradosHoy}`, tone: 'up' as const } : undefined,
+      visible: true,
+    },
+    {
+      key: 'reservados', title: 'Reservados', value: dashboard?.totales.reservados ?? 0, icon: Lock,
+      description: 'Confidenciales', accent: 'violet', delta: undefined, visible: puedeVerReservados,
+    },
+    {
+      key: 'movimientos', title: 'Movimientos', value: dashboard?.totales.tramites ?? 0, icon: Activity,
+      description: 'En trazabilidad', accent: 'sky', delta: undefined, visible: true,
+    },
   ];
   const metrics = allMetrics.filter((m) => m.visible);
 
   return (
     <div className="space-y-6 animate-fade-in">
 
-      {/* ── Hero header ─────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-            {saludo}, <span className="text-primary">{nombre.split(' ')[0]}</span>.
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{fechaCapitalizada}</p>
-          <p className="text-[11px] text-muted-foreground/50 mt-0.5 tracking-wide uppercase">
-            Centro de Control Operacional · DOC360 HUAP
-          </p>
+      {/* ── Hero header premium ──────────────────────────────────── */}
+      <div className="hero-glass flex flex-wrap items-center justify-between gap-5 px-5 sm:px-6 py-5">
+        <div className="flex items-center gap-4 min-w-0">
+          <Avatar className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 border-2 border-white/50 dark:border-white/10 shadow-lg">
+            <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-base font-bold">
+              {iniciales(nombre)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">
+              {saludo}, <span className="text-gradient-huap">{nombre.split(' ')[0]}</span>
+            </h1>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs sm:text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                {fechaCapitalizada}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="live-dot" />
+                {horaActual} hrs
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground/50 mt-1 tracking-wide uppercase flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 shrink-0" />
+              Centro de Control Operacional · DOC360 HUAP
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <SemaforoEjecutivo nivel={nivelSemaforo} loading={loadingDash} />
           <Link to="/documentos/nuevo" className="shrink-0">
-            <Button size="sm" className="gap-2 h-9">
-              <Plus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Nuevo documento</span>
-              <span className="sm:hidden">Nuevo</span>
+            <Button size="sm" className="btn-premium gap-2 h-10 px-4 text-sm border-0 text-primary-foreground">
+              <Plus className="h-4 w-4 relative z-10" />
+              <span className="hidden sm:inline relative z-10">Nuevo documento</span>
+              <span className="sm:hidden relative z-10">Nuevo</span>
             </Button>
           </Link>
         </div>
@@ -195,8 +357,18 @@ export function DashboardPage() {
           ? 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-6'
           : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-5',
       )}>
-        {metrics.map((m) => (
-          <MetricCard key={m.title} {...m} loading={loadingDash} variant="compact" />
+        {metrics.map((m, i) => (
+          <DashboardKpiCard
+            key={m.key}
+            title={m.title}
+            value={m.value}
+            icon={m.icon}
+            description={m.description}
+            accent={m.accent}
+            delta={m.delta}
+            loading={loadingDash}
+            style={{ animationDelay: `${i * 60}ms` }}
+          />
         ))}
       </div>
 
@@ -226,8 +398,7 @@ export function DashboardPage() {
                 icon={stage.icon}
                 label={stage.label}
                 count={getCount(stage.ids)}
-                colorClass={stage.colorClass}
-                bgClass={stage.bgClass}
+                accent={stage.accent}
                 isLast={i === pipelineStages.length - 1}
                 loading={loadingDash}
               />
@@ -261,17 +432,15 @@ export function DashboardPage() {
                 <AreaChart data={dashboard?.porMes ?? []} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="dashGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="hsl(var(--primary))" stopOpacity={0.22} />
+                      <stop offset="5%"  stopColor="hsl(var(--primary))" stopOpacity={0.32} />
+                      <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity={0.08} />
                       <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                    cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }}
-                  />
+                  <Tooltip content={<AreaChartTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }} />
                   <Area
                     type="monotone"
                     dataKey="cantidad"
@@ -311,19 +480,45 @@ export function DashboardPage() {
               </>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={110}>
-                  <PieChart>
-                    <Pie data={dashboard?.porEstado ?? []} dataKey="cantidad" nameKey="desc_estado_documento" cx="50%" cy="50%" outerRadius={48} innerRadius={28}>
-                      {(dashboard?.porEstado ?? []).map((e, i) => (
-                        <Cell key={i} fill={ESTADO_COLORES[e.id_estado_documento] ?? '#94a3b8'} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(v: number) => [v, 'Docs']}
-                      contentStyle={{ fontSize: 12, borderRadius: 8, backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="relative">
+                  <ResponsiveContainer width="100%" height={120}>
+                    <PieChart>
+                      <defs>
+                        {(dashboard?.porEstado ?? []).map((e, i) => {
+                          const color = ESTADO_COLORES[e.id_estado_documento] ?? '#94a3b8';
+                          return (
+                            <linearGradient id={`pieGrad${i}`} key={i} x1="0" y1="0" x2="1" y2="1">
+                              <stop offset="0%" stopColor={color} stopOpacity={1} />
+                              <stop offset="100%" stopColor={color} stopOpacity={0.65} />
+                            </linearGradient>
+                          );
+                        })}
+                      </defs>
+                      <Pie
+                        data={dashboard?.porEstado ?? []}
+                        dataKey="cantidad"
+                        nameKey="desc_estado_documento"
+                        cx="50%" cy="50%"
+                        outerRadius={56}
+                        innerRadius={36}
+                        paddingAngle={3}
+                        cornerRadius={6}
+                        stroke="none"
+                      >
+                        {(dashboard?.porEstado ?? []).map((_, i) => (
+                          <Cell key={i} fill={`url(#pieGrad${i})`} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<PieChartTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-lg font-bold text-foreground tabular-nums">
+                      {(dashboard?.totales.total ?? 0).toLocaleString('es-CL')}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Total</span>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   {(dashboard?.porEstado ?? []).map((estado) => {
                     const color = ESTADO_COLORES[estado.id_estado_documento] ?? '#94a3b8';
@@ -381,14 +576,21 @@ export function DashboardPage() {
           ) : (actividad ?? []).length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-8">Sin actividad reciente</p>
           ) : (
-            <div className="space-y-3">
-              {(actividad ?? []).map((item) => {
+            <div className="timeline-rail">
+              {(actividad ?? []).map((item, i) => {
                 const badgeConfig = ACCION_BADGE[item.accion ?? ''] ?? ACCION_BADGE.MOVIMIENTO;
+                const accent = ACCENTS[ACCION_ACCENT[badgeConfig.variant] ?? 'slate'];
                 return (
-                  <div key={item.id_historial} className="flex items-start gap-3 py-0.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                      {(item.nombres_fun ?? item.usuario ?? '?')[0]?.toUpperCase()}
-                    </div>
+                  <div
+                    key={item.id_historial}
+                    className="relative flex items-start gap-3 py-2 pl-7 rounded-lg transition-colors duration-150 hover:bg-muted/40 animate-fade-in-up"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
+                    <span className={cn('icon-3d absolute left-0 top-2 flex h-7 w-7 shrink-0 items-center justify-center ring-4 ring-card', accent.icon3d)}>
+                      <span className="relative z-10 text-[10px] font-bold text-white">
+                        {(item.nombres_fun ?? item.usuario ?? '?')[0]?.toUpperCase()}
+                      </span>
+                    </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-start justify-between gap-x-2">
                         <p className="text-sm font-medium text-foreground truncate flex-1 min-w-0">

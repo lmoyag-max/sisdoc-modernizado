@@ -92,19 +92,16 @@ export function DespacharModal({ open, onClose, idDocumento, materia, esRedespac
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 modal-overlay" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl flex flex-col animate-fade-in">
+      <div className="modal-panel relative w-full max-w-lg flex flex-col">
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-          <div className={cn(
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-            esRedespacho ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-amber-100 dark:bg-amber-900/30'
-          )}>
-            <Send className={cn('h-4 w-4', esRedespacho ? 'text-orange-600 dark:text-orange-400' : 'text-amber-600 dark:text-amber-400')} />
-          </div>
+          <span className="icon-3d icon-3d-amber flex h-9 w-9 shrink-0 items-center justify-center">
+            <Send className="h-4 w-4 text-white" />
+          </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">
               {esRedespacho ? 'Redespachar a otro destino' : 'Despachar documento'}

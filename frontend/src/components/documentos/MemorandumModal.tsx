@@ -251,15 +251,15 @@ export function MemorandumModal({
   const sinRut = fase === 'preview' && !firmante.rut;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-background rounded-xl border shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4">
+      <div className="modal-panel bg-background w-full max-w-4xl max-h-[92vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600 shrink-0">
-              <FileText className="h-5 w-5" />
-            </div>
+            <span className="icon-3d icon-3d-sky flex h-9 w-9 shrink-0 items-center justify-center">
+              <FileText className="h-5 w-5 text-white" />
+            </span>
             <div>
               <h2 className="font-semibold text-sm">Vista previa — Memorándum</h2>
               <p className="text-xs text-muted-foreground">

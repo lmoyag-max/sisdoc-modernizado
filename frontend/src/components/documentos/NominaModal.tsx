@@ -254,14 +254,14 @@ export function NominaModal({ open, onClose, data, onNavigate }: NominaModalProp
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 modal-overlay"
         onClick={handleCerrar}
         aria-hidden="true"
       />
 
       {/* Panel */}
       <div
-        className="relative w-full max-w-3xl bg-card border border-border rounded-2xl shadow-2xl flex flex-col"
+        className="modal-panel relative w-full max-w-3xl flex flex-col"
         style={{ maxHeight: '92vh' }}
         role="dialog"
         aria-modal="true"
@@ -270,9 +270,9 @@ export function NominaModal({ open, onClose, data, onNavigate }: NominaModalProp
         {/* Cabecera del modal */}
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-              <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
-            </div>
+            <span className="icon-3d icon-3d-indigo flex h-9 w-9 shrink-0 items-center justify-center">
+              <FileText className="h-4 w-4 text-white" aria-hidden="true" />
+            </span>
             <div>
               <p className="text-sm font-bold text-foreground">
                 NÓMINA N° {data.numDocumento ?? data.idDocumento}

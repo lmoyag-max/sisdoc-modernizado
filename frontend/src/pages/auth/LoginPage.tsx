@@ -108,6 +108,7 @@ export function LoginPage() {
               <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950" />
               <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl" />
+              <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-violet-600/10 rounded-full blur-3xl" />
               <div
                 className="absolute inset-0 opacity-[0.03]"
                 style={{
@@ -145,9 +146,9 @@ export function LoginPage() {
 
           {/* Hero */}
           <div className="flex-1 flex flex-col justify-center mt-12">
-            <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
+            <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4 animate-fade-in-up">
               {textos.tituloPrincipal}{' '}
-              <span className="text-indigo-400">{textos.tituloPrincipalAcento}</span>
+              <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">{textos.tituloPrincipalAcento}</span>
             </h1>
             <p className="text-slate-400 text-lg leading-relaxed mb-12">
               {textos.descripcion}
@@ -160,11 +161,12 @@ export function LoginPage() {
                 return (
                   <div
                     key={i}
-                    className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3 backdrop-blur-sm"
+                    className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-3 backdrop-blur-sm transition-colors hover:bg-white/[0.08] hover:border-white/20 animate-fade-in-up"
+                    style={{ animationDelay: `${i * 60}ms` }}
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20">
-                      <Icon className="h-4 w-4 text-indigo-400" />
-                    </div>
+                    <span className="icon-3d-sm icon-3d-indigo flex h-8 w-8 shrink-0 items-center justify-center">
+                      <Icon className="h-4 w-4 text-white" />
+                    </span>
                     <span className="text-sm text-slate-300 font-medium">{label}</span>
                   </div>
                 );
@@ -292,7 +294,7 @@ export function LoginPage() {
             {/* Submit */}
             <Button
               type="submit"
-              className="w-full h-10 text-sm font-medium"
+              className="btn-premium w-full h-10 text-sm font-medium border-0 text-primary-foreground"
               loading={isSubmitting}
             >
               {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}

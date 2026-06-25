@@ -399,6 +399,9 @@ export function NuevoDocumentoPage() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/documentos')} className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
+          <span className="icon-3d icon-3d-indigo hidden sm:flex h-11 w-11 shrink-0 items-center justify-center">
+            <FileText className="h-5 w-5 text-white" />
+          </span>
           <div>
             <h1 className="text-2xl font-bold">Ingreso de Documento</h1>
             <p className="text-sm text-muted-foreground">Identificación del documento y trámite</p>
@@ -418,7 +421,9 @@ export function NuevoDocumentoPage() {
               <Card className="border-primary/30 bg-primary/[0.02]">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <FileStack className="h-4 w-4 text-primary" />
+                    <span className="icon-3d-sm icon-3d-indigo flex h-7 w-7 shrink-0 items-center justify-center">
+                      <FileStack className="h-3.5 w-3.5 text-white" />
+                    </span>
                     Soporte y Condición
                     <span className="ml-auto flex items-center gap-1 text-xs font-normal text-primary">
                       <ShieldAlert className="h-3 w-3" />Oficina de Partes
@@ -523,7 +528,9 @@ export function NuevoDocumentoPage() {
               <Card className="border-blue-200/60 bg-blue-50/30 dark:bg-blue-900/10">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Send className="h-4 w-4 text-blue-600" />
+                    <span className="icon-3d-sm icon-3d-sky flex h-7 w-7 shrink-0 items-center justify-center">
+                      <Send className="h-3.5 w-3.5 text-white" />
+                    </span>
                     Firmante del Memorándum
                   </CardTitle>
                   <CardDescription>Selecciona quién firmará digitalmente el documento en FirmaGov</CardDescription>
@@ -593,7 +600,9 @@ export function NuevoDocumentoPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-primary" />
+                  <span className="icon-3d-sm icon-3d-indigo flex h-7 w-7 shrink-0 items-center justify-center">
+                    <FileText className="h-3.5 w-3.5 text-white" />
+                  </span>
                   Identificación del Documento
                 </CardTitle>
               </CardHeader>
@@ -665,7 +674,9 @@ export function NuevoDocumentoPage() {
             <Card className="border-emerald-200 dark:border-emerald-800/40">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <ChevronRight className="h-4 w-4 text-emerald-500" />
+                  <span className="icon-3d-sm icon-3d-emerald flex h-7 w-7 shrink-0 items-center justify-center">
+                    <ChevronRight className="h-3.5 w-3.5 text-white" />
+                  </span>
                   Origen del Trámite
                   <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted-foreground">
                     <Lock className="h-3 w-3" />Automático
@@ -690,7 +701,9 @@ export function NuevoDocumentoPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <ChevronRight className="h-4 w-4 text-primary" />
+                  <span className="icon-3d-sm icon-3d-violet flex h-7 w-7 shrink-0 items-center justify-center">
+                    <ChevronRight className="h-3.5 w-3.5 text-white" />
+                  </span>
                   Destino del Trámite
                 </CardTitle>
                 <CardDescription>
@@ -822,7 +835,9 @@ export function NuevoDocumentoPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-primary" />
+                  <span className="icon-3d-sm icon-3d-amber flex h-7 w-7 shrink-0 items-center justify-center">
+                    <Tag className="h-3.5 w-3.5 text-white" />
+                  </span>
                   Distribución y Compromiso
                 </CardTitle>
               </CardHeader>
@@ -862,7 +877,9 @@ export function NuevoDocumentoPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Paperclip className="h-4 w-4 text-primary" />
+                  <span className="icon-3d-sm icon-3d-slate flex h-7 w-7 shrink-0 items-center justify-center">
+                    <Paperclip className="h-3.5 w-3.5 text-white" />
+                  </span>
                   Archivos Adjuntos
                   <span className="text-xs text-muted-foreground font-normal">
                     {tipoSoporte === 'F' ? '(no requeridos para documentos físicos)' : '(opcionales)'}
@@ -878,10 +895,12 @@ export function NuevoDocumentoPage() {
                   onClick={() => document.getElementById('file-input')?.click()}
                   className={cn(
                     'flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-dashed cursor-pointer transition-all',
-                    dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                    dragOver ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-border hover:border-primary/50 hover:bg-muted/30'
                   )}
                 >
-                  <Paperclip className={cn('h-7 w-7', dragOver ? 'text-primary' : 'text-muted-foreground')} />
+                  <span className={cn('icon-3d flex h-12 w-12 items-center justify-center transition-transform', dragOver ? 'icon-3d-indigo scale-105' : 'icon-3d-slate')}>
+                    <Paperclip className="h-5 w-5 text-white" />
+                  </span>
                   <div className="text-center">
                     <p className="text-sm font-medium">
                       {dragOver ? 'Suelta los archivos' : 'Arrastra o haz clic para seleccionar'}
@@ -951,7 +970,7 @@ export function NuevoDocumentoPage() {
               <Button type="button" variant="outline" onClick={() => navigate('/documentos')}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isPending || excuotaTotal} className="gap-2 px-8">
+              <Button type="submit" disabled={isPending || excuotaTotal} className="btn-premium gap-2 px-8 border-0 text-primary-foreground">
                 {isPending
                   ? <><Loader2 className="h-4 w-4 animate-spin" />Procesando...</>
                   : esMemorandum

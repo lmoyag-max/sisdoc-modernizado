@@ -292,9 +292,9 @@ export function JefaturasPage() {
       {/* Header */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <UserCheck className="h-5 w-5" />
-          </div>
+          <span className="icon-3d icon-3d-indigo flex h-10 w-10 shrink-0 items-center justify-center">
+            <UserCheck className="h-5 w-5 text-white" />
+          </span>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Jefaturas y Subrogancias</h1>
             <p className="text-sm text-muted-foreground">
@@ -307,12 +307,14 @@ export function JefaturasPage() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { label: 'Servicios configurados', value: jefaturas.length, icon: Building2, color: 'text-primary' },
-          { label: 'Firmantes activos hoy',  value: activos,           icon: CheckCircle, color: 'text-emerald-600' },
-          { label: 'Sin firmante activo',    value: jefaturas.length - activos, icon: AlertCircle, color: 'text-amber-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-xl border bg-card px-4 py-3 flex items-center gap-3">
-            <Icon className={cn('h-5 w-5 shrink-0', color)} />
+          { label: 'Servicios configurados', value: jefaturas.length, icon: Building2, accent: 'indigo' },
+          { label: 'Firmantes activos hoy',  value: activos,           icon: CheckCircle, accent: 'emerald' },
+          { label: 'Sin firmante activo',    value: jefaturas.length - activos, icon: AlertCircle, accent: 'amber' },
+        ].map(({ label, value, icon: Icon, accent }) => (
+          <div key={label} className="kpi-premium px-4 py-3 flex items-center gap-3">
+            <span className={cn('icon-3d-sm flex h-9 w-9 shrink-0 items-center justify-center', `icon-3d-${accent}`)}>
+              <Icon className="h-4 w-4 text-white" />
+            </span>
             <div>
               <p className="text-xl font-bold leading-tight">{value}</p>
               <p className="text-xs text-muted-foreground leading-tight">{label}</p>
@@ -583,10 +585,10 @@ export function JefaturasPage() {
       {/* ── Modal crear/editar ──────────────────────────────────── */}
       {modalOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) cerrarModal(); }}
         >
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+          <div className="modal-panel bg-background w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-background z-10">
               <h3 className="font-semibold text-sm flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
@@ -777,14 +779,14 @@ export function JefaturasPage() {
       {/* ── Modal confirmar eliminación ──────────────────────────── */}
       {confirmDelete && (
         <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setConfirmDelete(null); }}
         >
-          <div className="bg-background rounded-xl border shadow-xl w-full max-w-sm p-6 space-y-4">
+          <div className="modal-panel bg-background w-full max-w-sm p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
-                <Trash2 className="h-5 w-5 text-destructive" />
-              </div>
+              <span className="icon-3d icon-3d-red flex h-10 w-10 shrink-0 items-center justify-center">
+                <Trash2 className="h-5 w-5 text-white" />
+              </span>
               <div>
                 <p className="font-semibold text-sm">Eliminar jefatura</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Esta acción no se puede deshacer</p>

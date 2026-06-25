@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, FileText, Inbox, Send, ClipboardList,
   Network, Search, Upload, Users, BarChart3,
@@ -9,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore, displayName } from '@/stores/auth.store';
 import { authApi } from '@/lib/api/auth.api';
+import { apiClient } from '@/lib/api/client';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -22,6 +24,25 @@ interface NavItem {
   icon:   React.ComponentType<{ className?: string }>;
   modulo: string;
 }
+
+/* Identidad visual por módulo — icono 3D con color propio (ver plan de diseño) */
+const ACCENT_MODULO: Record<string, string> = {
+  dashboard:      'indigo',
+  documentos:     'indigo',
+  bandeja:        'amber',
+  enviados:       'sky',
+  tramites:       'violet',
+  trazabilidad:   'violet',
+  busqueda:       'sky',
+  archivos:       'emerald',
+  usuarios:       'amber',
+  reportes:       'emerald',
+  roles:          'violet',
+  alertas:        'red',
+  jefaturas:      'indigo',
+  'firma-gob':    'slate',
+  configuracion:  'slate',
+};
 
 const NAV_PRINCIPAL: NavItem[] = [
   { label: 'Dashboard',       to: '/dashboard',    icon: LayoutDashboard, modulo: 'dashboard'    },
@@ -75,6 +96,22 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const itemsPrincipal = NAV_PRINCIPAL.filter((item) => puede(item.modulo));
   const itemsAdmin     = NAV_ADMIN.filter((item) => puede(item.modulo));
   const mostrarAdmin   = isAdmin || itemsAdmin.length > 0;
+
+  // Contador "por recibir" para el badge del ítem Bandeja entrada (solo lectura, mismo endpoint que BandejaPage)
+  const { data: pendientesBandeja } = useQuery({
+    queryKey: ['sidebar-pendientes-bandeja'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ meta: { total: number } }>('/tramites', {
+        params: { idEstado: 2, pagina: 1, porPagina: 1 },
+      });
+      return data.meta?.total ?? 0;
+    },
+    enabled: puede('bandeja'),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  const badgeFor = (modulo: string) => (modulo === 'bandeja' ? pendientesBandeja : undefined);
 
   // Escape key + body scroll lock cuando el drawer está abierto
   useEffect(() => {
@@ -131,7 +168,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
             </p>
           )}
           {itemsPrincipal.map((item) => (
-            <SidebarItem key={item.to} item={item} collapsed={collapsed} />
+            <SidebarItem key={item.to} item={item} collapsed={collapsed} badge={badgeFor(item.modulo)} />
           ))}
           {mostrarAdmin && (
             <>
@@ -142,7 +179,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                 </p>
               )}
               {itemsAdmin.map((item) => (
-                <SidebarItem key={item.to} item={item} collapsed={collapsed} />
+                <SidebarItem key={item.to} item={item} collapsed={collapsed} badge={badgeFor(item.modulo)} />
               ))}
             </>
           )}
@@ -227,7 +264,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                 </p>
               )}
               {itemsPrincipal.map((item) => (
-                <SidebarItem key={item.to} item={item} collapsed={false} onClick={handleMobileNav} />
+                <SidebarItem key={item.to} item={item} collapsed={false} onClick={handleMobileNav} badge={badgeFor(item.modulo)} />
               ))}
               {mostrarAdmin && (
                 <>
@@ -236,7 +273,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                     Administración
                   </p>
                   {itemsAdmin.map((item) => (
-                    <SidebarItem key={item.to} item={item} collapsed={false} onClick={handleMobileNav} />
+                    <SidebarItem key={item.to} item={item} collapsed={false} onClick={handleMobileNav} badge={badgeFor(item.modulo)} />
                   ))}
                 </>
               )}
@@ -271,19 +308,23 @@ function SidebarItem({
   item,
   collapsed,
   onClick,
+  badge,
 }: {
   item: NavItem;
   collapsed: boolean;
   onClick?: () => void;
+  badge?: number;
 }) {
   const Icon = item.icon;
+  const accent = ACCENT_MODULO[item.modulo] ?? 'slate';
+  const showBadge = typeof badge === 'number' && badge > 0;
   return (
     <NavLink
       to={item.to}
       title={collapsed ? item.label : undefined}
       onClick={onClick}
       className={({ isActive }) => cn(
-        'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-150 group overflow-hidden',
+        'relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-all duration-150 group overflow-hidden',
         'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
         isActive && 'bg-sidebar-primary/15 text-sidebar-primary font-medium hover:bg-sidebar-primary/20',
         collapsed && 'justify-center px-2',
@@ -292,8 +333,18 @@ function SidebarItem({
       {({ isActive }) => (
         <>
           {isActive && <span className="nav-active-indicator" />}
-          <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-sidebar-primary' : 'group-hover:text-sidebar-foreground')} />
-          {!collapsed && <span className="truncate animate-fade-in">{item.label}</span>}
+          <span className={cn('icon-3d-sm relative flex h-7 w-7 shrink-0 items-center justify-center', `icon-3d-${accent}`, 'group-hover:-translate-y-0.5')}>
+            <Icon className="h-3.5 w-3.5 text-white" />
+            {collapsed && showBadge && (
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-sidebar-background" />
+            )}
+          </span>
+          {!collapsed && <span className="truncate animate-fade-in flex-1">{item.label}</span>}
+          {!collapsed && showBadge && (
+            <span className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white animate-fade-in">
+              {badge! > 99 ? '99+' : badge}
+            </span>
+          )}
         </>
       )}
     </NavLink>

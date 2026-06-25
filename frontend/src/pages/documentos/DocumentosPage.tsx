@@ -45,14 +45,19 @@ export function DocumentosPage() {
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Documentos</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {meta ? `${meta.total.toLocaleString('es-CL')} documento${meta.total !== 1 ? 's' : ''} en total` : 'Cargando...'}
-          </p>
+        <div className="flex items-center gap-3">
+          <span className="icon-3d icon-3d-indigo hidden sm:flex h-11 w-11 shrink-0 items-center justify-center">
+            <FileText className="h-5 w-5 text-white" />
+          </span>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Documentos</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {meta ? `${meta.total.toLocaleString('es-CL')} documento${meta.total !== 1 ? 's' : ''} en total` : 'Cargando...'}
+            </p>
+          </div>
         </div>
         <Link to="/documentos/nuevo">
-          <Button size="sm" className="gap-2 shrink-0">
+          <Button size="sm" className="btn-premium gap-2 shrink-0 border-0 text-primary-foreground">
             <Plus className="h-4 w-4" />
             Nuevo documento
           </Button>
@@ -157,8 +162,8 @@ export function DocumentosPage() {
         <div className="flex items-center justify-between md:hidden">
           <p className="text-xs text-muted-foreground">{meta.pagina} / {meta.totalPaginas} · {meta.total} docs</p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="h-9 w-9" disabled={meta.pagina <= 1} onClick={() => setPage(meta.pagina - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button>
-            <Button variant="outline" size="icon" className="h-9 w-9" disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPage(meta.pagina + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></Button>
+            <button type="button" className="pagination-pill h-9 w-9" disabled={meta.pagina <= 1} onClick={() => setPage(meta.pagina - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></button>
+            <button type="button" className="pagination-pill h-9 w-9" disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPage(meta.pagina + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></button>
           </div>
         </div>
       )}
@@ -167,8 +172,8 @@ export function DocumentosPage() {
       <Card className="hidden md:block">
         <div className="overflow-x-auto">
           <div className="min-w-[780px]">
-            <CardHeader className="px-6 py-4 border-b bg-muted/20">
-              <div className="grid grid-cols-12 gap-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <CardHeader className="table-head-modern px-6 py-3.5">
+              <div className="grid grid-cols-12 gap-4">
                 <div className="col-span-1">N°</div>
                 <div className="col-span-3 flex items-center gap-1 cursor-pointer hover:text-foreground transition-colors">
                   Asunto <ArrowUpDown className="h-3 w-3" />
@@ -274,9 +279,9 @@ export function DocumentosPage() {
               Mostrando {(meta.pagina - 1) * meta.porPagina + 1}–{Math.min(meta.pagina * meta.porPagina, meta.total)} de {meta.total.toLocaleString('es-CL')}
             </p>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={meta.pagina <= 1} onClick={() => setPage(meta.pagina - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button>
+              <button type="button" className="pagination-pill" disabled={meta.pagina <= 1} onClick={() => setPage(meta.pagina - 1)} aria-label="Página anterior"><ChevronLeft className="h-3.5 w-3.5" /></button>
               <span className="text-xs text-muted-foreground px-2 tabular-nums">{meta.pagina} / {meta.totalPaginas}</span>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPage(meta.pagina + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></Button>
+              <button type="button" className="pagination-pill" disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPage(meta.pagina + 1)} aria-label="Página siguiente"><ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
           </div>
         )}

@@ -121,9 +121,9 @@ export function TrazabilidadPage() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-          <GitBranch className="h-5 w-5 text-primary" />
-        </div>
+        <span className="icon-3d icon-3d-violet flex h-11 w-11 shrink-0 items-center justify-center">
+          <GitBranch className="h-5 w-5 text-white" />
+        </span>
         <div>
           <h1 className="text-2xl font-bold">Trazabilidad Documental</h1>
           <p className="text-sm text-muted-foreground">Historial completo de movimientos</p>
@@ -131,27 +131,17 @@ export function TrazabilidadPage() {
       </div>
 
       {/* Selector de modo */}
-      <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit">
+      <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => cambiarModo('numero')}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-            modo === 'numero'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
+          className={cn('filter-pill', modo === 'numero' && 'filter-pill-active')}
         >
           <Hash className="h-3.5 w-3.5" />
           Por N° documento
         </button>
         <button
           onClick={() => cambiarModo('general')}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-            modo === 'general'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
+          className={cn('filter-pill', modo === 'general' && 'filter-pill-active')}
         >
           <Search className="h-3.5 w-3.5" />
           Búsqueda general
@@ -273,7 +263,9 @@ export function TrazabilidadPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <GitBranch className="h-4 w-4 text-primary" />
+                <span className="icon-3d-sm icon-3d-violet flex h-7 w-7 shrink-0 items-center justify-center">
+                  <GitBranch className="h-3.5 w-3.5 text-white" />
+                </span>
                 Timeline completo de movimientos
               </CardTitle>
               <CardDescription>

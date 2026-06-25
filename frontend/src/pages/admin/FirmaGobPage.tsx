@@ -570,7 +570,7 @@ function HistorialPanel() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-muted/30 border-b border-border text-xs text-muted-foreground">
+                <tr className="table-head-modern">
                   <th className="px-4 py-2.5 text-left font-semibold">#</th>
                   <th className="px-4 py-2.5 text-left font-semibold">Correlativo</th>
                   <th className="px-4 py-2.5 text-left font-semibold">Firmante</th>
@@ -783,7 +783,7 @@ function LogsPanel() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-muted/30 border-b border-border text-xs text-muted-foreground">
+                <tr className="table-head-modern">
                   <th className="px-4 py-2.5 text-left font-semibold">Fecha/Hora</th>
                   <th className="px-4 py-2.5 text-left font-semibold">Ambiente</th>
                   <th className="px-4 py-2.5 text-left font-semibold">Evento</th>
@@ -892,16 +892,16 @@ function LogDetailModal({ logId, onClose }: { logId: number; onClose: () => void
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 modal-overlay" onClick={onClose} aria-hidden="true" />
       <div
-        className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-2xl animate-fade-in"
+        className="modal-panel relative w-full max-w-2xl max-h-[85vh] overflow-y-auto"
         role="dialog" aria-modal="true" aria-label="Detalle del log técnico"
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border sticky top-0 bg-card z-10">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-            <ScrollText className="h-4 w-4 text-primary" />
-          </div>
+          <span className="icon-3d-sm icon-3d-slate flex h-9 w-9 shrink-0 items-center justify-center">
+            <ScrollText className="h-4 w-4 text-white" />
+          </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">Detalle del log técnico #{logId}</p>
             {data && (
@@ -1104,9 +1104,9 @@ export function FirmaGobPage() {
       {/* Header */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <PenLine className="h-5 w-5" />
-          </div>
+          <span className="icon-3d icon-3d-slate flex h-10 w-10 shrink-0 items-center justify-center">
+            <PenLine className="h-5 w-5 text-white" />
+          </span>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Integración Firma.gob</h1>
             <p className="text-sm text-muted-foreground">

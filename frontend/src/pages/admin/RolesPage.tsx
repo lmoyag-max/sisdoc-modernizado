@@ -65,8 +65,8 @@ function RolModal({ rol, modulos, onClose, onSaved }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-fade-in">
+      <div className="absolute inset-0 modal-overlay" onClick={onClose} />
+      <div className="modal-panel relative w-full max-w-lg flex flex-col max-h-[90vh]">
 
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <h2 className="text-base font-semibold">{isEdit ? 'Editar rol' : 'Nuevo rol'}</h2>
@@ -188,15 +188,15 @@ export function RolesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Shield className="h-5 w-5 text-primary" />
-          </div>
+          <span className="icon-3d icon-3d-violet flex h-11 w-11 shrink-0 items-center justify-center">
+            <Shield className="h-5 w-5 text-white" />
+          </span>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Roles y Permisos</h1>
             <p className="text-sm text-muted-foreground">Configura qué módulos puede ver cada rol</p>
           </div>
         </div>
-        <Button onClick={() => setModal('nuevo')} className="gap-2">
+        <Button onClick={() => setModal('nuevo')} className="btn-premium gap-2 border-0 text-primary-foreground">
           <Plus className="h-4 w-4" />Nuevo rol
         </Button>
       </div>
@@ -225,8 +225,8 @@ export function RolesPage() {
                 return (
                   <div key={rol.id_rol} className="px-6 py-4">
                     <div className="flex items-center gap-4">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                        <Shield className="h-4 w-4 text-primary" />
+                      <div className="icon-3d-sm icon-3d-violet flex h-9 w-9 shrink-0 items-center justify-center">
+                        <Shield className="h-4 w-4 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">

@@ -114,21 +114,21 @@ export function AdjuntarArchivoModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 modal-overlay"
         onClick={handleCerrar}
         aria-hidden="true"
       />
       <div
-        className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl animate-fade-in"
+        className="modal-panel relative w-full max-w-md"
         role="dialog"
         aria-modal="true"
         aria-label="Adjuntar archivo al documento"
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-            <Paperclip className="h-4 w-4 text-primary" aria-hidden="true" />
-          </div>
+          <span className="icon-3d icon-3d-slate flex h-9 w-9 shrink-0 items-center justify-center">
+            <Paperclip className="h-4 w-4 text-white" aria-hidden="true" />
+          </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">Adjuntar archivo</p>
             <p className="text-xs text-muted-foreground">Documento #{idDocumento}</p>
@@ -174,7 +174,9 @@ export function AdjuntarArchivoModal({
                       : 'border-primary/30 hover:border-primary/60 hover:bg-primary/5 cursor-pointer',
                   )}
                 >
-                  <Upload className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+                  <span className="icon-3d-sm icon-3d-indigo flex h-10 w-10 items-center justify-center">
+                    <Upload className="h-4.5 w-4.5 text-white" aria-hidden="true" />
+                  </span>
                   <p className="text-sm text-muted-foreground text-center">
                     Haz clic para seleccionar archivos
                     <br />

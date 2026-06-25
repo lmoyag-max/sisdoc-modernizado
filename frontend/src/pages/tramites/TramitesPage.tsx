@@ -60,12 +60,17 @@ export function TramitesPage() {
   const meta = data?.meta;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Mis Trámites</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {meta ? `${meta.total} trámite${meta.total !== 1 ? 's' : ''}` : 'Cargando...'}
-        </p>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center gap-3">
+        <span className="icon-3d icon-3d-violet hidden sm:flex h-11 w-11 shrink-0 items-center justify-center">
+          <GitBranch className="h-5 w-5 text-white" />
+        </span>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Mis Trámites</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {meta ? `${meta.total} trámite${meta.total !== 1 ? 's' : ''}` : 'Cargando...'}
+          </p>
+        </div>
       </div>
 
       <Card>
@@ -94,8 +99,8 @@ export function TramitesPage() {
 
                 return (
                   <div key={t.id_tramite} className="flex items-start gap-4 px-6 py-5 hover:bg-muted/30 transition-colors">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                      <GitBranch className="h-5 w-5 text-primary" />
+                    <div className="icon-3d-sm icon-3d-violet flex h-10 w-10 shrink-0 items-center justify-center">
+                      <GitBranch className="h-5 w-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground line-clamp-1">
@@ -158,12 +163,12 @@ export function TramitesPage() {
               Página {meta.pagina} de {meta.totalPaginas}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={meta.pagina <= 1} onClick={() => setPagina(p => p - 1)}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPagina(p => p + 1)}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <button type="button" className="pagination-pill" disabled={meta.pagina <= 1} onClick={() => setPagina(p => p - 1)}>
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" className="pagination-pill" disabled={meta.pagina >= meta.totalPaginas} onClick={() => setPagina(p => p + 1)}>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         )}

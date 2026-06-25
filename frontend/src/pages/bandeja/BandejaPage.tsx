@@ -42,6 +42,13 @@ const FILTROS = [
   { label: 'Cerrados',      value: 5 },
 ] as const;
 
+const KPI_GLOW: Record<string, { glow: string; border: string }> = {
+  indigo:  { glow: 'rgba(79, 70, 229, .35)',  border: 'hsl(239 84% 60% / .35)' },
+  amber:   { glow: 'rgba(217, 119, 6, .30)',  border: 'hsl(38 92% 50% / .35)' },
+  sky:     { glow: 'rgba(2, 132, 199, .30)',  border: 'hsl(199 89% 48% / .35)' },
+  emerald: { glow: 'rgba(5, 150, 105, .30)',  border: 'hsl(160 84% 39% / .35)' },
+};
+
 export function BandejaPage() {
   const [pagina, setPagina]       = useState(1);
   const [filtroEstado, setFiltro] = useState<number | null>(null);
@@ -83,9 +90,13 @@ export function BandejaPage() {
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="icon-3d icon-3d-amber hidden sm:flex h-11 w-11 shrink-0 items-center justify-center">
+            <Inbox className="h-5 w-5 text-white" />
+          </span>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-            <Inbox className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            <Inbox className="h-5 w-5 sm:hidden text-primary" />
             Bandeja de Entrada
             {pendientes > 0 && (
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white px-1.5 animate-critical">
@@ -103,6 +114,7 @@ export function BandejaPage() {
             </div>
           )}
         </div>
+        </div>
         <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ['bandeja'] })} className="gap-2 shrink-0">
           <RefreshCw className="h-4 w-4" />
           Actualizar
@@ -112,17 +124,19 @@ export function BandejaPage() {
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total',         value: meta?.total ?? '—', color: 'text-foreground',                icon: Inbox },
-          { label: 'Por recibir',   value: isLoading ? '—' : pendientes,   color: 'text-amber-600',   icon: AlertCircle },
-          { label: 'Recepcionados', value: isLoading ? '—' : recepcionados, color: 'text-sky-600',    icon: CheckCircle },
-          { label: 'Cerrados',      value: isLoading ? '—' : cerrados,      color: 'text-emerald-600', icon: CheckCircle },
-        ].map(({ label, value, color, icon: Icon }) => (
-          <div key={label} className="rounded-xl border bg-card px-4 py-3 card-executive">
-            <div className="flex items-center gap-2 mb-1">
-              <Icon className={cn('h-3.5 w-3.5', color)} />
+          { label: 'Total',         value: meta?.total ?? '—', accent: 'indigo',  icon: Inbox },
+          { label: 'Por recibir',   value: isLoading ? '—' : pendientes,    accent: 'amber',   icon: AlertCircle },
+          { label: 'Recepcionados', value: isLoading ? '—' : recepcionados, accent: 'sky',      icon: CheckCircle },
+          { label: 'Cerrados',      value: isLoading ? '—' : cerrados,      accent: 'emerald',  icon: CheckCircle },
+        ].map(({ label, value, accent, icon: Icon }) => (
+          <div key={label} className="kpi-premium px-4 py-3" style={{ '--kpi-glow': KPI_GLOW[accent].glow, '--kpi-border': KPI_GLOW[accent].border } as React.CSSProperties}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={cn('icon-3d-sm flex h-7 w-7 shrink-0 items-center justify-center', `icon-3d-${accent}`)}>
+                <Icon className="h-3.5 w-3.5 text-white" />
+              </span>
               <p className="text-xs text-muted-foreground">{label}</p>
             </div>
-            <p className={cn('text-2xl font-bold tabular-nums animate-number', color)}>{value}</p>
+            <p className="text-2xl font-bold tabular-nums animate-number text-foreground">{value}</p>
           </div>
         ))}
       </div>
@@ -130,20 +144,19 @@ export function BandejaPage() {
       {/* Filtros rápidos */}
       <div className="flex gap-2 flex-wrap">
         {FILTROS.map(({ label, value }) => (
-          <Button
+          <button
             key={label}
-            variant={filtroEstado === value ? 'default' : 'outline'}
-            size="sm"
+            type="button"
             onClick={() => handleFiltro(value)}
-            className="h-8 text-xs"
+            className={cn('filter-pill', filtroEstado === value && 'filter-pill-active')}
           >
             {label}
             {value === 2 && pendientes > 0 && (
-              <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500/20 text-amber-700 dark:bg-amber-400/20 dark:text-amber-400 text-[9px] font-bold px-1">
+              <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500/20 text-amber-700 dark:bg-amber-400/20 dark:text-amber-400 text-[9px] font-bold px-1">
                 {pendientes}
               </span>
             )}
-          </Button>
+          </button>
         ))}
       </div>
 
@@ -187,16 +200,16 @@ export function BandejaPage() {
                   >
                     {/* Icono de estado */}
                     <div className={cn(
-                      'flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl',
-                      isPendiente ? 'bg-amber-100 dark:bg-amber-900/30' :
-                      isCerrado   ? 'bg-emerald-100 dark:bg-emerald-900/30' :
-                      'bg-muted',
+                      'icon-3d-sm flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center',
+                      isPendiente ? 'icon-3d-amber' :
+                      isCerrado   ? 'icon-3d-emerald' :
+                      'icon-3d-slate',
                     )}>
                       {isPendiente
-                        ? <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                        ? <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                         : isCerrado
-                          ? <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
-                          : <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                          ? <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                          : <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                       }
                     </div>
 
@@ -260,8 +273,8 @@ export function BandejaPage() {
               Página {meta.pagina} de {meta.totalPaginas} · {meta.total} documentos
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></Button>
+              <button type="button" className="pagination-pill" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior"><ChevronLeft className="h-3.5 w-3.5" /></button>
+              <button type="button" className="pagination-pill" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente"><ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
           </div>
         )}

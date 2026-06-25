@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   Bell, Send, RefreshCw, CheckCircle2,
   XCircle, Clock, AlertTriangle, Mail, Settings2,
-  FileText, Building2, ChevronDown, ChevronRight, Power,
+  FileText, Building2, ChevronDown, ChevronLeft, ChevronRight, Power,
   Plus, UserCheck, Info, FlaskConical,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -418,10 +418,17 @@ function PendientesPanel({
 // ── Panel: historial de envíos ────────────────────────────────
 
 function LogsPanel() {
-  const { data: logs = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['alertas-logs'],
-    queryFn:  () => alertasApi.getLogs(1, 50),
+  const [pagina, setPagina] = useState(1);
+  const POR_PAGINA = 20;
+
+  const { data: result, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['alertas-logs', pagina],
+    queryFn:  () => alertasApi.getLogs(pagina, POR_PAGINA),
+    placeholderData: keepPreviousData,
   });
+
+  const logs = result?.data ?? [];
+  const meta = result?.meta;
 
   return (
     <Card>
@@ -436,7 +443,11 @@ function LogsPanel() {
             Actualizar
           </Button>
         </div>
-        <CardDescription>Últimos 50 registros de alertas enviadas (automáticas y manuales)</CardDescription>
+        <CardDescription>
+          {meta
+            ? `${meta.total} registro${meta.total !== 1 ? 's' : ''} de alertas enviadas (automáticas y manuales)`
+            : 'Alertas enviadas (automáticas y manuales)'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading
@@ -490,6 +501,19 @@ function LogsPanel() {
             )
         }
       </CardContent>
+
+      {/* Paginación */}
+      {meta && meta.totalPaginas > 1 && (
+        <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/10">
+          <p className="text-xs text-muted-foreground">
+            Página {meta.pagina} de {meta.totalPaginas} · {meta.total} registros
+          </p>
+          <div className="flex gap-2">
+            <button type="button" className="pagination-pill" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior"><ChevronLeft className="h-3.5 w-3.5" /></button>
+            <button type="button" className="pagination-pill" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente"><ChevronRight className="h-3.5 w-3.5" /></button>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

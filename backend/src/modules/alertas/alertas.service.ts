@@ -291,7 +291,7 @@ interface AlertaLogRow {
   estado: string; mensaje_error: string | null; total: number;
 }
 
-export async function getLogs(pagina = 1, porPagina = 30): Promise<{ data: AlertaLog[]; total: number }> {
+export async function getLogs(pagina = 1, porPagina = 20): Promise<{ data: AlertaLog[]; total: number }> {
   const pool   = await getPool();
   const offset = (pagina - 1) * porPagina;
   const r = await pool.request()

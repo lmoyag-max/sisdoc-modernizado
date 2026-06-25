@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../../middleware/auth.middleware';
-import { sendSuccess, sendError } from '../../shared/utils/response';
+import { sendSuccess, sendError, sendPaginated, buildPaginationMeta } from '../../shared/utils/response';
 import { AuthenticatedRequest } from '../../shared/types/api.types';
 import * as service from './alertas.service';
 
@@ -51,12 +51,14 @@ router.get('/destinatarios', async (req, res, next) => {
 });
 
 // ── GET /alertas/logs ─────────────────────────────────────────
+// Paginado desde BD (OFFSET/FETCH) — ver alertas.service.ts#getLogs.
+// Tamaño de página por defecto: 20 (historial de envíos puede crecer indefinidamente).
 router.get('/logs', async (req, res, next) => {
   try {
     const pagina    = Math.max(1, Number(req.query.pagina    ?? 1));
-    const porPagina = Math.min(100, Math.max(1, Number(req.query.porPagina ?? 30)));
+    const porPagina = Math.min(100, Math.max(1, Number(req.query.porPagina ?? 20)));
     const result    = await service.getLogs(pagina, porPagina);
-    sendSuccess(res, result.data);
+    sendPaginated(res, result.data, buildPaginationMeta(result.total, pagina, porPagina));
   } catch (e) { next(e); }
 });
 

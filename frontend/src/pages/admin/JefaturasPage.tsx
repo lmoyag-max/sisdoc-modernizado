@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  Users, Plus, RefreshCw, ChevronDown, Pencil, Trash2,
+  Users, Plus, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2,
   Building2, Search, X, Upload, CheckCircle, AlertCircle,
   ShieldCheck, UserCheck, CalendarClock,
 } from 'lucide-react';
@@ -37,6 +37,22 @@ interface Jefatura {
 }
 
 interface CatItem { id: number; descripcion: string; }
+
+interface PaginacionMeta {
+  total:        number;
+  pagina:       number;
+  porPagina:    number;
+  totalPaginas: number;
+}
+
+interface KpisJefaturas {
+  total:       number;
+  activos:     number;
+  sinFirmante: number;
+}
+
+// Tamaño de página por defecto del listado — fácil de ajustar a futuro.
+const POR_PAGINA = 20;
 
 // ── Helpers ───────────────────────────────────────────────────────
 function esFirmanteVigenteHoy(desde: string | null, hasta: string | null): boolean {
@@ -144,6 +160,7 @@ export function JefaturasPage() {
   const [editItem,   setEditItem]   = useState<Jefatura | null>(null);
   const [busqGlobal, setBusqGlobal] = useState('');
   const [busqDep,    setBusqDep]    = useState('');
+  const [pagina,     setPagina]     = useState(1);
   const debouncedGlobal = useDebounce(busqGlobal, 200);
   const debouncedDep    = useDebounce(busqDep, 300);
   const [confirmDelete, setConfirmDelete] = useState<Jefatura | null>(null);
@@ -157,14 +174,21 @@ export function JefaturasPage() {
     vigDesdeSub2: '', vigHastaSub2: '',
   });
 
-  const { data: jefaturas = [], isFetching, refetch } = useQuery({
-    queryKey: ['jefaturas'],
+  const { data: result, isFetching, refetch } = useQuery({
+    queryKey: ['jefaturas', pagina, debouncedGlobal],
     queryFn: async () => {
-      const res = await apiClient.get<{ ok: boolean; data: Jefatura[] }>('/jefaturas');
-      return res.data.data;
+      const res = await apiClient.get<{ ok: boolean; data: Jefatura[]; meta: PaginacionMeta; kpis: KpisJefaturas }>('/jefaturas', {
+        params: { pagina, porPagina: POR_PAGINA, q: debouncedGlobal || undefined },
+      });
+      return res.data;
     },
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
+
+  const jefaturas = result?.data ?? [];
+  const meta       = result?.meta;
+  const kpis       = result?.kpis;
 
   const { data: dependencias = [] } = useQuery({
     queryKey: ['dependencias'],
@@ -203,17 +227,6 @@ export function JefaturasPage() {
   const depsFiltradas = dependencias.filter((d) =>
     d.descripcion.toLowerCase().includes(debouncedDep.toLowerCase())
   );
-
-  const jefaturasFiltradas = jefaturas.filter((j) => {
-    if (!debouncedGlobal) return true;
-    const q = debouncedGlobal.toLowerCase();
-    return (
-      (j.dependencia ?? '').toLowerCase().includes(q) ||
-      j.titular.nombre?.toLowerCase().includes(q) ||
-      j.subrogante.nombre?.toLowerCase().includes(q) ||
-      j.subrogante2.nombre?.toLowerCase().includes(q)
-    );
-  });
 
   function abrirCrear() {
     setEditItem(null);
@@ -285,8 +298,6 @@ export function JefaturasPage() {
     });
   }
 
-  const activos = jefaturas.filter((j) => resolverEstadoFirmante(j.titular) === 'activo').length;
-
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto">
       {/* Header */}
@@ -307,9 +318,9 @@ export function JefaturasPage() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { label: 'Servicios configurados', value: jefaturas.length, icon: Building2, accent: 'indigo' },
-          { label: 'Firmantes activos hoy',  value: activos,           icon: CheckCircle, accent: 'emerald' },
-          { label: 'Sin firmante activo',    value: jefaturas.length - activos, icon: AlertCircle, accent: 'amber' },
+          { label: 'Servicios configurados', value: kpis?.total ?? 0,       icon: Building2,   accent: 'indigo' },
+          { label: 'Firmantes activos hoy',  value: kpis?.activos ?? 0,     icon: CheckCircle, accent: 'emerald' },
+          { label: 'Sin firmante activo',    value: kpis?.sinFirmante ?? 0, icon: AlertCircle, accent: 'amber' },
         ].map(({ label, value, icon: Icon, accent }) => (
           <div key={label} className="kpi-premium px-4 py-3 flex items-center gap-3">
             <span className={cn('icon-3d-sm flex h-9 w-9 shrink-0 items-center justify-center', `icon-3d-${accent}`)}>
@@ -348,11 +359,11 @@ export function JefaturasPage() {
               type="text"
               placeholder="Buscar por servicio o firmante..."
               value={busqGlobal}
-              onChange={(e) => setBusqGlobal(e.target.value)}
+              onChange={(e) => { setBusqGlobal(e.target.value); setPagina(1); }}
               className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
             />
             {busqGlobal && (
-              <button onClick={() => setBusqGlobal('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <button onClick={() => { setBusqGlobal(''); setPagina(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
@@ -360,7 +371,7 @@ export function JefaturasPage() {
         </CardHeader>
 
         <CardContent className="px-0 pb-0">
-          {jefaturasFiltradas.length === 0 ? (
+          {jefaturas.length === 0 ? (
             <div className="flex flex-col items-center py-14 gap-2 text-muted-foreground px-6">
               <ShieldCheck className="h-10 w-10 opacity-20" />
               <p className="text-sm font-medium">
@@ -372,7 +383,7 @@ export function JefaturasPage() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {jefaturasFiltradas.map((j) => {
+              {jefaturas.map((j) => {
                 const isOpen = selectedId === j.id;
                 const estadoTit  = resolverEstadoFirmante(j.titular);
                 const estadoSub  = j.subrogante.nombre  ? resolverEstadoFirmante(j.subrogante)  : null;
@@ -574,9 +585,21 @@ export function JefaturasPage() {
             </div>
           )}
 
-          {jefaturas.length > 0 && (
-            <div className="px-5 py-2 border-t border-border/40">
-              <p className="text-xs text-muted-foreground">{jefaturasFiltradas.length} de {jefaturas.length} servicio{jefaturas.length !== 1 ? 's' : ''}</p>
+          {meta && (
+            <div className="flex items-center justify-between px-5 py-2 border-t border-border/40">
+              <p className="text-xs text-muted-foreground">
+                Página {meta.pagina} de {Math.max(1, meta.totalPaginas)} · {meta.total} servicio{meta.total !== 1 ? 's' : ''}
+              </p>
+              {meta.totalPaginas > 1 && (
+                <div className="flex gap-2">
+                  <button type="button" className="pagination-pill" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)} aria-label="Página anterior">
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <button type="button" className="pagination-pill" disabled={pagina >= meta.totalPaginas} onClick={() => setPagina((p) => p + 1)} aria-label="Página siguiente">
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

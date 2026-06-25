@@ -57,6 +57,7 @@ interface JefaturaRow {
   vigencia_desde_sub_2:            string | null;
   vigencia_hasta_sub_2:            string | null;
   desc_dependencia:                string | null;
+  total:                           number;
 }
 
 function mapJefatura(r: JefaturaRow) {
@@ -103,16 +104,57 @@ function mapJefatura(r: JefaturaRow) {
 const soloAdmin = [requireRole('admin', 'of.partes')];
 
 // ── GET /jefaturas ─────────────────────────────────────────────────
-router.get('/', ...soloAdmin, async (_req: Request, res: Response, next: NextFunction) => {
+// Paginado desde BD (OFFSET/FETCH). Los KPIs (total_global/activos_global)
+// se calculan en una consulta aparte, sobre la tabla completa sin filtro de
+// búsqueda ni de página, para que el strip de indicadores no varíe con la
+// búsqueda ni quede en 0 cuando una página/búsqueda no tiene resultados.
+router.get('/', ...soloAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const pagina    = Math.max(1, Number(req.query.pagina ?? 1));
+    const porPagina = Math.min(100, Math.max(1, Number(req.query.porPagina ?? 20)));
+    const offset    = (pagina - 1) * porPagina;
+    const q         = String(req.query.q ?? '').trim();
+
     const pool = await getPool();
-    const result = await pool.request().query<JefaturaRow>(`
-      SELECT j.*, LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia
-      FROM   jefatura j
-      JOIN   dependencia d ON d.id_dependencia = j.id_dependencia
-      ORDER BY d.desc_dependencia
+
+    const kpisResult = await pool.request().query<{ total_global: number; activos_global: number }>(`
+      SELECT
+        COUNT(*) AS total_global,
+        SUM(CASE WHEN j.activo_titular = 1
+                  AND (j.vigencia_desde_titular IS NULL OR j.vigencia_desde_titular <= CAST(GETDATE() AS DATE))
+                  AND (j.vigencia_hasta_titular IS NULL OR j.vigencia_hasta_titular >= CAST(GETDATE() AS DATE))
+                 THEN 1 ELSE 0 END) AS activos_global
+      FROM jefatura j
     `);
-    sendSuccess(res, result.recordset.map(mapJefatura));
+    const totalGlobal   = kpisResult.recordset[0]?.total_global   ?? 0;
+    const activosGlobal = kpisResult.recordset[0]?.activos_global ?? 0;
+
+    const result = await pool.request()
+      .input('offset',    sql.Int,     offset)
+      .input('porPagina', sql.Int,     porPagina)
+      .input('like',      sql.VarChar, `%${q}%`)
+      .query<JefaturaRow>(`
+        SELECT j.*, LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia,
+               COUNT(*) OVER() AS total
+        FROM   jefatura j
+        JOIN   dependencia d ON d.id_dependencia = j.id_dependencia
+        WHERE  @like = '%%' OR
+               d.desc_dependencia    LIKE @like OR
+               j.nombre_titular      LIKE @like OR
+               j.nombre_subrogante   LIKE @like OR
+               j.nombre_subrogante_2 LIKE @like
+        ORDER BY d.desc_dependencia
+        OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
+      `);
+
+    const total = result.recordset[0]?.total ?? 0;
+
+    res.status(200).json({
+      ok:   true,
+      data: result.recordset.map(mapJefatura),
+      meta: { total, pagina, porPagina, totalPaginas: Math.ceil(total / porPagina) },
+      kpis: { total: totalGlobal, activos: activosGlobal, sinFirmante: totalGlobal - activosGlobal },
+    });
   } catch (e) { next(e); }
 });
 

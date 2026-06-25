@@ -45,6 +45,13 @@ export interface AlertaLog {
   mensajeError:        string | null;
 }
 
+export interface PaginacionMeta {
+  total:        number;
+  pagina:       number;
+  porPagina:    number;
+  totalPaginas: number;
+}
+
 export interface ResultadoEnvio {
   enviados:  number;
   errores:   number;
@@ -85,8 +92,10 @@ export const alertasApi = {
       apiClient.get(`${BASE}/destinatarios`, { params: idDependencia ? { idDependencia } : {} })
     ),
 
-  getLogs: (pagina = 1, porPagina = 30) =>
-    unwrap<AlertaLog[]>(apiClient.get(`${BASE}/logs`, { params: { pagina, porPagina } })),
+  getLogs: (pagina = 1, porPagina = 20) =>
+    apiClient
+      .get<{ ok: boolean; data: AlertaLog[]; meta: PaginacionMeta }>(`${BASE}/logs`, { params: { pagina, porPagina } })
+      .then((r) => ({ data: r.data.data, meta: r.data.meta })),
 
   enviarManual: (idDependencia: number) =>
     unwrap<ResultadoServicio>(apiClient.post(`${BASE}/enviar-manual`, { idDependencia })),

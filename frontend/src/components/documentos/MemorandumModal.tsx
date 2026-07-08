@@ -23,6 +23,10 @@ export interface FirmanteActivo {
   dependencia?:    string | null;
   idDependencia?:  number;
   vigente?:        boolean;
+  /** Firma Simple DOC360 — aditivo, no afecta el flujo de FirmaGOB */
+  usuarioVinculado?:   { idUsuario: number } | null;
+  estadoFirmaSimple?:  'disponible' | 'sin_vincular' | 'usuario_inactivo';
+  motivoNoHabilitada?: string | null;
 }
 
 /** Datos del formulario de nuevo documento que llegan al modal */

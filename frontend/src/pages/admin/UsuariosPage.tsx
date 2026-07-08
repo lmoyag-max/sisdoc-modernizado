@@ -49,7 +49,7 @@ interface ModalProps {
   roles:       Rol[];
   dependencias: Dependencia[];
   onClose:     () => void;
-  onSaved:     () => void;
+  onSaved:     (isEdit: boolean) => void;
 }
 
 function UsuarioModal({ usuario, roles, dependencias, onClose, onSaved }: ModalProps) {
@@ -84,12 +84,15 @@ function UsuarioModal({ usuario, roles, dependencias, onClose, onSaved }: ModalP
     },
     onSuccess: () => {
       toast.success(isEdit ? 'Usuario actualizado' : 'Usuario creado correctamente');
-      onSaved();
+      onSaved(isEdit);
       onClose();
     },
     onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al guardar';
-      toast.error(msg);
+      const data = (e as { response?: { data?: { error?: string; details?: Record<string, string[]> } } })?.response?.data;
+      // Si el backend devolvió errores por campo (Zod), mostrarlos en vez del
+      // mensaje genérico "Datos inválidos" — así se ve exactamente qué campo falló.
+      const detalles = data?.details ? Object.values(data.details).flat().join(' ') : '';
+      toast.error(detalles || data?.error || 'Error al guardar');
     },
   });
 
@@ -293,12 +296,26 @@ export function UsuariosPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.delete(`/usuarios/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['usuarios'] }); toast.success('Usuario eliminado'); },
-    onError: () => toast.error('No se pudo eliminar el usuario'),
+    onError: (e: unknown) => {
+      // El backend ya distingue motivos concretos (autoeliminación, único
+      // admin, documentos/memorándums asociados) — mostrarlos en vez de un
+      // mensaje genérico que oculta la causa real del bloqueo.
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'No se pudo eliminar el usuario';
+      toast.error(msg);
+    },
   });
 
   const usuarios = data?.data ?? [];
   const meta = data?.meta;
-  const handleSaved = () => qc.invalidateQueries({ queryKey: ['usuarios'] });
+  const handleSaved = (isEdit: boolean) => {
+    qc.invalidateQueries({ queryKey: ['usuarios'] });
+    // Solo tras una edición exitosa se limpia el filtro — al cancelar o si la
+    // edición falla, onSaved nunca se invoca, así que el buscador no se toca.
+    if (isEdit) {
+      setSearch('');
+      setPagina(1);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">

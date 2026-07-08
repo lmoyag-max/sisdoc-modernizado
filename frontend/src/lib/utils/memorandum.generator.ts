@@ -29,6 +29,19 @@ export interface MemorandumData {
   logoBase64:         string | null;
   /** Servicio/dependencia del firmante — si no viene, se usa `origen` */
   servicioFirmante?:  string | null;
+  /**
+   * Mecanismo de firma a dibujar en el bloque final. Si se omite (caso de
+   * FirmaGOB hoy, y de la vista previa/borrador), el comportamiento es
+   * idéntico al actual — este campo es aditivo y no cambia ningún flujo
+   * existente cuando no se especifica.
+   */
+  mecanismoFirma?:    'FIRMA_GOB' | 'FIRMA_SIMPLE';
+  /** Requerido cuando mecanismoFirma === 'FIRMA_SIMPLE' — evidencia emitida por el backend */
+  datosFirmaSimple?: {
+    codigoVerificacion: string;
+    hashOriginalCorto:  string;
+    fechaFirma:         string; // ISO
+  };
 }
 
 // ── Helpers internos ──────────────────────────────────────────
@@ -143,6 +156,107 @@ function drawSelloFirmaElectronica(
   return cy + r; // y final ocupado por el sello (borde inferior del círculo)
 }
 
+/**
+ * Dibuja el "pie de firma" de Firma Simple DOC360: una sola tarjeta
+ * centrada en la página, con el sello/imagen de firma-timbre a la
+ * IZQUIERDA y el texto de la firma (rótulo, declaración, nombre, cargo,
+ * fecha, código de verificación + hash) alineado a la derecha del sello,
+ * dentro del mismo recuadro — igual disposición que un pie de firma
+ * institucional con logo al lado del texto. La imagen es solo
+ * representación visual — la evidencia real es este bloque de datos,
+ * registrado en memorandum_firma_simple.
+ * El alto del recuadro se calcula a partir del contenido real dibujado (no es
+ * un valor fijo), para que el borde siempre encierre exactamente el contenido.
+ */
+function drawSelloFirmaSimple(
+  doc: jsPDF, cW: number, mg: number, yTop: number,
+  nombreFirmante: string, cargoFirmante: string, servicio: string | null,
+  firmaTimbreBase64: string | null, natW: number, natH: number,
+  codigoVerificacion: string, hashOriginalCorto: string, fechaFirma: string,
+  colores: { principal: [number, number, number]; grisLabel: [number, number, number]; negro: [number, number, number] },
+): number {
+  const cardW   = Math.min(130, cW);
+  const cardX   = mg + (cW - cardW) / 2;
+  const padX    = 5;
+  const padTop  = 3.5;
+  const imgZoneW = 30;
+  const gap      = 4;
+
+  const textX    = cardX + padX + imgZoneW + gap;
+  const textMaxW = cardW - padX * 2 - imgZoneW - gap;
+
+  // ── Columna de texto (izquierda a derecha del sello) ──────────
+  let ty = yTop + padTop;
+
+  doc.setTextColor(...colores.principal);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('FIRMA SIMPLE DOC360', textX, ty);
+  ty += 3.4;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5.8);
+  doc.setTextColor(...colores.grisLabel);
+  const declaracion = doc.splitTextToSize(
+    'Firmado electrónicamente mediante credenciales institucionales DOC360.', textMaxW,
+  ) as string[];
+  declaracion.forEach((linea) => { doc.text(linea, textX, ty); ty += 2.6; });
+
+  ty += 0.6;
+  doc.setTextColor(...colores.negro);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.text(nombreFirmante, textX, ty);
+  ty += 3.2;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...colores.negro);
+  const cargoServicio = servicio ? `${cargoFirmante} · ${servicio}` : cargoFirmante;
+  const cargoLines = doc.splitTextToSize(cargoServicio, textMaxW) as string[];
+  cargoLines.forEach((linea) => { doc.text(linea, textX, ty); ty += 2.8; });
+
+  doc.setTextColor(...colores.grisLabel);
+  doc.text(fmtFechaFirma(new Date(fechaFirma)), textX, ty);
+  ty += 3.2;
+
+  // Código de verificación y hash en una sola línea.
+  doc.setFontSize(5.8);
+  doc.text(`Código: ${codigoVerificacion}  ·  Hash SHA-256: ${hashOriginalCorto}…`, textX, ty);
+  ty += padTop; // padding inferior simétrico al superior
+
+  // ── Sello/imagen — a la izquierda, dentro del mismo recuadro ──
+  // Se dibuja después de calcular el bloque de texto para poder centrarlo
+  // verticalmente respecto a él (o al menos ocupar el mismo alto disponible).
+  const textBlockH = ty - (yTop + padTop);
+  let imgBottom = yTop + padTop;
+  if (firmaTimbreBase64) {
+    const MAX_FT_W = imgZoneW - 2, MAX_FT_H = Math.max(18, textBlockH);
+    let ftW = MAX_FT_W, ftH = MAX_FT_H;
+    if (natW > 0 && natH > 0) {
+      const ratio = natH / natW;
+      ftW = MAX_FT_W; ftH = ftW * ratio;
+      if (ftH > MAX_FT_H) { ftH = MAX_FT_H; ftW = ftH / ratio; }
+    }
+    const imgZoneCx = cardX + padX + imgZoneW / 2;
+    const ftX = imgZoneCx - ftW / 2;
+    const ftY = yTop + padTop + Math.max(0, (textBlockH - ftH) / 2);
+    try { doc.addImage(firmaTimbreBase64, ftX, ftY, ftW, ftH); imgBottom = ftY + ftH; } catch (e) {
+      console.warn('[memoPDF] addImage firma+timbre (Firma Simple) falló:', e);
+    }
+  }
+
+  const contentBottom = Math.max(ty, imgBottom + padTop);
+
+  // Recuadro dibujado al final, ajustado exactamente al contenido real
+  // (evita descuadres si algún texto envuelve a 2 líneas o la imagen es alta).
+  doc.setDrawColor(...colores.principal);
+  doc.setLineWidth(0.5);
+  doc.rect(cardX, yTop, cardW, contentBottom - yTop, 'S');
+
+  return contentBottom;
+}
+
 /** Carga una URL de imagen (pública o con credenciales) como data URL JPEG.
  *  Mismo patrón que NominaModal: fetch → blob → canvas (quita alfa).
  *  Registra un aviso en consola si la imagen no se puede cargar,
@@ -242,16 +356,16 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
     doc.restoreGraphicsState();
   }
 
-  // ── 1. Header institucional (igual que nómina) ────────────────
-  const hdrH   = 26;
-  const logoSz = 18;
-  const logoX  = mg + 4;
+  // ── 1. Header institucional (compacto) ────────────────────────
+  const hdrH   = 15;
+  const logoSz = 11;
+  const logoX  = mg + 3;
   const logoY  = y + (hdrH - logoSz) / 2;
 
   doc.setFillColor(...headerFondo);
   doc.rect(mg, y, cW, hdrH, 'F');
   doc.setDrawColor(...headerBorde);
-  doc.setLineWidth(0.5);
+  doc.setLineWidth(0.4);
   doc.rect(mg, y, cW, hdrH, 'S');
 
   if (data.logoBase64) {
@@ -260,34 +374,34 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
     console.warn('[memoPDF] logoBase64 es null — el logo no se insertará en el encabezado.');
   }
 
-  const textX  = mg + 4 + logoSz + 5;
+  const textX  = mg + 3 + logoSz + 4;
   const textCX = textX + (mg + cW - 4 - textX) / 2;
 
   doc.setTextColor(...negro);
-  doc.setFontSize(10.5);
+  doc.setFontSize(9.5);
   doc.setFont('helvetica', 'bold');
-  doc.text(BRANDING.nombreInstitucion, textCX, y + 11, { align: 'center' });
+  doc.text(BRANDING.nombreInstitucion, textCX, y + 6.5, { align: 'center' });
   doc.setTextColor(...textoSecundario);
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'italic');
-  doc.text(BRANDING.subTitulo, textCX, y + 19, { align: 'center' });
+  doc.text(BRANDING.subTitulo, textCX, y + 11.5, { align: 'center' });
 
   doc.setFillColor(...headerBorde);
-  doc.rect(mg, y + hdrH, cW, 1.5, 'F');
-  y += hdrH + 1.5 + 5;
+  doc.rect(mg, y + hdrH, cW, 1, 'F');
+  y += hdrH + 1 + 3;
 
   // ── 2. Bloque título MEMORÁNDUM ───────────────────────────────
-  const tH = 14;
+  const tH = 7.5;
   doc.setFillColor(...principal);
   doc.rect(mg, y, cW, tH, 'F');
   doc.setTextColor(...blanco);
-  doc.setFontSize(13);
+  doc.setFontSize(10.5);
   doc.setFont('helvetica', 'bold');
-  doc.text('MEMORÁNDUM INTERNO', mg + cW / 2, y + tH / 2 + 2.5, { align: 'center' });
-  y += tH + 4;
+  doc.text('MEMORÁNDUM INTERNO', mg + cW / 2, y + tH / 2 + 1.8, { align: 'center' });
+  y += tH + 3;
 
   // ── 3. Correlativo + Fecha ────────────────────────────────────
-  const corrH = 9;
+  const corrH = 6.5;
   doc.setFillColor(...grisFondo);
   doc.rect(mg, y, cW, corrH, 'F');
   doc.setDrawColor(226, 232, 240);
@@ -295,22 +409,22 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
   doc.rect(mg, y, cW, corrH, 'S');
 
   doc.setTextColor(...negro);
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont('helvetica', 'bold');
   const corrText = data.esBorrador
     ? 'N° [Por asignar — Borrador]'
     : `N° ${data.correlativo ?? '—'}`;
-  doc.text(corrText, mg + 4, y + corrH / 2 + 1.5);
+  doc.text(corrText, mg + 3.5, y + corrH / 2 + 1.3);
 
   const fechaText = fmtFecha(data.fechaDocumento);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.text(fechaText, mg + cW - 4, y + corrH / 2 + 1.5, { align: 'right' });
-  y += corrH + 5;
+  doc.setFontSize(8);
+  doc.text(fechaText, mg + cW - 3.5, y + corrH / 2 + 1.3, { align: 'right' });
+  y += corrH + 3;
 
   // ── 4. Tabla PARA / DE / MATERIA / REFERENCIA ─────────────────
-  const rH     = 9;
-  const labelW = 30;
+  const rH     = 6.5;
+  const labelW = 28;
   const valW   = cW - labelW;
 
   const destinosStr = data.destinos.length > 0
@@ -341,36 +455,38 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
 
     // Etiqueta
     doc.setTextColor(...principal);
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text(etq, mg + 3, ry + 6.3);
+    doc.text(etq, mg + 3, ry + rH / 2 + 1.3);
 
     // Valor (con truncado si excede ancho)
     doc.setTextColor(...negro);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     const maxW = valW - 6;
     const lines = doc.splitTextToSize(val, maxW) as string[];
     const display = lines[0] + (lines.length > 1 ? '…' : '');
-    doc.text(display, mg + labelW + 3, ry + 6.3);
+    doc.text(display, mg + labelW + 3, ry + rH / 2 + 1.3);
   });
 
-  y += filasMeta.length * rH + 7;
+  y += filasMeta.length * rH + 4;
 
   // ── 5. Línea separadora ───────────────────────────────────────
   doc.setDrawColor(...principal);
   doc.setLineWidth(0.6);
   doc.line(mg, y, mg + cW, y);
-  y += 6;
+  y += 4;
 
   // ── 6. Cuerpo del memorándum ──────────────────────────────────
   doc.setTextColor(...negro);
-  doc.setFontSize(9.5);
+  doc.setFontSize(8.75);
   doc.setFont('helvetica', 'normal');
 
-  const lineaAltura = 5.5;
-  // Reservar ~70mm al final para firma (img+línea+texto) + pie de página
-  const reservaFirma = 70;
+  const lineaAltura = 4.5;
+  // Reservar espacio para el pie de firma compacto (tarjeta ~40mm + separador
+  // + pie de página). El bloque de FirmaGOB (drawSelloFirmaElectronica, ~26mm)
+  // y el resto de variantes caben holgadamente dentro de esta reserva.
+  const reservaFirma = 44;
 
   const cuerpoLines = doc.splitTextToSize(data.cuerpo || '—', cW) as string[];
 
@@ -385,17 +501,18 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
   }
 
   // Espacio moderado entre cuerpo y firma (reduce hueco visual excesivo)
-  y += 4;
+  y += 3;
 
   // ── 7. Bloque firma ───────────────────────────────────────────
-  // Imagen combinada firma+timbre, escala proporcional, centrada.
-  const firmaBlockH = 60;
+  const firmaBlockH = 40;
   if (y + firmaBlockH > pH - mg) {
     doc.addPage();
-    y = mg + 8;
+    y = mg + 6;
   }
 
-  // Zona de firma: mitad derecha de la página
+  // Zona de firma: mitad derecha de la página — usada solo por las variantes
+  // legacy (FirmaGOB / imagen escaneada); Firma Simple centra su propia
+  // tarjeta en el ancho completo (ver drawSelloFirmaSimple).
   const firmaX = mg + cW / 2;  // x inicio
   const firmaW = cW / 2;       // ancho disponible
 
@@ -429,7 +546,49 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
   // Centrar horizontalmente dentro de la zona de firma
   const ftX = firmaX + (firmaW - ftW) / 2;
 
-  if (data.firmaTimbreBase64) {
+  if (data.mecanismoFirma === 'FIRMA_SIMPLE' && !data.esBorrador && data.datosFirmaSimple) {
+    // Firma Simple DOC360: reemplaza el sello de FirmaGOB. La imagen de
+    // firma/timbre (si existe) es solo representación visual — la evidencia
+    // real es el código de verificación + hash, emitidos por el backend en
+    // POST /memorandum/:id/firmar-simple (Fase A).
+    y = drawSelloFirmaSimple(
+      doc, cW, mg, y,
+      data.nombreFirmante, data.cargoFirmante, data.servicioFirmante ?? data.origen ?? null,
+      data.firmaTimbreBase64, natW, natH,
+      data.datosFirmaSimple.codigoVerificacion, data.datosFirmaSimple.hashOriginalCorto, data.datosFirmaSimple.fechaFirma,
+      { principal, grisLabel, negro },
+    );
+  } else if (data.mecanismoFirma === 'FIRMA_SIMPLE' && !data.esBorrador) {
+    // PDF pre-firma de Firma Simple (antes de la Fase A): todavía no hay
+    // código/hash que mostrar. Sin este branch explícito, caería en el
+    // sello de FirmaGOB por defecto (rama siguiente) — texto incorrecto
+    // para este mecanismo. Tarjeta compacta centrada, consistente con el
+    // pie de firma final (drawSelloFirmaSimple) pero con borde tenue —
+    // señala visualmente que aún está pendiente.
+    const cardW = Math.min(115, cW);
+    const cardX = mg + (cW - cardW) / 2;
+    const cx    = cardX + cardW / 2;
+    const cardYStart = y;
+    let ty = y + 5;
+    doc.setTextColor(...negro);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(data.nombreFirmante, cx, ty, { align: 'center' });
+    ty += 3.3;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...grisLabel);
+    doc.text(data.cargoFirmante, cx, ty, { align: 'center' });
+    ty += 3.3;
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'italic');
+    doc.text('(Pendiente de Firma Simple DOC360 — se completará al confirmar)', cx, ty, { align: 'center' });
+    ty += 4;
+    doc.setDrawColor(...grisLabel);
+    doc.setLineWidth(0.3);
+    doc.rect(cardX, cardYStart, cardW, ty - cardYStart, 'S');
+    y = ty;
+  } else if (data.firmaTimbreBase64) {
     try {
       // jsPDF auto-detecta el formato desde el prefijo data:image/png o data:image/jpeg
       doc.addImage(data.firmaTimbreBase64, ftX, y, ftW, ftH);
@@ -474,8 +633,9 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
     y = yFinSello + 4;
   } else {
     // Vista previa (borrador): solo nombre y cargo, sin sello — la firma
-    // electrónica todavía no existe en esta etapa.
-    y += 8;
+    // todavía no existe en esta etapa. El texto de "pendiente" depende del
+    // mecanismo (Firma Simple no debe mencionar FirmaGov y viceversa).
+    y += 6;
 
     doc.setDrawColor(...negro);
     doc.setLineWidth(0.4);
@@ -486,34 +646,37 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
     doc.text(data.nombreFirmante, firmaX + firmaW / 2, y, { align: 'center' });
-    y += 5;
+    y += 4.5;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...grisLabel);
     doc.text(data.cargoFirmante, firmaX + firmaW / 2, y, { align: 'center' });
-    y += 5;
+    y += 4.5;
 
     doc.setFontSize(7);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(...grisLabel);
-    doc.text('(Pendiente de firma electrónica — se aplicará al confirmar con FirmaGov)', firmaX + firmaW / 2, y, { align: 'center' });
+    const pendienteTexto = data.mecanismoFirma === 'FIRMA_SIMPLE'
+      ? '(Pendiente de Firma Simple DOC360 — se asignará al confirmar la emisión)'
+      : '(Pendiente de firma electrónica — se aplicará al confirmar con FirmaGov)';
+    doc.text(pendienteTexto, firmaX + firmaW / 2, y, { align: 'center' });
     y += 5;
   }
 
   // ── 8. Línea separadora inferior ─────────────────────────────
-  y += 4;
+  y += 3;
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.3);
   doc.line(mg, y, mg + cW, y);
-  y += 5;
+  y += 3.5;
 
   // ── 9. Pie de página ──────────────────────────────────────────
   const ahora = new Date().toLocaleDateString('es-CL', {
     year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(...grisLabel);
 

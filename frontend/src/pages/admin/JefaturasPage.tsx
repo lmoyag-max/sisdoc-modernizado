@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import {
   Users, Plus, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2,
   Building2, Search, X, Upload, CheckCircle, AlertCircle,
-  ShieldCheck, UserCheck, CalendarClock,
+  ShieldCheck, UserCheck, CalendarClock, KeyRound, Link2, Link2Off,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,9 @@ import {
 import { useDebounce } from '@/hooks/useDebounce';
 
 // ── Tipos ─────────────────────────────────────────────────────────
+type TipoJefatura = 'TITULAR' | 'SUBROGANTE' | 'SUBROGANTE_2';
+type EstadoFirmaSimple = 'disponible' | 'sin_vincular' | 'usuario_inactivo' | 'sin_firma_timbre' | 'slot_inactivo';
+
 interface FirmanteInfo {
   nombre:        string | null;
   cargo:         string | null;
@@ -25,6 +28,19 @@ interface FirmanteInfo {
   activo:        boolean;
   vigenciaDesde: string | null;
   vigenciaHasta: string | null;
+  usuarioVinculado: { idUsuario: number; usuario: string; activo: boolean } | null;
+  estado:        EstadoFirmaSimple;
+  motivo:        string | null;
+}
+
+interface CandidatoUsuario {
+  idUsuario:       number;
+  usuario:         string;
+  email:           string | null;
+  activo:          boolean;
+  nombreCompleto:  string | null;
+  descDependencia: string | null;
+  vinculadoComo:   string | null;
 }
 
 interface Jefatura {
@@ -72,6 +88,14 @@ const ESTADO_BADGE: Record<string, { label: string; cls: string }> = {
   activo:   { label: 'Activo',   cls: 'border-emerald-300 text-emerald-700 bg-emerald-50' },
   inactivo: { label: 'Inactivo', cls: 'border-border text-muted-foreground' },
   vencido:  { label: 'Vencido',  cls: 'border-amber-300 text-amber-700 bg-amber-50' },
+};
+
+const FIRMA_SIMPLE_BADGE: Record<EstadoFirmaSimple, { label: string; cls: string }> = {
+  disponible:       { label: 'Firma Simple: habilitada',     cls: 'border-emerald-300 text-emerald-700 bg-emerald-50' },
+  sin_vincular:     { label: 'Firma Simple: no habilitada',  cls: 'border-border text-muted-foreground' },
+  usuario_inactivo: { label: 'Firma Simple: no habilitada',  cls: 'border-border text-muted-foreground' },
+  sin_firma_timbre: { label: 'Firma Simple: no habilitada',  cls: 'border-border text-muted-foreground' },
+  slot_inactivo:    { label: 'Firma Simple: no habilitada',  cls: 'border-border text-muted-foreground' },
 };
 
 const inCls = 'w-full h-9 px-3 text-sm rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring';
@@ -152,6 +176,155 @@ function ImagenFirmante({
   );
 }
 
+// ── Bloque de vínculo Firma Simple (badge + botones) ──────────────
+function VincularUsuarioBlock({
+  estado, motivo, usuarioVinculado, onVincular, onQuitar, quitando,
+}: {
+  estado: EstadoFirmaSimple;
+  motivo: string | null;
+  usuarioVinculado: { idUsuario: number; usuario: string; activo: boolean } | null;
+  onVincular: () => void;
+  onQuitar: () => void;
+  quitando: boolean;
+}) {
+  const badge = FIRMA_SIMPLE_BADGE[estado];
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-muted-foreground">Firma Simple DOC360</p>
+      <Badge variant="outline" className={cn('text-xs', badge.cls)}>{badge.label}</Badge>
+      {usuarioVinculado ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-xs">
+            Usuario DOC360: <span className="font-mono font-medium">{usuarioVinculado.usuario}</span>
+            {!usuarioVinculado.activo && <span className="text-destructive ml-1">(inactivo)</span>}
+          </p>
+        </div>
+      ) : motivo ? (
+        <p className="text-xs text-muted-foreground italic">{motivo}</p>
+      ) : null}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onVincular}
+          className="flex items-center gap-1.5 h-7 px-2.5 text-xs rounded-lg border border-dashed border-input hover:border-primary/50 hover:bg-muted/30 transition-all text-muted-foreground"
+        >
+          <Link2 className="h-3 w-3" />
+          {usuarioVinculado ? 'Cambiar usuario' : 'Vincular usuario DOC360'}
+        </button>
+        {usuarioVinculado && (
+          <button
+            type="button"
+            onClick={onQuitar}
+            disabled={quitando}
+            className="flex items-center gap-1.5 h-7 px-2.5 text-xs rounded-lg border border-dashed border-input hover:border-destructive/50 hover:bg-destructive/5 transition-all text-muted-foreground"
+          >
+            {quitando ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Link2Off className="h-3 w-3" />}
+            Quitar vínculo
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: vincular usuario DOC360 a un slot de firmante ──────────
+function VincularUsuarioModal({
+  idJefatura, tipo, tipoLabel, actual, onClose, onVinculado,
+}: {
+  idJefatura: number;
+  tipo: TipoJefatura;
+  tipoLabel: string;
+  actual: { idUsuario: number; usuario: string } | null;
+  onClose: () => void;
+  onVinculado: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const debouncedQ = useDebounce(q, 250);
+
+  const { data: candidatos = [], isFetching } = useQuery({
+    queryKey: ['jefatura-usuarios-vinculables', idJefatura, debouncedQ],
+    queryFn: async () => {
+      const res = await apiClient.get<{ ok: boolean; data: CandidatoUsuario[] }>(`/jefaturas/${idJefatura}/usuarios-vinculables`, {
+        params: { q: debouncedQ || undefined },
+      });
+      return res.data.data;
+    },
+  });
+
+  const vincularMut = useMutation({
+    mutationFn: (idUsuario: number) =>
+      apiClient.patch(`/jefaturas/${idJefatura}/vincular-usuario`, { tipo, idUsuario }),
+    onSuccess: () => { toast.success('Usuario vinculado'); onVinculado(); },
+    onError: (e: unknown) => {
+      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Error al vincular');
+    },
+  });
+
+  return (
+    <div
+      className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="modal-panel bg-background w-full max-w-md max-h-[80vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 bg-background z-10">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-primary" />
+            Vincular usuario DOC360 — {tipoLabel}
+          </h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          {actual && (
+            <p className="text-xs text-muted-foreground">
+              Vinculado actualmente a <span className="font-mono font-medium">{actual.usuario}</span>.
+            </p>
+          )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar por usuario o nombre..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              autoFocus
+              className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="rounded-lg border border-input overflow-y-auto max-h-72 divide-y divide-border/50">
+            {isFetching ? (
+              <p className="px-3 py-4 text-sm text-muted-foreground text-center">Buscando...</p>
+            ) : candidatos.length === 0 ? (
+              <p className="px-3 py-4 text-sm text-muted-foreground text-center">Sin resultados</p>
+            ) : (
+              candidatos.map((c) => (
+                <button
+                  key={c.idUsuario}
+                  type="button"
+                  disabled={!c.activo || vincularMut.isPending}
+                  onClick={() => vincularMut.mutate(c.idUsuario)}
+                  className="w-full px-3 py-2.5 text-left text-sm hover:bg-muted/50 transition-colors flex items-center justify-between gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{c.nombreCompleto ?? c.usuario}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      <span className="font-mono">{c.usuario}</span>
+                      {c.descDependencia ? ` · ${c.descDependencia}` : ''}
+                    </p>
+                  </div>
+                  {!c.activo && <Badge variant="outline" className="text-xs shrink-0">Inactivo</Badge>}
+                  {c.vinculadoComo && <Badge variant="outline" className="text-xs shrink-0">Ya vinculado</Badge>}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Página principal ──────────────────────────────────────────────
 export function JefaturasPage() {
   const qc = useQueryClient();
@@ -164,6 +337,10 @@ export function JefaturasPage() {
   const debouncedGlobal = useDebounce(busqGlobal, 200);
   const debouncedDep    = useDebounce(busqDep, 300);
   const [confirmDelete, setConfirmDelete] = useState<Jefatura | null>(null);
+  const [vincularTarget, setVincularTarget] = useState<{
+    idJefatura: number; tipo: TipoJefatura; tipoLabel: string; actual: { idUsuario: number; usuario: string } | null;
+  } | null>(null);
+  const [quitandoTipo, setQuitandoTipo] = useState<TipoJefatura | null>(null);
 
   const [form, setForm] = useState({
     idDependencia: '', nombreTitular: '', cargoTitular: '', rutTitular: '', activoTitular: true,
@@ -220,6 +397,15 @@ export function JefaturasPage() {
       setSelectedId(null);
     },
     onError: () => toast.error('Error al eliminar'),
+  });
+
+  const quitarVinculoMut = useMutation({
+    mutationFn: ({ idJefatura, tipo }: { idJefatura: number; tipo: TipoJefatura }) =>
+      apiClient.patch(`/jefaturas/${idJefatura}/vincular-usuario`, { tipo, idUsuario: null }),
+    onMutate: ({ tipo }) => setQuitandoTipo(tipo),
+    onSuccess: () => { toast.success('Vínculo quitado'); qc.invalidateQueries({ queryKey: ['jefaturas'] }); },
+    onError: () => toast.error('Error al quitar el vínculo'),
+    onSettled: () => setQuitandoTipo(null),
   });
 
   const setF = (k: keyof typeof form, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
@@ -477,6 +663,17 @@ export function JefaturasPage() {
                               tipoImg="firma_timbre_titular"
                               onUploaded={() => refetch()}
                             />
+                            <VincularUsuarioBlock
+                              estado={j.titular.estado}
+                              motivo={j.titular.motivo}
+                              usuarioVinculado={j.titular.usuarioVinculado}
+                              quitando={quitandoTipo === 'TITULAR'}
+                              onVincular={() => setVincularTarget({
+                                idJefatura: j.id, tipo: 'TITULAR', tipoLabel: 'Titular',
+                                actual: j.titular.usuarioVinculado,
+                              })}
+                              onQuitar={() => quitarVinculoMut.mutate({ idJefatura: j.id, tipo: 'TITULAR' })}
+                            />
                           </div>
 
                           {/* Subrogante 1 */}
@@ -514,6 +711,17 @@ export function JefaturasPage() {
                                   idJefatura={j.id}
                                   tipoImg="firma_timbre_subrogante"
                                   onUploaded={() => refetch()}
+                                />
+                                <VincularUsuarioBlock
+                                  estado={j.subrogante.estado}
+                                  motivo={j.subrogante.motivo}
+                                  usuarioVinculado={j.subrogante.usuarioVinculado}
+                                  quitando={quitandoTipo === 'SUBROGANTE'}
+                                  onVincular={() => setVincularTarget({
+                                    idJefatura: j.id, tipo: 'SUBROGANTE', tipoLabel: 'Subrogante 1',
+                                    actual: j.subrogante.usuarioVinculado,
+                                  })}
+                                  onQuitar={() => quitarVinculoMut.mutate({ idJefatura: j.id, tipo: 'SUBROGANTE' })}
                                 />
                               </>
                             ) : (
@@ -556,6 +764,17 @@ export function JefaturasPage() {
                                   idJefatura={j.id}
                                   tipoImg="firma_timbre_subrogante_2"
                                   onUploaded={() => refetch()}
+                                />
+                                <VincularUsuarioBlock
+                                  estado={j.subrogante2.estado}
+                                  motivo={j.subrogante2.motivo}
+                                  usuarioVinculado={j.subrogante2.usuarioVinculado}
+                                  quitando={quitandoTipo === 'SUBROGANTE_2'}
+                                  onVincular={() => setVincularTarget({
+                                    idJefatura: j.id, tipo: 'SUBROGANTE_2', tipoLabel: 'Subrogante 2',
+                                    actual: j.subrogante2.usuarioVinculado,
+                                  })}
+                                  onQuitar={() => quitarVinculoMut.mutate({ idJefatura: j.id, tipo: 'SUBROGANTE_2' })}
                                 />
                               </>
                             ) : (
@@ -834,6 +1053,18 @@ export function JefaturasPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal vincular usuario DOC360 ─────────────────────────── */}
+      {vincularTarget && (
+        <VincularUsuarioModal
+          idJefatura={vincularTarget.idJefatura}
+          tipo={vincularTarget.tipo}
+          tipoLabel={vincularTarget.tipoLabel}
+          actual={vincularTarget.actual}
+          onClose={() => setVincularTarget(null)}
+          onVinculado={() => { qc.invalidateQueries({ queryKey: ['jefaturas'] }); setVincularTarget(null); }}
+        />
       )}
     </div>
   );

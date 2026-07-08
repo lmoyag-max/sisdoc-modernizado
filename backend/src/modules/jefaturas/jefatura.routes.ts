@@ -56,8 +56,31 @@ interface JefaturaRow {
   activo_subrogante_2:             boolean;
   vigencia_desde_sub_2:            string | null;
   vigencia_hasta_sub_2:            string | null;
+  id_usuario_titular:              number | null;
+  usuario_titular:                 string | null;
+  usuario_titular_activo:          boolean | null;
+  id_usuario_subrogante:           number | null;
+  usuario_subrogante:              string | null;
+  usuario_subrogante_activo:       boolean | null;
+  id_usuario_subrogante_2:         number | null;
+  usuario_subrogante_2:            string | null;
+  usuario_subrogante_2_activo:     boolean | null;
   desc_dependencia:                string | null;
   total:                           number;
+}
+
+// Estado de habilitación de Firma Simple para un slot de firmante.
+function estadoFirmaSimple(
+  activoSlot: boolean,
+  idUsuarioVinculado: number | null,
+  usuarioActivo: boolean | null,
+  firmaTimbreRuta: string | null,
+): { estado: 'disponible' | 'sin_vincular' | 'usuario_inactivo' | 'sin_firma_timbre' | 'slot_inactivo'; motivo: string | null } {
+  if (!activoSlot)              return { estado: 'slot_inactivo',     motivo: 'El cargo no está activo' };
+  if (!idUsuarioVinculado)      return { estado: 'sin_vincular',      motivo: 'Sin usuario DOC360 vinculado' };
+  if (usuarioActivo === false)  return { estado: 'usuario_inactivo',  motivo: 'El usuario vinculado está inactivo' };
+  if (!firmaTimbreRuta)         return { estado: 'sin_firma_timbre',  motivo: 'Sin firma/timbre cargado' };
+  return { estado: 'disponible', motivo: null };
 }
 
 function mapJefatura(r: JefaturaRow) {
@@ -75,6 +98,10 @@ function mapJefatura(r: JefaturaRow) {
       activo:        !!r.activo_titular,
       vigenciaDesde: r.vigencia_desde_titular ?? null,
       vigenciaHasta: r.vigencia_hasta_titular ?? null,
+      usuarioVinculado: r.id_usuario_titular
+        ? { idUsuario: r.id_usuario_titular, usuario: r.usuario_titular, activo: !!r.usuario_titular_activo }
+        : null,
+      ...estadoFirmaSimple(!!r.activo_titular, r.id_usuario_titular, r.usuario_titular_activo, r.firma_timbre_titular_ruta),
     },
     subrogante: {
       nombre:         r.nombre_subrogante   ?? null,
@@ -86,6 +113,10 @@ function mapJefatura(r: JefaturaRow) {
       activo:        !!r.activo_subrogante,
       vigenciaDesde: r.vigencia_desde_sub   ?? null,
       vigenciaHasta: r.vigencia_hasta_sub   ?? null,
+      usuarioVinculado: r.id_usuario_subrogante
+        ? { idUsuario: r.id_usuario_subrogante, usuario: r.usuario_subrogante, activo: !!r.usuario_subrogante_activo }
+        : null,
+      ...estadoFirmaSimple(!!r.activo_subrogante, r.id_usuario_subrogante, r.usuario_subrogante_activo, r.firma_timbre_subrogante_ruta),
     },
     subrogante2: {
       nombre:         r.nombre_subrogante_2   ?? null,
@@ -97,9 +128,26 @@ function mapJefatura(r: JefaturaRow) {
       activo:        !!r.activo_subrogante_2,
       vigenciaDesde: r.vigencia_desde_sub_2   ?? null,
       vigenciaHasta: r.vigencia_hasta_sub_2   ?? null,
+      usuarioVinculado: r.id_usuario_subrogante_2
+        ? { idUsuario: r.id_usuario_subrogante_2, usuario: r.usuario_subrogante_2, activo: !!r.usuario_subrogante_2_activo }
+        : null,
+      ...estadoFirmaSimple(!!r.activo_subrogante_2, r.id_usuario_subrogante_2, r.usuario_subrogante_2_activo, r.firma_timbre_subrogante_2_ruta),
     },
   };
 }
+
+// JOIN reusado por GET / y GET /:id para traer datos básicos del usuario
+// vinculado a cada slot (username + activo), sin exponer clave/clave_hash.
+const JOIN_USUARIOS_VINCULADOS = `
+  LEFT JOIN usuario ut  ON ut.id_usuario  = j.id_usuario_titular
+  LEFT JOIN usuario us  ON us.id_usuario  = j.id_usuario_subrogante
+  LEFT JOIN usuario us2 ON us2.id_usuario = j.id_usuario_subrogante_2
+`;
+const SELECT_USUARIOS_VINCULADOS = `
+  ut.usuario  AS usuario_titular,      ut.activo  AS usuario_titular_activo,
+  us.usuario  AS usuario_subrogante,   us.activo  AS usuario_subrogante_activo,
+  us2.usuario AS usuario_subrogante_2, us2.activo AS usuario_subrogante_2_activo
+`;
 
 const soloAdmin = [requireRole('admin', 'of.partes')];
 
@@ -135,9 +183,11 @@ router.get('/', ...soloAdmin, async (req: Request, res: Response, next: NextFunc
       .input('like',      sql.VarChar, `%${q}%`)
       .query<JefaturaRow>(`
         SELECT j.*, LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia,
+               ${SELECT_USUARIOS_VINCULADOS},
                COUNT(*) OVER() AS total
         FROM   jefatura j
         JOIN   dependencia d ON d.id_dependencia = j.id_dependencia
+        ${JOIN_USUARIOS_VINCULADOS}
         WHERE  @like = '%%' OR
                d.desc_dependencia    LIKE @like OR
                j.nombre_titular      LIKE @like OR
@@ -165,14 +215,128 @@ router.get('/:id', ...soloAdmin, async (req: Request, res: Response, next: NextF
     const result = await pool.request()
       .input('id', sql.Int, Number(req.params.id))
       .query<JefaturaRow>(`
-        SELECT j.*, LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia
+        SELECT j.*, LTRIM(RTRIM(d.desc_dependencia)) AS desc_dependencia,
+               ${SELECT_USUARIOS_VINCULADOS}
         FROM   jefatura j
         JOIN   dependencia d ON d.id_dependencia = j.id_dependencia
+        ${JOIN_USUARIOS_VINCULADOS}
         WHERE  j.id_jefatura = @id
       `);
     const row = result.recordset[0];
     if (!row) { sendError(res, 'Jefatura no encontrada', 404); return; }
     sendSuccess(res, mapJefatura(row));
+  } catch (e) { next(e); }
+});
+
+// ── GET /jefaturas/:id/usuarios-vinculables ────────────────────────
+// Candidatos para vincular a un slot de firmante: por defecto usuarios de
+// la misma dependencia de la jefatura, filtrables por q (usuario/nombres/apellidos).
+// No expone clave/clave_hash.
+router.get('/:id/usuarios-vinculables', ...soloAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Number(req.params.id);
+    const q  = String(req.query.q ?? '').trim();
+
+    const pool = await getPool();
+
+    const jef = await pool.request().input('id', sql.Int, id)
+      .query<{ id_dependencia: number }>('SELECT id_dependencia FROM jefatura WHERE id_jefatura = @id');
+    if (!jef.recordset[0]) { sendError(res, 'Jefatura no encontrada', 404); return; }
+    const idDependencia = jef.recordset[0].id_dependencia;
+
+    const request = pool.request()
+      .input('idDep', sql.Int, idDependencia)
+      .input('idJef', sql.Int, id);
+
+    let where = '(f.id_dependencia = @idDep OR f.id_dependencia IS NULL)';
+    if (q) {
+      request.input('q', sql.VarChar(100), `%${q}%`);
+      where += ' AND (u.usuario LIKE @q OR f.nombres LIKE @q OR f.apellidos LIKE @q)';
+    }
+
+    const result = await request.query<{
+      id_usuario: number; usuario: string; email: string | null; activo: boolean;
+      nombres: string | null; apellidos: string | null;
+      id_dependencia: number | null; desc_dependencia: string | null;
+      vinculado_como: string | null;
+    }>(`
+      SELECT u.id_usuario, u.usuario, u.email, u.activo,
+             f.nombres, f.apellidos, f.id_dependencia,
+             d.desc_dependencia,
+             CASE
+               WHEN j.id_usuario_titular      = u.id_usuario THEN 'TITULAR'
+               WHEN j.id_usuario_subrogante    = u.id_usuario THEN 'SUBROGANTE'
+               WHEN j.id_usuario_subrogante_2  = u.id_usuario THEN 'SUBROGANTE_2'
+               ELSE NULL
+             END AS vinculado_como
+      FROM usuario u
+      LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
+      LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
+      LEFT JOIN jefatura j    ON j.id_jefatura = @idJef
+      WHERE ${where}
+      ORDER BY f.nombres, u.usuario
+    `);
+
+    sendSuccess(res, result.recordset.map((r) => ({
+      idUsuario:       r.id_usuario,
+      usuario:         r.usuario,
+      email:           r.email,
+      activo:          !!r.activo,
+      nombreCompleto:  [r.nombres, r.apellidos].filter(Boolean).join(' ') || null,
+      idDependencia:   r.id_dependencia,
+      descDependencia: r.desc_dependencia,
+      vinculadoComo:   r.vinculado_como,
+    })));
+  } catch (e) { next(e); }
+});
+
+// ── PATCH /jefaturas/:id/vincular-usuario ──────────────────────────
+// Ata (o quita, con idUsuario:null) un usuario DOC360 real a un slot de
+// firmante. Requiere admin estricto (más restrictivo que el resto del CRUD
+// de jefatura) porque esto conecta una identidad de login con autoridad de
+// firma — no basta con el rol of.partes que sí puede editar nombre/cargo.
+const COL_USUARIO_POR_TIPO: Record<string, string> = {
+  TITULAR:      'id_usuario_titular',
+  SUBROGANTE:   'id_usuario_subrogante',
+  SUBROGANTE_2: 'id_usuario_subrogante_2',
+};
+
+router.patch('/:id/vincular-usuario', requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Number(req.params.id);
+    const { tipo, idUsuario } = req.body as { tipo?: string; idUsuario?: number | null };
+
+    const col = tipo ? COL_USUARIO_POR_TIPO[tipo] : undefined;
+    if (!col) {
+      sendError(res, 'tipo inválido. Use TITULAR, SUBROGANTE o SUBROGANTE_2', 400);
+      return;
+    }
+
+    const pool = await getPool();
+
+    const jef = await pool.request().input('id', sql.Int, id)
+      .query<{ id_dependencia: number }>('SELECT id_dependencia FROM jefatura WHERE id_jefatura = @id');
+    if (!jef.recordset[0]) { sendError(res, 'Jefatura no encontrada', 404); return; }
+
+    if (idUsuario != null) {
+      const usr = await pool.request().input('id', sql.Int, idUsuario)
+        .query<{ activo: boolean; id_dependencia: number | null }>(`
+          SELECT u.activo, f.id_dependencia
+          FROM usuario u
+          LEFT JOIN funcionario f ON u.id_funcionario = f.id_funcionario
+          WHERE u.id_usuario = @id
+        `);
+      const usrRow = usr.recordset[0];
+      if (!usrRow) { sendError(res, 'Usuario no encontrado', 404); return; }
+      if (!usrRow.activo) { sendError(res, 'El usuario está inactivo — actívalo antes de vincularlo', 400); return; }
+    }
+
+    await pool.request()
+      .input('id',  sql.Int, id)
+      .input('idU', sql.Int, idUsuario ?? null)
+      .query(`UPDATE jefatura SET ${col} = @idU, fecha_update = GETDATE() WHERE id_jefatura = @id`);
+
+    sendSuccess(res, { id, tipo, idUsuarioVinculado: idUsuario ?? null }, idUsuario ? 'Usuario vinculado' : 'Vínculo quitado');
   } catch (e) { next(e); }
 });
 

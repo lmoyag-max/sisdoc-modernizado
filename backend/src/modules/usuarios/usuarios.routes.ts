@@ -354,6 +354,27 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
+    // jefatura.id_usuario_{titular,subrogante,subrogante_2} referencian a
+    // usuario con ON DELETE NO ACTION (SQL Server no permite más de un FK con
+    // cascada entre las mismas 2 tablas) — se limpian a mano antes de borrar,
+    // igual que softDelete() de documentos limpia firma_gob_historial.id_documento.
+    await pool.request().input('id', sql.Int, idUsuario)
+      .query(`
+        UPDATE jefatura SET
+          id_usuario_titular      = CASE WHEN id_usuario_titular      = @id THEN NULL ELSE id_usuario_titular      END,
+          id_usuario_subrogante   = CASE WHEN id_usuario_subrogante   = @id THEN NULL ELSE id_usuario_subrogante   END,
+          id_usuario_subrogante_2 = CASE WHEN id_usuario_subrogante_2 = @id THEN NULL ELSE id_usuario_subrogante_2 END
+        WHERE @id IN (id_usuario_titular, id_usuario_subrogante, id_usuario_subrogante_2)
+      `);
+
+    // password_reset_tokens.id_usuario tiene FK real (FK_prt_usuario, NO ACTION)
+    // hacia usuario — si el usuario alguna vez solicitó recuperar su clave,
+    // el DELETE FROM usuario de más abajo falla con error 547 (violación de
+    // FK) y ese error sin controlar se propaga como 500 genérico. Se limpia
+    // a mano, igual que usuario_rol.
+    await pool.request().input('id', sql.Int, idUsuario)
+      .query('DELETE FROM password_reset_tokens WHERE id_usuario = @id');
+
     await pool.request().input('id', sql.Int, idUsuario)
       .query('DELETE FROM usuario_rol WHERE id_usuario = @id');
     await pool.request().input('id', sql.Int, idUsuario)

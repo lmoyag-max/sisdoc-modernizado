@@ -216,7 +216,7 @@ export async function getMe(idUsuario: number): Promise<UserSession> {
 
 // ── Helpers ──────────────────────────────────────────────────
 
-async function verifyPassword(
+export async function verifyPassword(
   clave: string,
   claveRaw: string | null,
   claveHash: string | null,

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
   FileText, ArrowLeft, Send, Paperclip, X, AlertCircle,
   Building2, Tag, MessageSquare, Calendar, Loader2, ChevronRight, Lock,
-  Search, CheckSquare, Square, FileStack, ShieldAlert, Eye,
+  Search, CheckSquare, Square, FileStack, ShieldAlert, Eye, KeyRound,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth.store';
@@ -21,7 +21,8 @@ import { useUploadRules } from '@/hooks/useUploadRules';
 import { NominaModal } from '@/components/documentos/NominaModal';
 import { type NominaData } from '@/lib/utils/nomina.generator';
 import { MemorandumFields } from '@/components/documentos/MemorandumFields';
-import { MemorandumModal, type FirmanteActivo, type MemoDocumentoPayload } from '@/components/documentos/MemorandumModal';
+import { type FirmanteActivo, type MemoDocumentoPayload } from '@/components/documentos/MemorandumModal';
+import { MemorandumFirmaSimpleModal, type FirmanteFirmaSimple } from '@/components/documentos/MemorandumFirmaSimpleModal';
 
 // ── Schema ───────────────────────────────────────────────────
 const schema = z.object({
@@ -88,10 +89,13 @@ export function NuevoDocumentoPage() {
   const [memoReferencia,        setMemoReferencia]        = useState('');
   const [memoCuerpo,            setMemoCuerpo]            = useState('');
   const [memoCuerpoErr,         setMemoCuerpoErr]         = useState<string | null>(null);
-  const [memoModalOpen,         setMemoModalOpen]         = useState(false);
   const [memoFirmante,          setMemoFirmante]          = useState<FirmanteActivo | null>(null);
   const [memoPayload,           setMemoPayload]           = useState<MemoDocumentoPayload | null>(null);
   const [firmanteSeleccionado,  setFirmanteSeleccionado]  = useState<FirmanteActivo | null>(null);
+  // El memorándum se firma exclusivamente con Firma Simple DOC360 (FirmaGOB
+  // queda fuera de este flujo por regla de negocio, aunque su módulo sigue
+  // intacto en el sistema para otros usos futuros).
+  const [memoFirmaSimpleOpen,   setMemoFirmaSimpleOpen]   = useState(false);
 
   // Solo of.partes y admin ven las opciones especiales
   const esOficinaPartes = user?.roles?.includes('of.partes') || user?.roles?.includes('admin');
@@ -360,6 +364,15 @@ export function NuevoDocumentoPage() {
       return;
     }
 
+    // El memorándum se firma exclusivamente con Firma Simple DOC360 — si el
+    // cargo elegido no la tiene habilitada, se informa el motivo exacto en
+    // vez de abrir un flujo alternativo.
+    if (firmanteSeleccionado.estadoFirmaSimple !== 'disponible') {
+      toast.error(firmanteSeleccionado.motivoNoHabilitada
+        ?? 'Este cargo no tiene Firma Simple DOC360 configurada. Vincula un usuario en Administración → Jefaturas.');
+      return;
+    }
+
     // Para memorándum la materia se genera automáticamente desde la referencia
     const materiaFinal = memoReferencia.trim().substring(0, 250) || 'Memorándum Institucional';
 
@@ -383,7 +396,7 @@ export function NuevoDocumentoPage() {
 
     setMemoFirmante(firmanteSeleccionado);
     setMemoPayload(payload);
-    setMemoModalOpen(true);
+    setMemoFirmaSimpleOpen(true);
   }
 
   // Nombres de destinos para el PDF del memo
@@ -533,7 +546,7 @@ export function NuevoDocumentoPage() {
                     </span>
                     Firmante del Memorándum
                   </CardTitle>
-                  <CardDescription>Selecciona quién firmará digitalmente el documento en FirmaGov</CardDescription>
+                  <CardDescription>Selecciona quién firmará el memorándum con Firma Simple DOC360</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {cargandoFirmantes ? (
@@ -582,9 +595,9 @@ export function NuevoDocumentoPage() {
                                   <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">Fuera de vigencia</span>
                                 )}
                               </div>
-                              {f.rut
-                                ? <p className="text-xs text-emerald-600 mt-0.5">RUT: {f.rut} ✓</p>
-                                : <p className="text-xs text-orange-500 mt-0.5">Sin RUT — configúralo para poder firmar</p>
+                              {f.estadoFirmaSimple === 'disponible'
+                                ? <p className="text-xs text-emerald-600 mt-0.5 flex items-center gap-1"><KeyRound className="h-3 w-3" />Firma Simple DOC360 habilitada</p>
+                                : <p className="text-xs text-orange-500 mt-0.5">{f.motivoNoHabilitada ?? 'Firma Simple no configurada para este cargo'} — configúralo en Administración → Jefaturas</p>
                               }
                             </div>
                           </label>
@@ -995,20 +1008,29 @@ export function NuevoDocumentoPage() {
         />
       )}
 
-      {/* Modal de previsualización y generación del Memorándum */}
-      {memoModalOpen && memoPayload && memoFirmante && (
-        <MemorandumModal
-          open={memoModalOpen}
-          onClose={() => setMemoModalOpen(false)}
+      {/* Modal de Firma Simple DOC360 — único mecanismo de firma para memorándum */}
+      {memoFirmaSimpleOpen && memoPayload && memoFirmante && (
+        <MemorandumFirmaSimpleModal
+          open={memoFirmaSimpleOpen}
+          onClose={() => setMemoFirmaSimpleOpen(false)}
           docPayload={memoPayload}
           referencia={memoReferencia}
           cuerpo={memoCuerpo}
           destinosNombres={destinosNombresParaMemo}
           origenNombre={origenNombre}
-          firmante={memoFirmante}
+          firmante={{
+            tipo:           memoFirmante.tipo ?? '',
+            idFirmante:     memoFirmante.idFirmante ?? 0,
+            nombre:         memoFirmante.nombre ?? '',
+            cargo:          memoFirmante.cargo ?? '',
+            rut:            memoFirmante.rut ?? null,
+            firmaTimbreUrl: memoFirmante.firmaTimbreUrl ?? null,
+            dependencia:    memoFirmante.dependencia ?? null,
+            idDependencia:  memoFirmante.idDependencia ?? 0,
+          } satisfies FirmanteFirmaSimple}
           archivos={archivos}
           onNavigate={(idDoc) => {
-            setMemoModalOpen(false);
+            setMemoFirmaSimpleOpen(false);
             navigate(`/documentos/${idDoc}`);
           }}
         />

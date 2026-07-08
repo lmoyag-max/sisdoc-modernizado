@@ -3,7 +3,7 @@
 
 Plataforma documental institucional moderna que reemplaza el sistema legacy SISDOC (Windows Server 2003 / ASP clásico / SQL Server 2005), manteniendo compatibilidad total con la base de datos y los datos históricos.
 
-**Estado:** Operativo en producción · Versión 2.0.0 · Auditado 2026-06-09
+**Estado:** Operativo en producción · Versión 2.0.0 · Auditado 2026-06-09 · Paquete de preproducción disponible (2026-06-24) · Rediseño visual completo (2026-06-25)
 
 ---
 
@@ -43,6 +43,7 @@ Plataforma documental institucional moderna que reemplaza el sistema legacy SISD
 | Base de datos | SQL Server 2022 | Docker |
 | Contenedor | Docker + Docker Compose | 27+ |
 | Proxy (prod) | Nginx | Alpine |
+| UI visual | Glassmorphism + iconos 3D (paleta unificada, `globals.css`) | — |
 
 ---
 
@@ -158,6 +159,29 @@ curl http://localhost:3001/api/health
 
 ---
 
+## Despliegue en preproducción (paquete autocontenido)
+
+Stack Docker aislado (`docker-compose.preprod.yml`, project name `sisdoc_preprod`) pensado para que Operaciones lo levante sin conocer el código fuente. No colisiona con el stack de desarrollo.
+
+```bash
+# Levantar todo (build + arranque)
+./scripts/start-preprod.sh              # Linux/Mac
+.\scripts\start-preprod.ps1             # Windows
+
+# Equivalente manual
+docker compose -f docker-compose.preprod.yml up -d --build
+
+# Backup / restore
+./scripts/backup-db.sh
+./scripts/restore-db.sh /var/opt/mssql/backup/archivo.bak
+```
+
+Guía completa (requisitos, puertos, variables de entorno, orden de scripts SQL, checklist funcional): [README_PREPROD.md](README_PREPROD.md).
+
+> **Importante:** este paquete no crea el esquema legacy SISDOC desde cero — requiere restaurar primero un `.bak` sanitizado de la base existente.
+
+---
+
 ## URLs de acceso
 
 | Servicio | Desarrollo | Producción |
@@ -234,13 +258,13 @@ GET    /usuarios/meta/roles
 GET    /roles
 
 # Jefaturas
-GET    /jefaturas
+GET    /jefaturas               (q, pagina, porPagina — KPIs del strip se calculan sobre el dataset completo)
 
 # Alertas (solo admin)
 GET    /alertas/configuracion
 PUT    /alertas/configuracion
 GET    /alertas/pendientes
-GET    /alertas/logs
+GET    /alertas/logs            (paginado — OFFSET/FETCH, 20 por página)
 POST   /alertas/enviar-manual
 
 # Firma Electrónica (solo admin)
@@ -415,15 +439,17 @@ sisdoc-modernizado/
 │   ├── backups/                      # Backups automáticos (NO en git)
 │   └── sp_legacy_fase2_backup_20260609.sql
 ├── scripts/
-│   ├── backup-db.ps1                 # Backup semanal automatizado
-│   ├── restore-db.ps1
+│   ├── backup-db.ps1 / backup-db.sh      # Backup semanal automatizado
+│   ├── restore-db.ps1 / restore-db.sh
+│   ├── start-preprod.ps1 / start-preprod.sh # Levanta el stack de preproducción
 │   ├── setup.ps1
 │   └── dev.ps1
-├── docs/
-│   ├── analisis/                     # Análisis legacy (referencia histórica)
-│   └── analisis-claude/              # Documentos de planificación (referencia histórica)
-├── docker-compose.yml
+├── docker/                           # Dockerfiles backend/frontend + init.sh SQL Server
+├── nginx/nginx.conf                  # Proxy prod y preprod (incluye /uploads/)
+├── docker-compose.yml                # Dev + perfil "prod"
+├── docker-compose.preprod.yml        # Stack aislado "sisdoc_preprod"
 ├── CLAUDE.md                         # Guía técnica completa para desarrollo
+├── README_PREPROD.md                 # Guía de despliegue para Operaciones
 └── README.md
 ```
 
@@ -471,6 +497,10 @@ Variables críticas que deben configurarse antes del primer arranque:
 - [x] Fase 3: Usuarios, Roles, Reportes, Configuración, Alertas, Jefaturas
 - [x] Fase 3b: Memorándum (PDF con firma/timbre), FirmaGOB (integración base)
 - [x] Fase 3c: Auditoría funcional y correcciones de seguridad (2026-06-09)
+- [x] Fase 3d: Empaquetado de preproducción con Docker (`docker-compose.preprod.yml`, 2026-06-24)
+- [x] Fase 3e: Rediseño visual completo — glassmorphism + iconos 3D en las 17 pantallas (2026-06-25)
+- [x] Fase 3f: Limpieza de Prisma sin uso y documentación legacy obsoleta (2026-06-25)
+- [x] Fase 3g: Paginación real en Historial de Alertas y Jefaturas (2026-06-25)
 - [ ] Fase 4: Notificaciones en tiempo real (WebSocket)
 - [ ] Fase 5: Tests automatizados (Vitest + Supertest)
 - [ ] Fase 6: CI/CD pipeline, modo oscuro, firma digital completa

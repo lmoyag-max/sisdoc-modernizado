@@ -273,6 +273,9 @@ export async function revertirDocumentoSinFirmar(pool: Pool, idDocumento: number
     await pool.request()
       .input('idDoc', sql.Int, idDocumento)
       .query('UPDATE firma_gob_historial SET id_documento = NULL WHERE id_documento = @idDoc');
+    await pool.request()
+      .input('idDoc', sql.Int, idDocumento)
+      .query('UPDATE memorandum_firma_simple SET id_documento = NULL WHERE id_documento = @idDoc');
 
     await pool.request().input('idDoc', sql.Int, idDocumento)
       .query('DELETE FROM documento_destino WHERE id_documento = @idDoc');

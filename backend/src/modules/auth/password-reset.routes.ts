@@ -212,17 +212,22 @@ router.post('/reset-password', resetLimiter, async (req: Request, res: Response,
       return;
     }
 
-    // Hashear nueva contraseña con bcrypt (y guardar texto plano truncado para compat legacy)
-    const nuevaHash  = await bcrypt.hash(nuevaClave, 12);
-    const claveCorta = nuevaClave.substring(0, 10);
+    // Hashear nueva contraseña con bcrypt. No se guarda en texto plano: a
+    // diferencia de la migración gradual en login (que solo escribe
+    // clave_hash cuando aún no existe, preservando clave legacy sin
+    // tocarla), aquí SIEMPRE queda clave_hash poblado — verifyPassword()
+    // nunca volverá a consultar la columna clave para este usuario. La
+    // columna es NOT NULL (schema legacy) así que no se toca: se deja el
+    // valor legacy anterior (ya obsoleto e inconsultable) en vez de
+    // sobrescribirlo con la contraseña nueva en claro.
+    const nuevaHash = await bcrypt.hash(nuevaClave, 12);
 
     await pool.request()
       .input('hash',  sql.VarChar(255), nuevaHash)
-      .input('clave', sql.VarChar(10),  claveCorta)
       .input('idUsr', sql.Int,          tkRow.id_usuario)
       .query(`
         UPDATE usuario
-        SET clave_hash = @hash, clave = @clave
+        SET clave_hash = @hash
         WHERE id_usuario = @idUsr
       `);
 

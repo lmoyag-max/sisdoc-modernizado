@@ -1,21 +1,24 @@
-import { FileText, AlignLeft, Hash } from 'lucide-react';
+import { FileText, AlignLeft, Hash, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 interface Props {
+  materia:        string;
+  materiaError:   string | null;
   referencia:     string;
   cuerpo:         string;
   cuerpoError:    string | null;
+  onMateria:      (v: string) => void;
   onReferencia:   (v: string) => void;
   onCuerpo:       (v: string) => void;
   disabled?:      boolean;
 }
 
 export function MemorandumFields({
-  referencia, cuerpo, cuerpoError,
-  onReferencia, onCuerpo, disabled = false,
+  materia, materiaError, referencia, cuerpo, cuerpoError,
+  onMateria, onReferencia, onCuerpo, disabled = false,
 }: Props) {
   return (
     <Card className="border-blue-200 dark:border-blue-800/40 bg-blue-50/30 dark:bg-blue-900/5">
@@ -33,6 +36,28 @@ export function MemorandumFields({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Materia (obligatoria) — distinta de Referencia, alimenta la línea MAT.: del PDF */}
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-1.5 text-sm">
+            <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+            Materia del Memorándum <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            value={materia}
+            onChange={(e) => onMateria(e.target.value)}
+            placeholder="Ej: Solicitud de insumos para el servicio"
+            maxLength={250}
+            disabled={disabled}
+            className={cn(materiaError && 'border-destructive')}
+          />
+          <div className="flex justify-between">
+            {materiaError
+              ? <p className="text-xs text-destructive">{materiaError}</p>
+              : <span />}
+            <p className="text-xs text-muted-foreground">{materia.length}/250</p>
+          </div>
+        </div>
+
         {/* Referencia (opcional) */}
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5 text-sm">

@@ -423,6 +423,8 @@ router.post('/confirmar', async (req: Request, res: Response, next: NextFunction
       firmaRuta?:         string;   // legado — ignorado si hay firmaTimbreRuta
       timbreRuta?:        string;   // legado
       idDependencia?:     number;
+      nombreDestinatario?: string;  // destinatario específico del memorándum (persona, no solo servicio)
+      cargoDestinatario?:  string;
     };
 
     if (!body.idDocumento) {
@@ -497,6 +499,8 @@ router.post('/confirmar', async (req: Request, res: Response, next: NextFunction
       .input('cargoFirm',     sql.VarChar(100), body.cargoFirmante ?? null)
       .input('tipoFirm',      sql.VarChar(20),  body.tipoFirmante ?? null)
       .input('ftRuta',        sql.VarChar(100), ftBase)
+      .input('nomDest',       sql.VarChar(100), body.nombreDestinatario?.substring(0, 100) || null)
+      .input('cargoDest',     sql.VarChar(100), body.cargoDestinatario?.substring(0, 100) || null)
       .query<{ correlativo: string; numero: number }>(`
         BEGIN TRANSACTION;
 
@@ -513,12 +517,14 @@ router.post('/confirmar', async (req: Request, res: Response, next: NextFunction
           (id_documento, correlativo, anio, numero, id_usuario_creador,
            id_dependencia_origen, materia, referencia, cuerpo,
            nombre_firmante, cargo_firmante, tipo_firmante,
-           firma_timbre_ruta, generado_por_sistema, fecha_creacion)
+           firma_timbre_ruta, generado_por_sistema, fecha_creacion,
+           nombre_destinatario, cargo_destinatario)
         VALUES
           (@idDoc, @corr, @anio, @sigNumero, @idUsr,
            @idDep, @materia, @referencia, @cuerpo,
            @nomFirm, @cargoFirm, @tipoFirm,
-           @ftRuta, 1, GETDATE());
+           @ftRuta, 1, GETDATE(),
+           @nomDest, @cargoDest);
 
         SELECT @corr AS correlativo, @sigNumero AS numero;
 
@@ -547,6 +553,101 @@ router.patch('/vincular-archivo', async (req: Request, res: Response, next: Next
       .query('UPDATE memo_generado SET id_archivo_digital = @idArchivo WHERE correlativo = @corr');
 
     sendSuccess(res, null, 'Archivo vinculado');
+  } catch (e) { next(e); }
+});
+
+// ── Reversión de memorándum sin firmar ─────────────────────────
+// Deshace por completo lo hecho por POST /confirmar (+ los pasos
+// posteriores del frontend: PDF borrador, adjuntos, Fase A de Firma
+// Simple) cuando la firma nunca se completa. Sin esto, el correlativo
+// queda consumido para siempre y el documento huérfano en estado 1
+// hasta que alguien lo borre manualmente. Calcada de
+// revertirDocumentoSinFirmar() (firma-gob.utils.ts) — mismo criterio de
+// "el número queda libre automáticamente al borrar memo_generado", pero
+// además limpia memorandum_firma_simple (que la versión de FirmaGOB no
+// conoce) desvinculando en vez de borrar, para conservar la evidencia
+// de intentos de firma (código de verificación, hashes, IP) igual que
+// ya se hace con firma_gob_historial.
+type MemoPool = Awaited<ReturnType<typeof getPool>>;
+
+async function revertirMemorandumSinFirmar(pool: MemoPool, idDocumento: number, uploadDir: string): Promise<void> {
+  try {
+    const archivosRes = await pool.request()
+      .input('idDoc', sql.Int, idDocumento)
+      .query<{ ruta: string | null }>('SELECT ruta FROM archivo_digital WHERE id_documento = @idDoc');
+
+    for (const fila of archivosRes.recordset) {
+      if (!fila.ruta) continue;
+      try { fs.unlinkSync(path.join(uploadDir, fila.ruta)); } catch { /* best-effort */ }
+    }
+
+    const memoRes = await pool.request()
+      .input('idDoc', sql.Int, idDocumento)
+      .query<{ anio: number; numero: number; id_dependencia_origen: number | null }>(
+        'SELECT anio, numero, id_dependencia_origen FROM memo_generado WHERE id_documento = @idDoc'
+      );
+    const memo = memoRes.recordset[0];
+
+    await pool.request()
+      .input('idDoc', sql.Int, idDocumento)
+      .query('UPDATE firma_gob_historial SET id_documento = NULL WHERE id_documento = @idDoc');
+    await pool.request()
+      .input('idDoc', sql.Int, idDocumento)
+      .query('UPDATE memorandum_firma_simple SET id_documento = NULL WHERE id_documento = @idDoc');
+
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM documento_destino WHERE id_documento = @idDoc');
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM tramite WHERE id_documento = @idDoc');
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM memo_generado WHERE id_documento = @idDoc');
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM archivo_digital WHERE id_documento = @idDoc');
+    await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query('DELETE FROM documento WHERE id_documento = @idDoc');
+
+    if (memo) {
+      logger.info(`[memorandum] Documento ${idDocumento} revertido tras fallo de Firma Simple. Número ${memo.numero} (año ${memo.anio}, servicio ${memo.id_dependencia_origen ?? 'GEN'}) liberado para reuso.`);
+    } else {
+      logger.info(`[memorandum] Documento ${idDocumento} revertido tras fallo de Firma Simple (sin memo_generado asociado).`);
+    }
+  } catch (e) {
+    logger.error(`[memorandum] No se pudo revertir el documento ${idDocumento} tras fallo de Firma Simple: ${e}`);
+    throw e;
+  }
+}
+
+// ── DELETE /memorandum/:idDocumento/pendiente ──────────────────
+// Llamado por el frontend cuando la Firma Simple falla en cualquier
+// paso posterior a la creación del documento — revierte todo de forma
+// atómica desde la perspectiva del usuario (no deja huérfanos ni
+// consume el correlativo). Solo quien creó el memo puede revertirlo, y
+// solo si sigue en estado 1 (si ya fue firmado/despachado, no aplica:
+// para eso existe la eliminación normal de documentos).
+router.delete('/:idDocumento/pendiente', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as unknown as AuthenticatedRequest).user;
+    const idDocumento = Number(req.params.idDocumento);
+
+    const pool = await getPool();
+    const memoRes = await pool.request().input('idDoc', sql.Int, idDocumento)
+      .query<{ id_usuario_creador: number; id_estado_documento: number }>(`
+        SELECT mg.id_usuario_creador, d.id_estado_documento
+        FROM memo_generado mg
+        JOIN documento d ON d.id_documento = mg.id_documento
+        WHERE mg.id_documento = @idDoc
+      `);
+    const memo = memoRes.recordset[0];
+    if (!memo) { sendError(res, 'Este documento no tiene un memorándum pendiente', 404); return; }
+    if (memo.id_usuario_creador !== user.idUsuario) {
+      sendError(res, 'Solo quien creó el memorándum puede revertirlo', 403); return;
+    }
+    if (memo.id_estado_documento !== 1) {
+      sendError(res, 'El documento ya fue despachado — no puede revertirse por esta vía', 409); return;
+    }
+
+    await revertirMemorandumSinFirmar(pool, idDocumento, path.resolve(env.UPLOAD_DIR));
+    sendSuccess(res, null, 'Memorándum revertido — el número no fue consumido');
   } catch (e) { next(e); }
 });
 
@@ -833,10 +934,11 @@ router.patch('/:id/firmar-simple/:idFirmaSimple/completar',
         .query<{
           id_documento: number; id_usuario_solicitante: number | null; estado: string;
           minutos_transcurridos: number; correlativo_memo: string | null; id_archivo_digital: number | null;
+          codigo_verificacion: string; nombre_firmante: string;
         }>(`
           SELECT id_documento, id_usuario_solicitante, estado,
                  DATEDIFF(MINUTE, fecha_creacion, GETDATE()) AS minutos_transcurridos,
-                 correlativo_memo, id_archivo_digital
+                 correlativo_memo, id_archivo_digital, codigo_verificacion, nombre_firmante
           FROM memorandum_firma_simple WHERE id = @id
         `);
       const registro = fsRes.recordset[0];
@@ -908,8 +1010,62 @@ router.patch('/:id/firmar-simple/:idFirmaSimple/completar',
 
       await pool.request().input('idDoc', sql.Int, idDocumento)
         .query(`UPDATE documento SET id_estado_documento = 2, fecha_update = GETDATE() WHERE id_documento = @idDoc AND id_estado_documento = 1`);
-      await pool.request().input('idDoc', sql.Int, idDocumento)
-        .query(`UPDATE tramite SET id_estado_tramite = 2, fecha_despacho = GETDATE(), fecha_update = GETDATE() WHERE id_documento = @idDoc AND id_estado_tramite = 1`);
+
+      // Antes esto hacía UPDATE del trámite en estado 1 in-place, lo que
+      // dejaba la observación original "[PENDIENTE:FIRMA]" obsoleta y no
+      // generaba ningún evento visible en la trazabilidad (findTrazabilidad
+      // solo lee filas de tramite) — un usuario no-admin no podía ver que el
+      // documento fue firmado, ni por quién, ni cuándo. Ahora se inserta un
+      // trámite nuevo (mismo patrón que despacharDocumento en
+      // documento.service.ts), preservando intacto el trámite original.
+      const tramOrigenRes = await pool.request().input('idDoc', sql.Int, idDocumento)
+        .query<{
+          id_procedencia: number; id_destino: number;
+          tipo_procedencia: string; tipo_destinatario: string;
+          id_tipo_distribucion: number; id_tipo_compromiso: number;
+          id_estado_compromiso: number; dias_compromiso: number;
+        }>(`
+          SELECT TOP 1 id_procedencia, id_destino, tipo_procedencia, tipo_destinatario,
+                 id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso, dias_compromiso
+          FROM tramite WHERE id_documento = @idDoc AND id_estado_tramite = 1
+          ORDER BY fecha_sistema DESC
+        `);
+      const tramOrigen = tramOrigenRes.recordset[0];
+      if (tramOrigen) {
+        const obsFirma = `Despachado — firmado vía Firma Simple DOC360 (${registro.nombre_firmante}, código ${registro.codigo_verificacion})`.substring(0, 250);
+        await pool.request()
+          .input('idDoc',    sql.Int,          idDocumento)
+          .input('idUsr',    sql.Int,          user.idUsuario)
+          .input('idProc',   sql.Int,          tramOrigen.id_procedencia)
+          .input('idDest',   sql.Int,          tramOrigen.id_destino)
+          .input('tipProc',  sql.Char(1),      tramOrigen.tipo_procedencia)
+          .input('tipDest',  sql.Char(1),      tramOrigen.tipo_destinatario)
+          .input('idTipDis', sql.Int,          tramOrigen.id_tipo_distribucion)
+          .input('idTipCom', sql.Int,          tramOrigen.id_tipo_compromiso)
+          .input('idEstCom', sql.Int,          tramOrigen.id_estado_compromiso)
+          .input('dias',     sql.Int,          tramOrigen.dias_compromiso)
+          .input('obs',      sql.VarChar(250), obsFirma)
+          .query(`
+            INSERT INTO tramite
+              (id_documento, id_usuario, id_procedencia, id_destino,
+               tipo_procedencia, tipo_destinatario,
+               id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+               id_estado_tramite, dias_compromiso, observaciones,
+               fecha_sistema, fecha_update, fecha_despacho)
+            VALUES
+              (@idDoc, @idUsr, @idProc, @idDest,
+               @tipProc, @tipDest,
+               @idTipDis, @idTipCom, @idEstCom,
+               2, @dias, @obs,
+               GETDATE(), GETDATE(), GETDATE())
+          `);
+      } else {
+        // Red de seguridad: si por alguna razón no queda tramite en estado 1
+        // (no debería ocurrir dado el chequeo previo), no se pierde el
+        // despacho — se mantiene el comportamiento anterior como fallback.
+        await pool.request().input('idDoc', sql.Int, idDocumento)
+          .query(`UPDATE tramite SET id_estado_tramite = 2, fecha_despacho = GETDATE(), fecha_update = GETDATE() WHERE id_documento = @idDoc AND id_estado_tramite = 1`);
+      }
 
       await logAuditoria(pool, {
         idUsuario: user.idUsuario, accion: 'FIRMA_SIMPLE_COMPLETADA',

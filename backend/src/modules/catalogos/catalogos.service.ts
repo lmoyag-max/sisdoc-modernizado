@@ -68,16 +68,38 @@ export async function getDescriptores() {
   return r.recordset;
 }
 
+// El "cargo" no existe como campo propio de funcionario/usuario en el
+// modelo legado — solo las jefaturas (titular/subrogante/subrogante_2)
+// tienen cargo_* registrado. Si el funcionario resulta ser el usuario
+// vinculado a alguno de esos 3 roles en su propia dependencia, se
+// autocompleta desde ahí; si no, el frontend pide el cargo manualmente
+// (no se inventa ni se guarda en funcionario).
+//
+// INNER JOIN usuario (a propósito, no LEFT JOIN): esta lista alimenta el
+// selector de "Destinatario específico" del memorándum — solo deben
+// aparecer personas con cuenta DOC360 real y activa, no todo el directorio
+// legado de funcionarios (que incluye personal sin login y registros
+// placeholder/de prueba). No se borra nada del directorio — solo se
+// restringe qué aparece como destinatario elegible.
 export async function getFuncionariosPorDependencia(idDependencia: number) {
   const pool = await getPool();
   const r = await pool.request()
     .input('idDep', sql.Int, idDependencia)
     .query(`
       SELECT f.id_funcionario AS id,
-             LTRIM(RTRIM(f.nombres)) + ' ' + LTRIM(RTRIM(f.apellidos)) AS nombre
+             LTRIM(RTRIM(f.nombres)) + ' ' + LTRIM(RTRIM(f.apellidos)) AS nombre,
+             CASE
+               WHEN u.id_usuario = j.id_usuario_titular      THEN j.cargo_titular
+               WHEN u.id_usuario = j.id_usuario_subrogante   THEN j.cargo_subrogante
+               WHEN u.id_usuario = j.id_usuario_subrogante_2 THEN j.cargo_subrogante_2
+               ELSE NULL
+             END AS cargo
       FROM funcionario f
+      INNER JOIN usuario u ON u.id_funcionario = f.id_funcionario AND u.activo = 1
+      LEFT JOIN  jefatura j ON j.id_dependencia = f.id_dependencia
       WHERE f.id_dependencia = @idDep
         AND LTRIM(RTRIM(ISNULL(f.nombres,''))) <> ''
+        AND ISNULL(f.vigencia, 'S') = 'S'
       ORDER BY f.apellidos, f.nombres
     `);
   return r.recordset;

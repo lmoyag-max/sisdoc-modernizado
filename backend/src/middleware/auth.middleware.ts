@@ -20,7 +20,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       usuario:        payload.usuario,
       idFuncionario:  payload.idFuncionario,
       idDependencia:  payload.idDependencia ?? null,
-      todosServicios: payload.todosServicios ?? true,
+      // Fail-closed: un token sin el claim (legacy o malformado) NO debe
+      // otorgar acceso total por defecto.
+      todosServicios: payload.todosServicios ?? false,
       roles:          payload.roles ?? [],
       modulos:        payload.modulos ?? [],
     };

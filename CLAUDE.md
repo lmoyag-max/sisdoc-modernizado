@@ -297,19 +297,28 @@ GET    /estados-compromiso
 
 ### Memorándum (`/api/v1/memorandum`) — requireAuth
 ```
-GET    /firmante-activo        → { disponible, firmante? } — firmante de la dependencia del usuario
-GET    /firmantes-disponibles  → titular + subrogante con estado de imagen
-POST   /confirmar              → { idDocumento, materia?, referencia?, cuerpo?, idFirmante? }
-                                 → asigna correlativo MEMO-YYYY-NNNNNN y genera PDF si hay firma/timbre
-PATCH  /vincular-archivo       → { idMemo, idArchivoDigital }
-GET    /firmantes              → requireRole('admin') — lista todos los firmantes
-GET    /firmantes/:id          → requireRole('admin')
-POST   /firmantes              → requireRole('admin') — crear firmante
-POST   /firmantes/:id/imagen   → requireRole('admin') — subir imagen firma+timbre
+GET    /firmante-activo               → { disponible, firmante? } — firmante de la dependencia del usuario
+GET    /firmantes-disponibles         → titular + subrogante + subrogante_2, con estado de imagen y de Firma Simple
+POST   /confirmar                     → { idDocumento, materia, referencia?, cuerpo?, nombreFirmante, cargoFirmante,
+                                          tipoFirmante, firmaTimbreRuta?, idDependencia?, nombreDestinatario?, cargoDestinatario? }
+                                       → asigna correlativo MEMO-AÑO-COD-NNNNNN (transaccional, TABLOCKX+HOLDLOCK)
+PATCH  /vincular-archivo              → { correlativo, idArchivo } — vincula el PDF borrador subido a memo_generado
+DELETE /:idDocumento/pendiente        → revierte un memo sin firmar (solo el creador, solo estado 1) — libera el
+                                          correlativo. Llamado automáticamente por el frontend si la Firma Simple falla
+POST   /:id/firmar-simple             → Fase A de Firma Simple: { idJefatura, tipoJefatura, password, confirmacion }
+                                       → valida contraseña DOC360 del firmante, emite código de verificación + hash
+PATCH  /:id/firmar-simple/:idFirmaSimple/completar
+                                       → Fase B: recibe el PDF final (multipart), recalcula el hash en servidor,
+                                          despacha el documento (inserta evento de trazabilidad, no sobrescribe el original)
+GET    /firmantes                     → requireRole('admin','of.partes') — lista todos los firmantes
+GET    /firmantes/:id                 → requireRole('admin','of.partes')
+POST   /firmantes                     → requireRole('admin','of.partes') — crear firmante
+POST   /firmantes/:id/imagen          → requireRole('admin','of.partes') — subir imagen firma+timbre
 ```
-**Requisito operacional:** Para generar PDF de memorándum, el firmante de la jefatura debe tener imagen
-subida vía `/admin/jefaturas` → botón "Subir firma y timbre". Sin imagen: correlativo se asigna pero PDF no se genera.
-Correlativo actual: MEMO-2026-000010 (próximo: MEMO-2026-000011).
+**Requisito operacional:** para firmar con Firma Simple, la jefatura debe tener imagen de firma+timbre subida vía
+`/admin/jefaturas` y el cargo (titular/subrogante/subrogante_2) vinculado a un usuario DOC360 activo. Sin esto,
+`GET /firmantes-disponibles` devuelve el motivo exacto en `motivoNoHabilitada`.
+Ver [Correlativos de memorándum — integridad transaccional](#correlativos-de-memorándum--integridad-transaccional-crítico) para las reglas de rollback y reutilización de números.
 
 ### Jefaturas (`/api/v1/jefaturas`) — requireAuth
 ```
@@ -346,6 +355,28 @@ POST   /probar-servicio/:id    → prueba de conectividad SMTP
 GET    /                       → lista de roles con módulos asignados
 ```
 Administración de módulos por rol en `/admin/roles` (UI).
+
+**Roles reales existentes en el sistema** (auditado 2026-07-09 contra `rol` en BD):
+- `admin` — acceso total, bypass de todos los controles de servicio
+- `of.partes` — Oficina de Partes: puede crear documentos físicos/reservados, ver destinos externos, gestionar firmantes de memorándum
+- `supervisores` — puede derivar y reabrir documentos, sin los privilegios exclusivos de `of.partes`
+- `funcionario` — rol base, solo ve/opera documentos de su propio servicio
+- Roles adicionales pueden crearse dinámicamente vía `POST /roles` (sin lista cerrada)
+
+**Visibilidad por servicio** — dos mecanismos independientes, no confundir:
+- `funcionario.id_dependencia` — **un solo servicio** por usuario (no hay modelo de múltiples servicios)
+- `usuario.todos_servicios` (BIT) — bypass total de visibilidad, independiente del rol. **Fail-closed**: default `false` a nivel de BD, de creación de usuario y de JWT; solo `admin` puede otorgarlo (`POST /usuarios`, `PATCH /usuarios/:id`)
+- El criterio de filtro por servicio (`EXISTS` sobre `tramite.id_destino`/`id_procedencia`) debe aplicarse de forma **consistente en todo endpoint que liste o exponga documentos/trámites/archivos** — ya se verificó y corrigió en: `GET /documentos`, `GET /tramites`, `GET /busqueda`, `GET /documentos/buscar-por-numero`, `GET /reportes/*`, `GET /archivos`, `GET /archivos/:id/{preview,download}`, y las transiciones de estado (despachar/recepcionar/derivar/terminar/reabrir/recepcionar-destino/terminar-destino). Si se agrega un nuevo endpoint de listado o lectura de documentos, replicar el mismo criterio.
+
+### Correlativos de memorándum — integridad transaccional (crítico)
+
+**Regla de negocio no negociable:** el correlativo (`MEMO-AÑO-COD-NNNNNN`) debe ser único, no debe repetirse, y no debe avanzar/consumirse cuando el documento no llega a completarse.
+
+- **Asignación atómica:** `POST /memorandum/confirmar` calcula `MAX(numero)+1` e inserta dentro de `BEGIN TRANSACTION` con `WITH (TABLOCKX, HOLDLOCK)` sobre `memo_generado` — dos confirmaciones concurrentes nunca calculan el mismo número. Mismo patrón en `memorandum_firma_simple.numero` (Fase A de Firma Simple).
+- **Reutilización automática:** el cálculo es `MAX(mg.numero) INNER JOIN documento` — al eliminar un documento, su número queda libre automáticamente para el siguiente memo del mismo año+servicio. Si se eliminan todos los memos de un período, el contador reinicia en 1. Esto es diseño deliberado, no requiere pasos manuales.
+- **Rollback si la firma falla:** si `POST /confirmar` tiene éxito pero cualquier paso posterior de Firma Simple falla (contraseña incorrecta, red, timeout, error de BD), el frontend (`MemorandumFirmaSimpleModal.tsx`) llama automáticamente a `DELETE /memorandum/:idDocumento/pendiente`, que ejecuta `revertirMemorandumSinFirmar()` — borra documento/memo_generado/tramite/documento_destino y desvincula (no borra) `firma_gob_historial`/`memorandum_firma_simple` para conservar evidencia de auditoría. El número queda libre de inmediato. Mismo patrón para FirmaGOB vía `revertirDocumentoSinFirmar()` (`firma-gob.utils.ts`).
+- **`softDelete()` es transaccional** (`documento.repository.ts`): los 6 pasos de borrado corren en una sola transacción SQL — un fallo intermedio no deja filas huérfanas.
+- Si se agrega una tabla nueva con FK NOT NULL hacia `documento`, **debe actualizarse `softDelete()`, `revertirMemorandumSinFirmar()` y `revertirDocumentoSinFirmar()`** — de lo contrario el borrado fallará o dejará registros huérfanos. `memorandum_firma_simple.id_documento` es nullable específicamente para permitir esto sin borrar la evidencia.
 
 ### Reportes (`/api/v1/reportes`) — requireAuth
 ```
@@ -408,6 +439,9 @@ GET    /exportar               → requireModule('reportes') — CSV con BOM par
 - `refresh_token` — id, token, id_usuario, expires_at, revoked_at, created_at
 - `password_reset_tokens` — id, id_usuario, token_hash (SHA256, VARCHAR 64), fecha_creacion, fecha_expiracion, usado (BIT), fecha_uso, ip_solicitud, user_agent
 - `auditoria_reset` — id, evento, id_usuario, email, ip, user_agent, detalle, fecha
+- `memo_generado` — correlativo, anio, numero, id_dependencia_origen, nombre/cargo_firmante, nombre/cargo_destinatario, id_archivo_digital, id_archivo_firmado, estado_firma
+- `memorandum_firma_simple` — evidencia de Firma Simple DOC360 (código de verificación, hashes original/firmado, IP, user agent). `id_documento` es **nullable** (se desvincula, no se borra, al revertir/eliminar el documento — preserva auditoría)
+- `firma_gob_config` / `firma_gob_historial` — configuración e historial de FirmaGOB por ambiente (TEST/PRODUCCION)
 
 ### Usuarios en BD
 | Usuario | id_usuario | Email configurado |
@@ -540,32 +574,34 @@ cd frontend && npm run typecheck
 
 ---
 
-## Estado actual del sistema (Junio 2026)
+## Estado actual del sistema (Julio 2026)
 
-Auditado funcionalmente el 2026-06-09. Correcciones de seguridad aplicadas.
+Auditoría técnica integral realizada el 2026-07-09 (12 módulos, ver `INFORME_AUDITORIA_DOC360.md` para el detalle completo). Se corrigieron hallazgos críticos de integridad transaccional (rollback de correlativos) y de visibilidad por servicio.
 
 ### Módulos funcionales ✅
 - Login + JWT + refresh automático + recuperación de contraseña por email
 - Dashboard con métricas reales, gráficos y actividad reciente (filtrado por servicio)
-- Documentos: listado paginado, detalle, crear, derivar, historial
+- Documentos: listado paginado, detalle, crear, derivar, historial — transiciones de estado validan pertenencia al servicio
 - Bandeja de entrada con paginación y estado
 - Enviados
 - Trámites
-- Trazabilidad documental
-- Búsqueda global (documentos, trámites, funcionarios)
-- Archivos: upload múltiple + listado + descarga + asociar a documento
-- Memorándum: correlativos MEMO-YYYY-NNNNNN, generación PDF con firma/timbre
-- Jefaturas: titular + subrogante + imagen firma/timbre por dependencia
-- Usuarios: CRUD + asignación de roles
-- Roles: gestión de módulos por rol
-- Alertas: configuración SMTP, horarios, envío manual
+- Trazabilidad documental — incluye eventos de firma electrónica (Firma Simple/FirmaGOB) como trámites propios
+- Búsqueda global (documentos, trámites, funcionarios) — filtrada por servicio
+- Archivos: upload múltiple + listado + descarga + asociar a documento — acceso restringido por servicio
+- Memorándum: correlativos `MEMO-AÑO-COD-NNNNNN` (por servicio), generación PDF 100% frontend (jsPDF)
+- **Firma Simple DOC360:** mecanismo de firma interno (re-autenticación con contraseña propia), único punto de entrada para firmar memorándums desde la UI. Rollback automático si la firma falla en cualquier paso posterior a la asignación del correlativo
+- FirmaGOB: integración externa alternativa, con su propio rollback (`revertirDocumentoSinFirmar`)
+- Jefaturas: titular + subrogante + subrogante_2 + imagen firma/timbre por dependencia, vinculados a usuario DOC360
+- Usuarios: CRUD + asignación de roles — solo admin puede asignar roles o `todos_servicios`
+- Roles: gestión de módulos por rol (roles reales: `admin`, `of.partes`, `supervisores`, `funcionario`)
+- Alertas: configuración SMTP, horarios, envío manual, historial paginado desde BD
 - Reportes: métricas, gráficos, exportar CSV (filtrado por servicio)
 - Configuración: logo, fondo login, nombres del sistema, reglas de carga configurables
-- FirmaGOB: módulo implementado, pendiente de configuración de credenciales
 
 ### Requiere configuración operacional
-- **Memorándum PDF:** subir imagen de firma+timbre en `/admin/jefaturas`
-- **FirmaGOB:** configurar URL y credenciales en `/admin/firma-gob`
+- **Memorándum PDF firmado:** requiere jefatura con imagen de firma+timbre y usuario DOC360 vinculado en `/admin/jefaturas`
+- **FirmaGOB:** configurar URL y credenciales en `/admin/firma-gob` (opcional — Firma Simple no la requiere)
+- **SMTP en producción:** si no se configura, las alertas quedan registradas como enviadas sin llegar a destinatarios reales (advertencia al boot del servidor)
 
 ### Pendiente / mejoras futuras
 - Notificaciones en tiempo real (WebSocket)
@@ -573,6 +609,7 @@ Auditado funcionalmente el 2026-06-09. Correcciones de seguridad aplicadas.
 - Export a PDF en reportes
 - Tests automatizados (Vitest + Supertest)
 - CI/CD pipeline
+- Streaming en exportación CSV para volúmenes muy grandes (actualmente hasta 50.000 filas en memoria)
 
 ---
 
@@ -678,3 +715,24 @@ Validaciones: array no vacío, `maxFileMB` entre 1–100, `maxTotalMB >= maxFile
 5. Con todas las extensiones activas y defaults, el comportamiento es igual al pre-feature
 6. Corromper `sistema.json` manualmente → el sistema usa defaults y no rompe
 7. Verificar que los hint texts en los tres puntos de upload muestran la configuración activa
+
+### [2026-07-09] Auditoría técnica integral — rollback de correlativos y visibilidad por servicio
+
+**Motivación:** auditoría solicitada de los 12 módulos funcionales de DOC360, con foco crítico en que la numeración de correlativos de memorándum sea única, transaccional, segura ante concurrencia, y no avance indebidamente cuando la firma falla. Detalle completo en `INFORME_AUDITORIA_DOC360.md`.
+
+**P1 — Crítico (numeración e integridad transaccional):**
+- Firma Simple no revertía el documento/correlativo cuando la firma fallaba en cualquier paso posterior a `POST /memorandum/confirmar` (a diferencia de FirmaGOB, que sí tenía `revertirDocumentoSinFirmar`). Se agregó `revertirMemorandumSinFirmar()` + endpoint `DELETE /memorandum/:idDocumento/pendiente`, invocado automáticamente por el frontend en cualquier fallo posterior a la creación del documento.
+- `documento.repository.ts#softDelete()` no era transaccional (6 statements independientes) y nunca limpiaba `memorandum_firma_simple`. Ahora corre en una sola transacción SQL y desvincula (no borra) la evidencia de Firma Simple, igual que ya se hacía con `firma_gob_historial`.
+- Nuevo script `database/scripts/16-firma-simple-rollback.sql`: `memorandum_firma_simple.id_documento` ahora es nullable (antes NOT NULL, impedía preservar evidencia al revertir/eliminar).
+
+**P2 — Visibilidad por servicio y trazabilidad:**
+- `GET /busqueda` y `GET /documentos/buscar-por-numero` no filtraban por servicio — cualquier usuario autenticado veía documentos/trámites/archivos de cualquier dependencia. Corregido con el mismo criterio `EXISTS(...)` ya usado en `reportes`/`tramites`.
+- Las transiciones de estado (despachar/recepcionar/derivar/terminar/reabrir/recepcionar-destino/terminar-destino) solo validaban rol, no pertenencia al documento — corregido en `documento.controller.ts` con `usuarioTieneAccesoDocumento()`.
+- `GET /archivos/:id/{preview,download}` y el listado `GET /archivos` no verificaban acceso al documento asociado — corregido con el mismo criterio ya usado en upload/delete.
+- `usuario.todos_servicios` (bypass total) tenía default inseguro y sin gate de rol — ahora fail-closed (default `false` en BD, creación de usuario y claim JWT) y solo `admin` puede otorgarlo/modificarlo (`database/scripts/17-todos-servicios-fail-closed.sql`).
+- Los eventos de firma electrónica (Firma Simple y FirmaGOB) hacían `UPDATE` in-place del trámite original en vez de insertar un evento nuevo — invisibles en la trazabilidad. Ahora se inserta un trámite nuevo con observación explícita, preservando el original intacto.
+- `password-reset.routes.ts`: dejó de escribirse la contraseña nueva en texto plano en `usuario.clave` al resetear (antes ocurría en cada reset, no solo en cuentas legacy no migradas).
+
+**P3 — Menor:** filtro `idDependencia` fantasma eliminado de `documento.schema.ts` (declarado pero nunca usado); advertencia al boot si `NODE_ENV=production` sin `SMTP_HOST`/`SMTP_USER` configurado.
+
+**Verificación:** todos los cambios probados end-to-end contra la BD de desarrollo (rollback + reutilización de correlativo, aislamiento cruzado entre servicios en búsqueda/buscar-por-número/transiciones/archivos, trazabilidad de firma) — ver `INFORME_AUDITORIA_DOC360.md` para el detalle de cada caso.

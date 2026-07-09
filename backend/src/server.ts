@@ -20,6 +20,15 @@ async function bootstrap(): Promise<void> {
     await getPool();
     ensureIndexes(); // non-blocking — crea índices si no existen
 
+    // Sin SMTP configurado, email.service.ts usa jsonTransport (los correos
+    // "se envían" y quedan como estado='ok' en alerta_log sin llegar a nadie)
+    // — en producción esto oculta una falla real de entrega. Solo advertir
+    // aquí, no bloquear el arranque: alertas por correo es una función
+    // secundaria del sistema.
+    if (env.NODE_ENV === 'production' && (!env.SMTP_HOST || !env.SMTP_USER)) {
+      logger.warn('SMTP no configurado en producción — las alertas se registrarán como enviadas sin llegar a ningún destinatario real. Configura SMTP_HOST/SMTP_USER en .env.');
+    }
+
     startAlertaScheduler();
 
     const server = app.listen(env.PORT, '0.0.0.0', () => {

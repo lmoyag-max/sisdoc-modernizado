@@ -3,7 +3,7 @@
 
 Plataforma documental institucional moderna que reemplaza el sistema legacy SISDOC (Windows Server 2003 / ASP clásico / SQL Server 2005), manteniendo compatibilidad total con la base de datos y los datos históricos.
 
-**Estado:** Operativo en producción · Versión 2.0.0 · Auditado 2026-06-09 · Paquete de preproducción disponible (2026-06-24) · Rediseño visual completo (2026-06-25)
+**Estado:** Operativo en producción · Versión 2.0.0 · Auditoría técnica integral 2026-07-09 (ver `INFORME_AUDITORIA_DOC360.md`) · Paquete de preproducción disponible (2026-06-24) · Rediseño visual completo (2026-06-25)
 
 ---
 
@@ -60,7 +60,7 @@ Plataforma documental institucional moderna que reemplaza el sistema legacy SISD
 | Búsqueda global | `/busqueda` | Todos + of.partes | ✅ Operativo |
 | Gestión de archivos | `/archivos` | admin | ✅ Operativo |
 | Reportes + CSV | `/reportes` | admin | ✅ Operativo |
-| Memorándum | (integrado en documentos) | Todos | ✅ Operativo* |
+| Memorándum + Firma Simple | (integrado en documentos) | Todos | ✅ Operativo* |
 | Usuarios | `/admin/usuarios` | admin | ✅ Operativo |
 | Roles | `/admin/roles` | admin | ✅ Operativo |
 | Jefaturas | `/admin/jefaturas` | admin | ✅ Operativo |
@@ -68,7 +68,7 @@ Plataforma documental institucional moderna que reemplaza el sistema legacy SISD
 | Firma electrónica | `/admin/firma-gob` | admin | ⚙️ Sin configurar |
 | Configuración | `/admin/configuracion` | admin | ✅ Operativo |
 
-> *Memorándum requiere imagen de firma/timbre configurada en Jefaturas para generar PDF.
+> *Memorándum requiere imagen de firma/timbre + usuario DOC360 vinculado en Jefaturas para firmar con Firma Simple (mecanismo interno, único punto de entrada de firma desde la UI). FirmaGOB es una integración externa alternativa, independiente y opcional.
 
 ---
 
@@ -220,31 +220,41 @@ POST   /auth/refresh
 POST   /auth/logout
 GET    /auth/me
 
-# Documentos
+# Documentos (todos filtrados por servicio del usuario, salvo admin/todosServicios)
 GET    /documentos              (q, idTipo, idEstado, fechaDesde, fechaHasta, pagina)
+GET    /documentos/buscar-por-numero (numero — antes de /:id para evitar colisión de ruta)
 GET    /documentos/:id
-GET    /documentos/:id/historial
+GET    /documentos/:id/historial | /trazabilidad
+GET    /documentos/:id/destinos       (multi-destino)
 POST   /documentos
-POST   /documentos/:id/derivar
+POST   /documentos/:id/despachar | /recepcionar | /derivar | /terminar | /reabrir
+POST   /documentos/:id/recepcionar-destino | /terminar-destino (multi-destino)
+DELETE /documentos/:id                (solo admin — transaccional, ver Seguridad)
 
 # Trámites
 GET    /tramites                (idEstado, pagina)
+GET    /tramites/enviados
 PATCH  /tramites/:id/recibir
 PATCH  /tramites/:id/cerrar
 
-# Archivos
+# Archivos (acceso restringido por servicio del documento asociado)
 POST   /archivos/upload         (multipart/form-data: archivo + idDocumento)
 GET    /archivos                (idDocumento?)
+GET    /archivos/:id/preview | /download
 DELETE /archivos/:id
 
-# Memorándum
+# Memorándum + Firma Simple DOC360
 GET    /memorandum/firmante-activo
 GET    /memorandum/firmantes-disponibles
-POST   /memorandum/confirmar    ({ idDocumento, materia?, referencia?, cuerpo? })
+POST   /memorandum/confirmar          ({ idDocumento, materia, referencia?, cuerpo?, nombreFirmante, cargoFirmante,
+                                          tipoFirmante, idDependencia?, nombreDestinatario?, cargoDestinatario? })
+DELETE /memorandum/:idDocumento/pendiente   (revierte un memo sin firmar — libera el correlativo)
+POST   /memorandum/:id/firmar-simple        (Fase A — valida contraseña del firmante)
+PATCH  /memorandum/:id/firmar-simple/:idFirmaSimple/completar  (Fase B — sube PDF final, despacha)
 PATCH  /memorandum/vincular-archivo
-GET    /memorandum/firmantes          (solo admin)
-POST   /memorandum/firmantes          (solo admin)
-POST   /memorandum/firmantes/:id/imagen (solo admin)
+GET    /memorandum/firmantes          (admin, of.partes)
+POST   /memorandum/firmantes          (admin, of.partes)
+POST   /memorandum/firmantes/:id/imagen (admin, of.partes)
 
 # Usuarios (solo admin)
 GET    /usuarios                (q, pagina)
@@ -279,7 +289,7 @@ GET    /reportes/dashboard      (requireModule 'dashboard')
 GET    /reportes/actividad-reciente (requireModule 'dashboard')
 GET    /reportes/exportar       (requireModule 'reportes' → CSV con BOM)
 
-# Búsqueda
+# Búsqueda (filtrada por servicio del usuario, salvo admin/todosServicios)
 GET    /busqueda                (q, tipo: documentos|tramites|funcionarios|todos, pagina)
 
 # Catálogos
@@ -368,11 +378,14 @@ git checkout <commit_hash> -- frontend/src/
 ## Seguridad
 
 - **Login de BD:** `doc360_app` (no `sa`) — permisos limitados a la base SISDOC
-- **Contraseñas:** bcrypt $2b$12 — columna legacy `clave` sin texto plano
-- **JWT:** Access token 15 min + Refresh token 7 días (httpOnly cookie, revocable)
+- **Contraseñas:** bcrypt $2b$12 — un reset ya no escribe la contraseña nueva en texto plano en `usuario.clave`
+- **JWT:** Access token 15 min + Refresh token 7 días (httpOnly cookie, revocable), verificado también contra BD (`expires_at`/`revoked_at`)
 - **CORS:** Lista explícita de orígenes permitidos
 - **Rate limiting:** 20 intentos de login por 15 minutos en producción
-- **Uploads:** Validación de extensión y tamaño en servidor + cliente
+- **Uploads:** Validación de extensión y tamaño en servidor + cliente; descarga/preview/listado restringidos al servicio del documento asociado
+- **Visibilidad por servicio:** aplicada de forma consistente en documentos, bandeja, búsqueda, buscar-por-número, reportes, archivos y transiciones de estado — un usuario sin `todosServicios` solo ve/opera documentos de su propia dependencia
+- **`todosServicios` (bypass total):** fail-closed por defecto (BD, creación de usuario, claim JWT); solo `admin` puede otorgarlo
+- **Correlativos de memorándum:** asignación transaccional (`TABLOCKX+HOLDLOCK`), con rollback automático si la firma falla — ver [CLAUDE.md](CLAUDE.md#correlativos-de-memorándum--integridad-transaccional-crítico)
 - **SQL:** `Page Verify = CHECKSUM` activo — detección de corrupción
 - **Puerto SQL:** `127.0.0.1:11433` — no accesible desde red externa
 - El `.env` **nunca** debe subirse a Git (listado en `.gitignore`)
@@ -501,6 +514,8 @@ Variables críticas que deben configurarse antes del primer arranque:
 - [x] Fase 3e: Rediseño visual completo — glassmorphism + iconos 3D en las 17 pantallas (2026-06-25)
 - [x] Fase 3f: Limpieza de Prisma sin uso y documentación legacy obsoleta (2026-06-25)
 - [x] Fase 3g: Paginación real en Historial de Alertas y Jefaturas (2026-06-25)
+- [x] Fase 3h: Firma Simple DOC360 (mecanismo de firma interno) + Memorándum institucional real
+- [x] Fase 3i: Auditoría técnica integral — rollback de correlativos, visibilidad por servicio, trazabilidad de firma (2026-07-09, ver `INFORME_AUDITORIA_DOC360.md`)
 - [ ] Fase 4: Notificaciones en tiempo real (WebSocket)
 - [ ] Fase 5: Tests automatizados (Vitest + Supertest)
 - [ ] Fase 6: CI/CD pipeline, modo oscuro, firma digital completa

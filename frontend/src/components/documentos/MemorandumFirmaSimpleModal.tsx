@@ -31,6 +31,8 @@ export interface MemorandumFirmaSimpleModalProps {
   referencia:      string;
   cuerpo:          string;
   destinosNombres: string[];
+  /** Destinatario específico del memorándum (persona) — null solo si es "reservado" */
+  destinatario:    { nombre: string; cargo: string } | null;
   origenNombre:    string;
   firmante:        FirmanteFirmaSimple;
   archivos:        File[];
@@ -42,7 +44,7 @@ type Fase = 'cargando' | 'preview' | 'firmando' | 'error';
 export function MemorandumFirmaSimpleModal({
   open, onClose,
   docPayload, referencia, cuerpo,
-  destinosNombres, origenNombre, firmante,
+  destinosNombres, destinatario, origenNombre, firmante,
   archivos, onNavigate,
 }: MemorandumFirmaSimpleModalProps) {
   const [fase, setFase]         = useState<Fase>('cargando');
@@ -51,6 +53,7 @@ export function MemorandumFirmaSimpleModal({
   const [password, setPassword] = useState('');
   const [declaro, setDeclaro]   = useState(false);
   const objUrlRef = useRef<string | null>(null);
+  const idDocumentoCreadoRef = useRef<number | null>(null);
 
   function liberarUrl() {
     if (objUrlRef.current) { URL.revokeObjectURL(objUrlRef.current); objUrlRef.current = null; }
@@ -75,6 +78,7 @@ export function MemorandumFirmaSimpleModal({
           fechaDocumento:    docPayload.fechaDocumento ?? null,
           origen:            origenNombre,
           destinos:          destinosNombres,
+          destinatario,
           materia:           docPayload.materia,
           referencia:        referencia || null,
           cuerpo,
@@ -123,6 +127,7 @@ export function MemorandumFirmaSimpleModal({
         { ...docPayload, despacharAhora: false }
       );
       const idDocumento = docRes.data.data.idDocumento;
+      idDocumentoCreadoRef.current = idDocumento;
 
       // 2. Asignar correlativo definitivo
       const corrRes = await apiClient.post<{ ok: boolean; data: { correlativo: string } }>(
@@ -137,6 +142,8 @@ export function MemorandumFirmaSimpleModal({
           tipoFirmante:   firmante.tipo,
           firmaTimbreRuta: firmante.firmaTimbreUrl,
           idDependencia:  firmante.idDependencia,
+          nombreDestinatario: destinatario?.nombre,
+          cargoDestinatario:  destinatario?.cargo,
         }
       );
       const { correlativo } = corrRes.data.data;
@@ -150,6 +157,7 @@ export function MemorandumFirmaSimpleModal({
         correlativo, esBorrador: false,
         fechaDocumento:   docPayload.fechaDocumento ?? null,
         origen:           origenNombre, destinos: destinosNombres,
+        destinatario,
         materia:          docPayload.materia, referencia: referencia || null, cuerpo,
         nombreFirmante:   firmante.nombre, cargoFirmante: firmante.cargo,
         firmaTimbreBase64: null, firmaTimbreNatW: 0, firmaTimbreNatH: 0,
@@ -226,13 +234,33 @@ export function MemorandumFirmaSimpleModal({
       }
 
       liberarUrl();
+      idDocumentoCreadoRef.current = null;
       onNavigate(idDocumento);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
         ?? 'Error al procesar la Firma Simple. Intenta nuevamente.';
-      setErrorMsg(msg);
+
+      // El documento ya se creó y el correlativo ya se consumió (pasos 1-2)
+      // antes de que fallara algún paso posterior — revertir automáticamente
+      // para no dejarlo huérfano ni desperdiciar el número de memorándum.
+      const idPendiente = idDocumentoCreadoRef.current;
+      if (idPendiente != null) {
+        try {
+          await apiClient.delete(`/memorandum/${idPendiente}/pendiente`);
+          idDocumentoCreadoRef.current = null;
+          setErrorMsg(`${msg} El documento fue revertido automáticamente — el número de memorándum no fue consumido. Puedes intentarlo de nuevo.`);
+          toast.error('Firma no completada — el documento fue revertido automáticamente.');
+        } catch {
+          // Best-effort: si la reversión también falla, se mantiene la
+          // recuperación manual como red de seguridad.
+          setErrorMsg(`${msg} El documento puede haberse creado pero no fue despachado. Puedes intentarlo nuevamente desde el detalle del documento.`);
+          toast.error(msg);
+        }
+      } else {
+        setErrorMsg(msg);
+        toast.error(msg);
+      }
       setFase('error');
-      toast.error(msg);
     }
   }
 
@@ -318,6 +346,14 @@ export function MemorandumFirmaSimpleModal({
                   {firmante.tipo === 'SUBROGANTE'   && <p className="text-xs text-amber-600">Subrogante 1</p>}
                   {firmante.tipo === 'SUBROGANTE_2' && <p className="text-xs text-amber-600">Subrogante 2</p>}
                 </div>
+
+                {destinatario && (
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+                    <p className="text-xs text-muted-foreground">Destinatario</p>
+                    <p className="text-sm font-medium">{destinatario.nombre}</p>
+                    <p className="text-xs text-muted-foreground">{destinatario.cargo}</p>
+                  </div>
+                )}
 
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Está a punto de firmar electrónicamente mediante <strong>Firma Simple DOC360</strong> este memorándum.

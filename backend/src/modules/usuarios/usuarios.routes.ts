@@ -100,7 +100,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       apellidos:       row.apellidos,
       idDependencia:   row.id_dependencia,
       descDependencia: row.desc_dependencia,
-      todosServicios:  row.todos_servicios ?? true,
+      todosServicios:  row.todos_servicios ?? false,
       roles:           row.roles ? row.roles.split(',') : ['funcionario'],
     });
   } catch (e) { next(e); }
@@ -121,6 +121,11 @@ router.post('/', validate(crearUsuarioSchema), async (req: Request, res: Respons
     const actorCreador = (req as unknown as import('../../shared/types/api.types').AuthenticatedRequest).user;
     if (roles !== undefined && !actorCreador.roles.includes('admin')) {
       sendError(res, 'Solo administradores pueden asignar roles', 403); return;
+    }
+    // Mismo gate que roles: solo admin puede otorgar acceso a todos los
+    // servicios (bypass total de visibilidad) al crear un usuario.
+    if (todos_servicios === true && !actorCreador.roles.includes('admin')) {
+      sendError(res, 'Solo administradores pueden otorgar acceso a todos los servicios', 403); return;
     }
 
     const pool = await getPool();
@@ -162,7 +167,9 @@ router.post('/', validate(crearUsuarioSchema), async (req: Request, res: Respons
 
     // Crear usuario — clave en texto plano (max 10 chars, se hashea en primer login)
     const claveCorta = clave.substring(0, 10);
-    const todosServ  = todos_servicios !== false; // default true
+    // Fail-closed: acceso a todos los servicios default false — solo admin
+    // puede otorgarlo explícitamente (ver chequeo de rol más abajo).
+    const todosServ  = todos_servicios === true;
     const emailVal   = email ? email.substring(0, 100).toLowerCase() : null;
     const usrRes = await pool.request()
       .input('usuario',         sql.VarChar(10),  usuario.substring(0, 10))
@@ -216,6 +223,12 @@ router.patch('/:id', validate(actualizarUsuarioSchema), async (req: Request, res
     // Solo administradores pueden modificar roles
     if (roles !== undefined && !currentUser.roles.includes('admin')) {
       sendError(res, 'Solo administradores pueden modificar roles', 403); return;
+    }
+    // Solo administradores pueden modificar el acceso a todos los servicios
+    // (bypass total de visibilidad) — antes cualquier rol con el módulo
+    // 'usuarios' asignado podía otorgárselo a cualquiera.
+    if (todos_servicios !== undefined && !currentUser.roles.includes('admin')) {
+      sendError(res, 'Solo administradores pueden modificar el acceso a todos los servicios', 403); return;
     }
 
     // Validar formato email si se provee

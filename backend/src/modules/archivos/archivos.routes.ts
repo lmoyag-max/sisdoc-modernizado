@@ -91,17 +91,44 @@ async function findArchivo(id: number) {
   const pool = await getPool();
   const r = await pool.request()
     .input('id', sql.Int, id)
-    .query<{ id_archivo_digital: number; archivo: string | null; ruta: string | null }>(`
-      SELECT id_archivo_digital, archivo, ruta FROM archivo_digital WHERE id_archivo_digital = @id
+    .query<{ id_archivo_digital: number; id_documento: number | null; archivo: string | null; ruta: string | null }>(`
+      SELECT id_archivo_digital, id_documento, archivo, ruta FROM archivo_digital WHERE id_archivo_digital = @id
     `);
   return r.recordset[0] ?? null;
+}
+
+// Mismo criterio ya usado en POST /upload y DELETE /:id — sin esto, cualquier
+// usuario autenticado podía previsualizar/descargar cualquier archivo del
+// sistema por ID, sin relación alguna con el documento asociado.
+async function usuarioTieneAccesoArchivo(user: AuthenticatedRequest['user'], idDocumento: number | null): Promise<boolean> {
+  if (user.roles.includes('admin') || user.roles.includes('of.partes') || user.todosServicios) return true;
+  if (idDocumento == null) return true; // archivo legacy sin documento asociado — sin criterio de servicio posible
+  const idDep = user.idDependencia;
+  if (!idDep) return false;
+  const pool = await getPool();
+  const r = await pool.request()
+    .input('idDoc', sql.Int, idDocumento)
+    .input('idDep', sql.Int, idDep)
+    .query<{ ok: number }>(`
+      SELECT TOP 1 1 AS ok FROM tramite
+      WHERE id_documento = @idDoc
+        AND (
+          (id_destino     = @idDep AND tipo_destinatario = 'D')
+          OR (id_procedencia = @idDep AND tipo_procedencia  = 'D')
+        )
+    `);
+  return !!r.recordset[0];
 }
 
 // ── GET /archivos/:id/preview — visualizar inline ────────────
 router.get('/:id/preview', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const user = (req as unknown as AuthenticatedRequest).user;
     const row = await findArchivo(Number(req.params.id));
     if (!row?.ruta) { res.status(404).send('Archivo no encontrado'); return; }
+    if (!(await usuarioTieneAccesoArchivo(user, row.id_documento))) {
+      res.status(403).send('No tienes acceso a este archivo'); return;
+    }
 
     const filePath = path.resolve(UPLOAD_DIR, row.ruta);
     if (!fs.existsSync(filePath)) { res.status(404).send('Archivo no encontrado en disco'); return; }
@@ -119,8 +146,12 @@ router.get('/:id/preview', async (req: Request, res: Response, next: NextFunctio
 // ── GET /archivos/:id/download — forzar descarga ─────────────
 router.get('/:id/download', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const user = (req as unknown as AuthenticatedRequest).user;
     const row = await findArchivo(Number(req.params.id));
     if (!row?.ruta) { res.status(404).send('Archivo no encontrado'); return; }
+    if (!(await usuarioTieneAccesoArchivo(user, row.id_documento))) {
+      res.status(403).send('No tienes acceso a este archivo'); return;
+    }
 
     const filePath = path.resolve(UPLOAD_DIR, row.ruta);
     if (!fs.existsSync(filePath)) { res.status(404).send('Archivo no encontrado en disco'); return; }
@@ -324,6 +355,7 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
 // ── GET /archivos ────────────────────────────────────────────
 router.get('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const user = (req as unknown as AuthenticatedRequest).user;
     const pool = await getPool();
     const { idDocumento } = req.query;
     const request = pool.request();
@@ -331,6 +363,20 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
     if (idDocumento && !isNaN(Number(idDocumento))) {
       request.input('idDocumento', sql.Int, Number(idDocumento));
       where += ' AND a.id_documento = @idDocumento';
+    }
+    // Mismo criterio de servicio que preview/download/upload/delete — sin
+    // esto, el listado exponía metadata de archivos de cualquier servicio.
+    if (!user.roles.includes('admin') && !user.roles.includes('of.partes') && !user.todosServicios) {
+      if (!user.idDependencia) {
+        where += ' AND 1=0';
+      } else {
+        request.input('idDep', sql.Int, user.idDependencia);
+        where += ` AND (a.id_documento IS NULL OR EXISTS (
+          SELECT 1 FROM tramite t_f WHERE t_f.id_documento = a.id_documento
+          AND ((t_f.id_destino = @idDep AND t_f.tipo_destinatario = 'D')
+            OR (t_f.id_procedencia = @idDep AND t_f.tipo_procedencia = 'D'))
+        ))`;
+      }
     }
     const result = await request.query<{
       id_archivo_digital: number; id_documento: number | null;

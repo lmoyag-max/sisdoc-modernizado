@@ -78,7 +78,6 @@ export const filtrosDocumentoSchema = z.object({
   q: z.string().optional(),
   idTipo: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
   idEstado: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
-  idDependencia: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
   fechaDesde: z.string().optional(),
   fechaHasta: z.string().optional(),
   pagina: z.string().default('1').transform(Number),

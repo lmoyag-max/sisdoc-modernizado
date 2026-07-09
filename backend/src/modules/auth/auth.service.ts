@@ -94,7 +94,7 @@ export async function login(dto: LoginDto): Promise<{ user: UserSession; tokens:
     email:           null,
     idDependencia:   row.id_dependencia,
     descDependencia: row.desc_dependencia,
-    todosServicios:  row.todos_servicios ?? true,
+    todosServicios:  row.todos_servicios ?? false,
     roles,
     modulos,
   };
@@ -208,7 +208,7 @@ export async function getMe(idUsuario: number): Promise<UserSession> {
     email:           null,
     idDependencia:   row.id_dependencia,
     descDependencia: row.desc_dependencia,
-    todosServicios:  row.todos_servicios ?? true,
+    todosServicios:  row.todos_servicios ?? false,
     roles,
     modulos,
   };

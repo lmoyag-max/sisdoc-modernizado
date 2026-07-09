@@ -11,8 +11,10 @@ export interface MemorandumData {
   fechaDocumento:  string | null;
   /** Servicio origen (dependencia del usuario creador) */
   origen:          string | null;
-  /** Uno o varios destinos internos/externos */
+  /** Uno o varios destinos internos/externos (nombres de servicio — informativo) */
   destinos:        string[];
+  /** Destinatario específico del memorándum (persona) — null si no aplica (ej. documento reservado) */
+  destinatario?:   { nombre: string; cargo: string } | null;
   materia:         string;
   referencia:      string | null;
   /** Cuerpo completo del memorándum (puede tener saltos de línea) */
@@ -47,9 +49,15 @@ export interface MemorandumData {
 // ── Helpers internos ──────────────────────────────────────────
 
 function fmtFecha(val: string | null | undefined): string {
-  if (!val) return new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' });
+  const opts: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  if (!val) return new Date().toLocaleDateString('es-CL', opts);
   try {
-    return new Date(val).toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' });
+    // val llega como "YYYY-MM-DD" (del <input type="date">) — construir la fecha en
+    // hora LOCAL (no con new Date(val), que la interpreta como medianoche UTC y
+    // retrocede un día al mostrarla en horario de Chile, UTC-3/UTC-4).
+    const [y, m, d] = val.split('T')[0].split('-').map(Number);
+    if (y && m && d) return new Date(y, m - 1, d).toLocaleDateString('es-CL', opts);
+    return new Date(val).toLocaleDateString('es-CL', opts);
   } catch { return val; }
 }
 
@@ -176,7 +184,7 @@ function drawSelloFirmaSimple(
   colores: { principal: [number, number, number]; grisLabel: [number, number, number]; negro: [number, number, number] },
 ): number {
   const cardW   = Math.min(130, cW);
-  const cardX   = mg + (cW - cardW) / 2;
+  const cardX   = mg + cW - cardW; // alineado a la derecha de la página
   const padX    = 5;
   const padTop  = 3.5;
   const imgZoneW = 30;
@@ -248,13 +256,46 @@ function drawSelloFirmaSimple(
 
   const contentBottom = Math.max(ty, imgBottom + padTop);
 
-  // Recuadro dibujado al final, ajustado exactamente al contenido real
-  // (evita descuadres si algún texto envuelve a 2 líneas o la imagen es alta).
-  doc.setDrawColor(...colores.principal);
-  doc.setLineWidth(0.5);
-  doc.rect(cardX, yTop, cardW, contentBottom - yTop, 'S');
-
   return contentBottom;
+}
+
+/**
+ * Dibuja un bloque institucional "DE:" o "A:" — etiqueta a la izquierda
+ * (misma columna que las filas MAT./REF. para que la línea vertical quede
+ * alineada) y, a la derecha, 3 líneas apiladas: nombre (negrita), cargo e
+ * institución. Reemplaza las antiguas filas de una sola línea PARA:/DE:.
+ */
+function drawBloqueParte(
+  doc: jsPDF, label: string, nombre: string, cargo: string, institucion: string,
+  x: number, y: number, labelW: number, totalW: number, blockH: number,
+  colores: { principal: [number, number, number]; grisFondo: [number, number, number]; negro: [number, number, number]; grisLabel: [number, number, number] },
+): void {
+  doc.setFillColor(...colores.grisFondo);
+  doc.rect(x, y, labelW, blockH, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.rect(x, y, totalW, blockH, 'S');
+  doc.line(x + labelW, y, x + labelW, y + blockH);
+
+  doc.setTextColor(...colores.principal);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.text(label, x + 3, y + blockH / 2 + 1);
+
+  const textX = x + labelW + 3;
+  let ty = y + 3.4;
+  doc.setTextColor(...colores.negro);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.text(nombre || '—', textX, ty);
+  ty += 3;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.text(cargo || '—', textX, ty);
+  ty += 3;
+  doc.setTextColor(...colores.grisLabel);
+  doc.setFontSize(6.5);
+  doc.text(institucion, textX, ty);
 }
 
 /** Carga una URL de imagen (pública o con credenciales) como data URL JPEG.
@@ -390,52 +431,48 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
   doc.rect(mg, y + hdrH, cW, 1, 'F');
   y += hdrH + 1 + 3;
 
-  // ── 2. Bloque título MEMORÁNDUM ───────────────────────────────
+  // ── 2. Título + número fusionados: "MEMORÁNDUM N° ..." ─────────
   const tH = 7.5;
   doc.setFillColor(...principal);
   doc.rect(mg, y, cW, tH, 'F');
   doc.setTextColor(...blanco);
   doc.setFontSize(10.5);
   doc.setFont('helvetica', 'bold');
-  doc.text('MEMORÁNDUM INTERNO', mg + cW / 2, y + tH / 2 + 1.8, { align: 'center' });
-  y += tH + 3;
+  const numeroTexto = data.esBorrador ? 'N° [Por asignar — Borrador]' : `N° ${data.correlativo ?? '—'}`;
+  doc.text(`MEMORÁNDUM ${numeroTexto}`, mg + cW / 2, y + tH / 2 + 1.8, { align: 'center' });
+  y += tH + 2.5;
 
-  // ── 3. Correlativo + Fecha ────────────────────────────────────
-  const corrH = 6.5;
-  doc.setFillColor(...grisFondo);
-  doc.rect(mg, y, cW, corrH, 'F');
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.3);
-  doc.rect(mg, y, cW, corrH, 'S');
-
+  // ── 3. Ciudad y fecha (formato institucional) ───────────────────
   doc.setTextColor(...negro);
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'bold');
-  const corrText = data.esBorrador
-    ? 'N° [Por asignar — Borrador]'
-    : `N° ${data.correlativo ?? '—'}`;
-  doc.text(corrText, mg + 3.5, y + corrH / 2 + 1.3);
-
-  const fechaText = fmtFecha(data.fechaDocumento);
-  doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(fechaText, mg + cW - 3.5, y + corrH / 2 + 1.3, { align: 'right' });
-  y += corrH + 3;
+  doc.setFont('helvetica', 'normal');
+  doc.text(`SANTIAGO, ${fmtFecha(data.fechaDocumento)}`, mg + cW, y, { align: 'right' });
+  y += 4.5;
 
-  // ── 4. Tabla PARA / DE / MATERIA / REFERENCIA ─────────────────
-  const rH     = 6.5;
-  const labelW = 28;
-  const valW   = cW - labelW;
+  // ── 4. Bloques DE: / A: — nombre, cargo e institución ───────────
+  const labelW      = 28;
+  const bloqueH     = 11.5;
+  const institucion = BRANDING.nombreInstitucion;
 
-  const destinosStr = data.destinos.length > 0
-    ? data.destinos.join(' / ')
-    : '—';
+  drawBloqueParte(
+    doc, 'DE:', data.nombreFirmante, data.cargoFirmante, institucion,
+    mg, y, labelW, cW, bloqueH, { principal, grisFondo, negro, grisLabel },
+  );
+  y += bloqueH;
 
-  const filasMeta: [string, string][] = [
-    ['PARA:',    destinosStr],
-    ['DE:',      data.origen ?? '—'],
-    ['MATERIA:', data.materia],
-  ];
+  const destNombre = data.destinatario?.nombre ?? (data.destinos[0] ?? '—');
+  const destCargo  = data.destinatario?.cargo ?? '';
+  drawBloqueParte(
+    doc, 'A:', destNombre, destCargo, institucion,
+    mg, y, labelW, cW, bloqueH, { principal, grisFondo, negro, grisLabel },
+  );
+  y += bloqueH;
+
+  // ── 5. MAT.: y REF.: (una línea cada una) ───────────────────────
+  const rH   = 6.5;
+  const valW = cW - labelW;
+
+  const filasMeta: [string, string][] = [['MAT.:', data.materia]];
   if (data.referencia?.trim()) {
     filasMeta.push(['REF.:', data.referencia.trim()]);
   }
@@ -562,11 +599,11 @@ export function generarMemorandumPDF(data: MemorandumData): jsPDF {
     // PDF pre-firma de Firma Simple (antes de la Fase A): todavía no hay
     // código/hash que mostrar. Sin este branch explícito, caería en el
     // sello de FirmaGOB por defecto (rama siguiente) — texto incorrecto
-    // para este mecanismo. Tarjeta compacta centrada, consistente con el
-    // pie de firma final (drawSelloFirmaSimple) pero con borde tenue —
-    // señala visualmente que aún está pendiente.
+    // para este mecanismo. Tarjeta compacta alineada a la derecha,
+    // consistente con el pie de firma final (drawSelloFirmaSimple) pero
+    // con borde tenue — señala visualmente que aún está pendiente.
     const cardW = Math.min(115, cW);
-    const cardX = mg + (cW - cardW) / 2;
+    const cardX = mg + cW - cardW;
     const cx    = cardX + cardW / 2;
     const cardYStart = y;
     let ty = y + 5;

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { getPool, sql } from '../../config/database';
 import { sendSuccess } from '../../shared/utils/response';
+import { AuthenticatedRequest } from '../../shared/types/api.types';
 
 const router = Router();
 router.use(requireAuth);
@@ -11,6 +12,13 @@ function esFTSError(err: unknown): boolean {
   const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
   return msg.includes('full-text') || msg.includes('7601') || msg.includes('7603')
     || msg.includes('7613') || msg.includes('freetext') || msg.includes('not full-text indexed');
+}
+
+// Mismo criterio de acceso usado en reportes.routes.ts / tramite.routes.ts —
+// sin esto, la búsqueda global exponía documentos, trámites y funcionarios
+// de cualquier servicio a cualquier usuario autenticado.
+function hasFullAccess(user: AuthenticatedRequest['user']): boolean {
+  return user.roles.includes('admin') || user.todosServicios === true;
 }
 
 // GET /api/v1/busqueda?q=texto&tipo=documentos|tramites|funcionarios|todos
@@ -26,6 +34,36 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
       sendSuccess(res, { documentos: [], tramites: [], funcionarios: [], total: 0 });
       return;
     }
+
+    const user = (req as unknown as AuthenticatedRequest).user;
+    const full = hasFullAccess(user);
+    const idDep = user.idDependencia;
+
+    const docFilter = full
+      ? ''
+      : idDep
+        ? `AND EXISTS (
+            SELECT 1 FROM tramite t_f
+            WHERE t_f.id_documento = d.id_documento
+            AND (
+              (t_f.id_destino     = @idDep AND t_f.tipo_destinatario = 'D')
+              OR (t_f.id_procedencia = @idDep AND t_f.tipo_procedencia  = 'D')
+            )
+          )`
+        : 'AND 1=0';
+    const tramFilter = full
+      ? ''
+      : idDep
+        ? `AND (
+            (t.id_destino     = @idDep AND t.tipo_destinatario = 'D')
+            OR (t.id_procedencia = @idDep AND t.tipo_procedencia  = 'D')
+          )`
+        : 'AND 1=0';
+    const funcFilter = full
+      ? ''
+      : idDep
+        ? 'AND f.id_dependencia = @idDep'
+        : 'AND 1=0';
 
     const pool = await getPool();
     const like = `%${q}%`;
@@ -65,6 +103,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
               .input('like', sql.NVarChar(200), like)
               .input('offset', sql.Int, offset)
               .input('n', sql.Int, porPagina)
+              .input('idDep', sql.Int, idDep ?? null)
               .query<DocRow>(`
                 SELECT d.id_documento, d.materia, d.num_interno,
                        td.desc_tipo_documento, ed.desc_estado_documento,
@@ -73,9 +112,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
                 FROM documento d
                 LEFT JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
                 LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
-                WHERE CONTAINS(d.materia, @ftsQ)
+                WHERE (CONTAINS(d.materia, @ftsQ)
                    OR CAST(d.num_interno AS NVARCHAR) LIKE @like
-                   OR CAST(d.num_oficial AS NVARCHAR) LIKE @like
+                   OR CAST(d.num_oficial AS NVARCHAR) LIKE @like)
+                  ${docFilter}
                 ORDER BY d.fecha_sistema DESC
                 OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
               `)
@@ -87,12 +127,14 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
               .input('like', sql.NVarChar(200), like)
               .input('offset', sql.Int, offset)
               .input('n', sql.Int, porPagina)
+              .input('idDep', sql.Int, idDep ?? null)
               .query<TramRow>(`
                 SELECT t.id_seguimiento, t.id_documento, d.materia, t.observaciones,
                        t.fecha_sistema, COUNT(*) OVER() AS total
                 FROM tramite t
                 LEFT JOIN documento d ON t.id_documento = d.id_documento
-                WHERE CONTAINS(d.materia, @ftsQ) OR t.observaciones LIKE @like
+                WHERE (CONTAINS(d.materia, @ftsQ) OR t.observaciones LIKE @like)
+                  ${tramFilter}
                 ORDER BY t.fecha_sistema DESC
                 OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
               `)
@@ -102,12 +144,14 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
           ? pool.request()
               .input('ftsQ', sql.NVarChar(200), ftsQ)
               .input('like', sql.NVarChar(200), like)
+              .input('idDep', sql.Int, idDep ?? null)
               .query<FuncRow>(`
                 SELECT TOP 20 f.id_funcionario, f.nombres, f.apellidos, f.rut,
                        d.desc_dependencia
                 FROM funcionario f
                 LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
-                WHERE CONTAINS((f.nombres, f.apellidos), @ftsQ) OR f.rut LIKE @like
+                WHERE (CONTAINS((f.nombres, f.apellidos), @ftsQ) OR f.rut LIKE @like)
+                  ${funcFilter}
                 ORDER BY f.apellidos, f.nombres
               `)
           : Promise.resolve(empty as { recordset: FuncRow[] }),
@@ -123,6 +167,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
               .input('like', sql.NVarChar(200), like)
               .input('offset', sql.Int, offset)
               .input('n', sql.Int, porPagina)
+              .input('idDep', sql.Int, idDep ?? null)
               .query<DocRow>(`
                 SELECT d.id_documento, d.materia, d.num_interno,
                        td.desc_tipo_documento, ed.desc_estado_documento,
@@ -131,9 +176,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
                 FROM documento d
                 LEFT JOIN tipo_documento td ON d.id_tipo_documento = td.id_tipo_documento
                 LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
-                WHERE d.materia LIKE @like
+                WHERE (d.materia LIKE @like
                    OR CAST(d.num_interno AS NVARCHAR) LIKE @like
-                   OR CAST(d.num_oficial AS NVARCHAR) LIKE @like
+                   OR CAST(d.num_oficial AS NVARCHAR) LIKE @like)
+                  ${docFilter}
                 ORDER BY d.fecha_sistema DESC
                 OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
               `)
@@ -144,12 +190,14 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
               .input('like', sql.NVarChar(200), like)
               .input('offset', sql.Int, offset)
               .input('n', sql.Int, porPagina)
+              .input('idDep', sql.Int, idDep ?? null)
               .query<TramRow>(`
                 SELECT t.id_seguimiento, t.id_documento, d.materia, t.observaciones,
                        t.fecha_sistema, COUNT(*) OVER() AS total
                 FROM tramite t
                 LEFT JOIN documento d ON t.id_documento = d.id_documento
-                WHERE d.materia LIKE @like OR t.observaciones LIKE @like
+                WHERE (d.materia LIKE @like OR t.observaciones LIKE @like)
+                  ${tramFilter}
                 ORDER BY t.fecha_sistema DESC
                 OFFSET @offset ROWS FETCH NEXT @n ROWS ONLY
               `)
@@ -158,14 +206,16 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
         tipo === 'funcionarios' || tipo === 'todos'
           ? pool.request()
               .input('like', sql.NVarChar(200), like)
+              .input('idDep', sql.Int, idDep ?? null)
               .query<FuncRow>(`
                 SELECT TOP 20 f.id_funcionario, f.nombres, f.apellidos, f.rut,
                        d.desc_dependencia
                 FROM funcionario f
                 LEFT JOIN dependencia d ON f.id_dependencia = d.id_dependencia
-                WHERE f.nombres LIKE @like
+                WHERE (f.nombres LIKE @like
                    OR f.apellidos LIKE @like
-                   OR f.rut LIKE @like
+                   OR f.rut LIKE @like)
+                  ${funcFilter}
                 ORDER BY f.apellidos, f.nombres
               `)
           : Promise.resolve(empty as { recordset: FuncRow[] }),

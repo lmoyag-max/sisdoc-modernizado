@@ -701,13 +701,62 @@ router.post('/solicitar', async (req: Request, res: Response, next: NextFunction
         WHERE  id_documento = @idDoc AND id_estado_documento = 1
       `);
 
-    await pool.request()
-      .input('idDoc', sql.Int, body.idDocumento)
-      .query(`
-        UPDATE tramite
-        SET    id_estado_tramite = 2, fecha_despacho = GETDATE(), fecha_update = GETDATE()
-        WHERE  id_documento = @idDoc AND id_estado_tramite = 1
+    // Antes esto hacía UPDATE del trámite en estado 1 in-place, sin generar
+    // ningún evento visible en la trazabilidad — un usuario no-admin no
+    // podía ver que el documento fue firmado electrónicamente vía FirmaGob,
+    // ni por quién, ni cuándo. Ahora se inserta un trámite nuevo (mismo
+    // patrón que despacharDocumento en documento.service.ts), preservando
+    // intacto el trámite original.
+    const tramOrigenRes = await pool.request().input('idDoc', sql.Int, body.idDocumento)
+      .query<{
+        id_procedencia: number; id_destino: number;
+        tipo_procedencia: string; tipo_destinatario: string;
+        id_tipo_distribucion: number; id_tipo_compromiso: number;
+        id_estado_compromiso: number; dias_compromiso: number;
+      }>(`
+        SELECT TOP 1 id_procedencia, id_destino, tipo_procedencia, tipo_destinatario,
+               id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso, dias_compromiso
+        FROM tramite WHERE id_documento = @idDoc AND id_estado_tramite = 1
+        ORDER BY fecha_sistema DESC
       `);
+    const tramOrigen = tramOrigenRes.recordset[0];
+    if (tramOrigen) {
+      const obsFirma = `Despachado — firmado vía FirmaGob (${body.nombreFirmante}, ${body.correlativoMemo})`.substring(0, 250);
+      await pool.request()
+        .input('idDoc',    sql.Int,          body.idDocumento)
+        .input('idUsr',    sql.Int,          user.idUsuario)
+        .input('idProc',   sql.Int,          tramOrigen.id_procedencia)
+        .input('idDest',   sql.Int,          tramOrigen.id_destino)
+        .input('tipProc',  sql.Char(1),      tramOrigen.tipo_procedencia)
+        .input('tipDest',  sql.Char(1),      tramOrigen.tipo_destinatario)
+        .input('idTipDis', sql.Int,          tramOrigen.id_tipo_distribucion)
+        .input('idTipCom', sql.Int,          tramOrigen.id_tipo_compromiso)
+        .input('idEstCom', sql.Int,          tramOrigen.id_estado_compromiso)
+        .input('dias',     sql.Int,          tramOrigen.dias_compromiso)
+        .input('obs',      sql.VarChar(250), obsFirma)
+        .query(`
+          INSERT INTO tramite
+            (id_documento, id_usuario, id_procedencia, id_destino,
+             tipo_procedencia, tipo_destinatario,
+             id_tipo_distribucion, id_tipo_compromiso, id_estado_compromiso,
+             id_estado_tramite, dias_compromiso, observaciones,
+             fecha_sistema, fecha_update, fecha_despacho)
+          VALUES
+            (@idDoc, @idUsr, @idProc, @idDest,
+             @tipProc, @tipDest,
+             @idTipDis, @idTipCom, @idEstCom,
+             2, @dias, @obs,
+             GETDATE(), GETDATE(), GETDATE())
+        `);
+    } else {
+      await pool.request()
+        .input('idDoc', sql.Int, body.idDocumento)
+        .query(`
+          UPDATE tramite
+          SET    id_estado_tramite = 2, fecha_despacho = GETDATE(), fecha_update = GETDATE()
+          WHERE  id_documento = @idDoc AND id_estado_tramite = 1
+        `);
+    }
 
     // ── 10. Actualizar historial a Firmado ────────────────────
     await pool.request()

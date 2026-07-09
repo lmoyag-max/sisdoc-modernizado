@@ -19,5 +19,5 @@ export const catalogosApi = {
   dependenciasExternas: () => get<CatalogoItem>('/catalogos/dependencias-externas'),
   descriptores: () => get<CatalogoItem>('/catalogos/descriptores'),
   funcionariosPorDependencia: (idDep: number) =>
-    get<{ id: number; nombre: string; email: string }>(`/catalogos/dependencias/${idDep}/funcionarios`),
+    get<{ id: number; nombre: string; cargo: string | null }>(`/catalogos/dependencias/${idDep}/funcionarios`),
 };

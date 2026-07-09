@@ -650,27 +650,32 @@ export async function softDelete(idDocumento: number, _idUsuario: number): Promi
     `);
   } catch { /* si falla el backup, continuar igual */ }
 
-  // Eliminar en orden para respetar FK:
-  // 1. firma_gob_historial.id_documento es nullable → se desvincula (no se
-  //    borra) para conservar la auditoría de intentos de firma electrónica.
+  // Eliminar en orden para respetar FK, todo en una sola transacción: si
+  // cualquier paso falla (p. ej. una FK nueva no contemplada aquí), nada
+  // queda a medio borrar — antes cada DELETE era un request independiente
+  // y un fallo intermedio dejaba filas huérfanas.
+  // 1. firma_gob_historial.id_documento y memorandum_firma_simple.id_documento
+  //    son nullable → se desvinculan (no se borran) para conservar la
+  //    auditoría de intentos de firma electrónica.
   // 2. memo_generado.id_documento es NOT NULL → debe borrarse antes que
   //    documento. Además memo_generado.id_archivo_digital referencia
   //    archivo_digital, así que debe borrarse ANTES que archivo_digital.
   // 3. documento_destino.id_documento es NOT NULL → antes que documento.
   // 4. archivo_digital y tramite no tienen FK hacia documento, pero se
   //    borran antes por prolijidad (no quedan huérfanos).
-  await pool.request().input('id', sql.Int, idDocumento)
-    .query('UPDATE firma_gob_historial SET id_documento = NULL WHERE id_documento = @id');
-  await pool.request().input('id', sql.Int, idDocumento)
-    .query('DELETE FROM memo_generado WHERE id_documento = @id');
-  await pool.request().input('id', sql.Int, idDocumento)
-    .query('DELETE FROM archivo_digital WHERE id_documento = @id');
-  await pool.request().input('id', sql.Int, idDocumento)
-    .query('DELETE FROM tramite WHERE id_documento = @id');
-  await pool.request().input('id', sql.Int, idDocumento)
-    .query('DELETE FROM documento_destino WHERE id_documento = @id');
-  await pool.request().input('id', sql.Int, idDocumento)
-    .query('DELETE FROM documento WHERE id_documento = @id');
+  await pool.request().input('id', sql.Int, idDocumento).query(`
+    BEGIN TRANSACTION;
 
-  logger.info(`[documentos] Documento ${idDocumento} eliminado por usuario ${_idUsuario} (memo_generado, archivo_digital, tramite y documento_destino asociados también eliminados; firma_gob_historial desvinculado).`);
+    UPDATE firma_gob_historial SET id_documento = NULL WHERE id_documento = @id;
+    UPDATE memorandum_firma_simple SET id_documento = NULL WHERE id_documento = @id;
+    DELETE FROM memo_generado WHERE id_documento = @id;
+    DELETE FROM archivo_digital WHERE id_documento = @id;
+    DELETE FROM tramite WHERE id_documento = @id;
+    DELETE FROM documento_destino WHERE id_documento = @id;
+    DELETE FROM documento WHERE id_documento = @id;
+
+    COMMIT TRANSACTION;
+  `);
+
+  logger.info(`[documentos] Documento ${idDocumento} eliminado por usuario ${_idUsuario} (memo_generado, archivo_digital, tramite y documento_destino asociados también eliminados; firma_gob_historial y memorandum_firma_simple desvinculados) — transaccional.`);
 }

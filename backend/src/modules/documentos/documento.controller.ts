@@ -15,6 +15,22 @@ function canSeeExternals(u: AuthenticatedRequest['user']): boolean {
   return u.roles.includes('admin') || u.roles.includes('of.partes');
 }
 
+// Antes solo `obtener`/`trazabilidad` verificaban pertenencia al documento —
+// las transiciones de flujo (despachar/recepcionar/derivar/terminar/reabrir)
+// solo validaban rol y estado, permitiendo que cualquier usuario con rol
+// genérico operara documentos de cualquier servicio (incluidos reservados,
+// que solo restringen quién puede crearlos, no quién puede operarlos después).
+async function verificarAccesoDocumento(req: Request, res: Response, idDoc: number): Promise<boolean> {
+  const u = user(req);
+  if (hasFullAccess(u)) return true;
+  const tieneAcceso = await service.usuarioTieneAccesoDocumento(idDoc, u.idDependencia, canSeeExternals(u));
+  if (!tieneAcceso) {
+    sendForbidden(res, 'No tienes acceso a este documento');
+    return false;
+  }
+  return true;
+}
+
 // ── Listar documentos (filtrado por servicio) ─────────────────
 
 export async function listar(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -93,7 +109,17 @@ export async function buscarPorNumero(req: Request, res: Response, next: NextFun
       return;
     }
     const rows = await service.buscarDocumentosPorNumero(numero);
-    sendSuccess(res, rows);
+
+    // Sin esto, cualquier usuario autenticado podía iterar números correlativos
+    // y leer documentos (incluidos reservados) de servicios ajenos al suyo.
+    const u = user(req);
+    if (hasFullAccess(u)) { sendSuccess(res, rows); return; }
+    const visibles = [];
+    for (const row of rows) {
+      const tieneAcceso = await service.usuarioTieneAccesoDocumento(row.idDocumento, u.idDependencia, canSeeExternals(u));
+      if (tieneAcceso) visibles.push(row);
+    }
+    sendSuccess(res, visibles);
   } catch (e) { next(e); }
 }
 
@@ -128,35 +154,45 @@ export async function crear(req: Request, res: Response, next: NextFunction): Pr
 
 export async function despachar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const doc = await service.despacharDocumento(Number(req.params.id), req.body, user(req).idUsuario);
+    const idDoc = Number(req.params.id);
+    if (!(await verificarAccesoDocumento(req, res, idDoc))) return;
+    const doc = await service.despacharDocumento(idDoc, req.body, user(req).idUsuario);
     sendSuccess(res, doc, 'Documento despachado');
   } catch (e) { next(e); }
 }
 
 export async function recepcionar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const doc = await service.recepcionarDocumento(Number(req.params.id), req.body, user(req).idUsuario);
+    const idDoc = Number(req.params.id);
+    if (!(await verificarAccesoDocumento(req, res, idDoc))) return;
+    const doc = await service.recepcionarDocumento(idDoc, req.body, user(req).idUsuario);
     sendSuccess(res, doc, 'Documento recepcionado');
   } catch (e) { next(e); }
 }
 
 export async function derivar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const doc = await service.derivarDocumento(Number(req.params.id), req.body, user(req).idUsuario);
+    const idDoc = Number(req.params.id);
+    if (!(await verificarAccesoDocumento(req, res, idDoc))) return;
+    const doc = await service.derivarDocumento(idDoc, req.body, user(req).idUsuario);
     sendSuccess(res, doc, 'Documento derivado');
   } catch (e) { next(e); }
 }
 
 export async function terminar(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const doc = await service.terminarDocumento(Number(req.params.id), req.body, user(req).idUsuario);
+    const idDoc = Number(req.params.id);
+    if (!(await verificarAccesoDocumento(req, res, idDoc))) return;
+    const doc = await service.terminarDocumento(idDoc, req.body, user(req).idUsuario);
     sendSuccess(res, doc, 'Documento terminado');
   } catch (e) { next(e); }
 }
 
 export async function reabrir(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const doc = await service.reabrirDocumento(Number(req.params.id), req.body, user(req).idUsuario);
+    const idDoc = Number(req.params.id);
+    if (!(await verificarAccesoDocumento(req, res, idDoc))) return;
+    const doc = await service.reabrirDocumento(idDoc, req.body, user(req).idUsuario);
     sendSuccess(res, doc, 'Documento reabierto y devuelto a estado Recepcionado');
   } catch (e) { next(e); }
 }
@@ -178,10 +214,12 @@ export async function listarDestinos(req: Request, res: Response, next: NextFunc
 
 export async function recepcionarDestino(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const idDoc = Number(req.params.id);
+    if (!(await verificarAccesoDocumento(req, res, idDoc))) return;
     const idDocDestinoBody = Number(req.body.idDocumentoDestino);
     if (!idDocDestinoBody) { sendError(res, 'idDocumentoDestino es requerido', 400); return; }
     const doc = await service.recepcionarDestino(
-      Number(req.params.id), idDocDestinoBody, req.body.observaciones, user(req).idUsuario,
+      idDoc, idDocDestinoBody, req.body.observaciones, user(req).idUsuario,
     );
     sendSuccess(res, doc, 'Destino recepcionado');
   } catch (e) { next(e); }
@@ -189,10 +227,12 @@ export async function recepcionarDestino(req: Request, res: Response, next: Next
 
 export async function terminarDestino(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const idDoc = Number(req.params.id);
+    if (!(await verificarAccesoDocumento(req, res, idDoc))) return;
     const idDocDestinoBody = Number(req.body.idDocumentoDestino);
     if (!idDocDestinoBody) { sendError(res, 'idDocumentoDestino es requerido', 400); return; }
     const doc = await service.terminarDestino(
-      Number(req.params.id), idDocDestinoBody, req.body.observaciones, user(req).idUsuario,
+      idDoc, idDocDestinoBody, req.body.observaciones, user(req).idUsuario,
     );
     sendSuccess(res, doc, 'Destino cerrado');
   } catch (e) { next(e); }

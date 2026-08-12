@@ -40,8 +40,8 @@ export async function listar(req: Request, res: Response, next: NextFunction): P
       ? null
       : { idDependencia: u.idDependencia, verExternos: canSeeExternals(u) };
 
-    const { data, meta } = await service.listarDocumentos(req.query as never, filtroServicio);
-    sendPaginated(res, data, meta);
+    const { data, meta, resumen } = await service.listarDocumentos(req.query as never, filtroServicio);
+    sendPaginated(res, data, meta, { resumen });
   } catch (e) { next(e); }
 }
 

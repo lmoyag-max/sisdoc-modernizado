@@ -78,8 +78,15 @@ export const filtrosDocumentoSchema = z.object({
   q: z.string().optional(),
   idTipo: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
   idEstado: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
+  // Servicio actualmente responsable del documento (destino del último trámite).
+  // Solo tiene efecto para usuarios con acceso total (admin / todos_servicios) —
+  // para el resto, la visibilidad ya está acotada a su propio servicio.
+  idDependencia: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
   fechaDesde: z.string().optional(),
   fechaHasta: z.string().optional(),
+  soloAtrasados: z.string().optional().transform((v) => v === 'true'),
+  proximoAVencer: z.string().optional().transform((v) => v === 'true'),
+  orden: z.enum(['fecha_desc', 'fecha_asc', 'antiguedad_desc', 'antiguedad_asc']).default('fecha_desc'),
   pagina: z.string().default('1').transform(Number),
   porPagina: z.string().default('20').transform(Number),
 });

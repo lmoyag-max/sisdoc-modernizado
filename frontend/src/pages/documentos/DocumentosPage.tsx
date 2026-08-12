@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { Plus, Search, FileText, Lock, Paperclip, ArrowUpDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Plus, Search, FileText, Lock, Paperclip, ArrowUpDown, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -11,21 +11,30 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { documentosApi, type FiltrosDocumento } from '@/lib/api/documentos.api';
 import { formatFechaHora, cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
-
-const ESTADO_BADGE: Record<number, { label: string; variant: 'info' | 'warning' | 'success' | 'secondary' | 'purple' }> = {
-  1: { label: 'Nuevo',        variant: 'info' },
-  2: { label: 'Recepcionado', variant: 'secondary' },
-  3: { label: 'Derivado',     variant: 'warning' },
-  4: { label: 'En proceso',   variant: 'purple' },
-  5: { label: 'Cerrado',      variant: 'success' },
-};
+import { getEstadoMeta, useEstadosDocumento } from '@/lib/estadoDocumento';
 
 export function DocumentosPage() {
-  const [filtros, setFiltros] = useState<FiltrosDocumento>({ pagina: 1, porPagina: 20 });
+  // Filtros iniciales desde la URL (?idEstado=&idTipo=&idDependencia=) — permite que
+  // "Ver todos" desde el panel del Dashboard llegue aquí con el mismo filtro aplicado.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paramNum = (key: string) => { const v = searchParams.get(key); return v ? Number(v) : undefined; };
+
+  const [filtros, setFiltros] = useState<FiltrosDocumento>({
+    pagina: 1, porPagina: 20,
+    idEstado:      paramNum('idEstado'),
+    idTipo:        paramNum('idTipo'),
+    idDependencia: paramNum('idDependencia'),
+  });
   const [search, setSearch]   = useState('');
   const debouncedSearch       = useDebounce(search, 300);
+  const { getLabel } = useEstadosDocumento();
 
   const queryFiltros: FiltrosDocumento = { ...filtros, q: debouncedSearch || undefined };
+
+  const limpiarFiltroEstado = () => {
+    setFiltros((f) => ({ ...f, idEstado: undefined, pagina: 1 }));
+    setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete('idEstado'); return next; }, { replace: true });
+  };
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['documentos', queryFiltros],
@@ -66,7 +75,7 @@ export function DocumentosPage() {
 
       {/* Barra de filtros */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -87,6 +96,22 @@ export function DocumentosPage() {
               Filtros
             </Button>
           </div>
+          {filtros.idEstado != null && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground">Filtrando por:</span>
+              <Badge variant="secondary" className="gap-1.5 pr-1">
+                Estado: {getLabel(filtros.idEstado)}
+                <button
+                  type="button"
+                  onClick={limpiarFiltroEstado}
+                  className="rounded-full p-0.5 hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  aria-label="Quitar filtro de estado"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -118,7 +143,8 @@ export function DocumentosPage() {
           ))
         ) : documentos.length === 0 ? null : (
           documentos.map((doc) => {
-            const badge = ESTADO_BADGE[doc.estadoDocumento?.id ?? 0] ?? { label: 'Desconocido', variant: 'secondary' as const };
+            const badge = getEstadoMeta(doc.estadoDocumento?.id);
+            const estadoLabel = doc.estadoDocumento?.descripcion ?? 'Desconocido';
             return (
               <Link key={doc.idDocumento} to={`/documentos/${doc.idDocumento}`} className="block">
                 <Card className={cn(
@@ -141,7 +167,7 @@ export function DocumentosPage() {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
-                        <Badge variant={badge.variant}>{badge.label}</Badge>
+                        <Badge variant={badge.badgeVariant}>{estadoLabel}</Badge>
                         {doc.reservado && <span className="text-[10px] text-violet-600 dark:text-violet-400 font-medium">Reservado</span>}
                       </div>
                     </div>
@@ -209,7 +235,8 @@ export function DocumentosPage() {
               ) : (
                 <div className={cn('divide-y', isFetching && 'opacity-60 transition-opacity')}>
                   {documentos.map((doc) => {
-                    const badge = ESTADO_BADGE[doc.estadoDocumento?.id ?? 0] ?? { label: 'Desconocido', variant: 'secondary' as const };
+                    const badge = getEstadoMeta(doc.estadoDocumento?.id);
+                    const estadoLabel = doc.estadoDocumento?.descripcion ?? 'Desconocido';
                     return (
                       <Link
                         key={doc.idDocumento}
@@ -251,7 +278,7 @@ export function DocumentosPage() {
                           </span>
                         </div>
                         <div className="col-span-2 flex items-center gap-1.5">
-                          <Badge variant={badge.variant}>{badge.label}</Badge>
+                          <Badge variant={badge.badgeVariant}>{estadoLabel}</Badge>
                           {doc.reservado && (
                             <span className="hidden xl:inline text-[10px] font-medium text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-1.5 py-0.5 rounded-full">
                               Reservado

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   FileText, Clock, CheckCircle2, Activity, ArrowRight,
-  Lock, Send, Inbox, Plus, TrendingUp, Zap, ChevronRight,
+  Lock, Plus, TrendingUp, Zap, ChevronRight,
   PieChart as PieIcon,
   Sparkles, CalendarDays,
 } from 'lucide-react';
@@ -19,9 +19,11 @@ import { reportesApi } from '@/lib/api/reportes.api';
 import { useAuthStore, displayName } from '@/stores/auth.store';
 import { useRole } from '@/hooks/useRole';
 import { formatRelativo, truncate, cn, iniciales } from '@/lib/utils';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useEstadosDocumento } from '@/lib/estadoDocumento';
+import { DocumentosPanel } from '@/components/dashboard/DocumentosPanel';
 
 // ── Mapeo visual ────────────────────────────────────────────────
 const ESTADO_COLORES: Record<number, string> = {
@@ -160,13 +162,27 @@ interface PipelineStageProps {
   accent: string;
   isLast?: boolean;
   loading?: boolean;
+  active?: boolean;
+  onClick?: () => void;
 }
 
-function PipelineStage({ icon: Icon, label, count, accent, isLast, loading }: PipelineStageProps) {
+function PipelineStage({ icon: Icon, label, count, accent, isLast, loading, active, onClick }: PipelineStageProps) {
   const a = ACCENTS[accent] ?? ACCENTS.slate;
   return (
     <div className="flex items-center flex-1 min-w-0">
-      <div className="flex-1 min-w-0 flex flex-col items-center gap-2.5 p-3 sm:p-4 group">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={loading}
+        aria-pressed={active}
+        aria-label={`Ver documentos ${label.toLowerCase()} — ${count} en total`}
+        className={cn(
+          'flex-1 min-w-0 flex flex-col items-center gap-2.5 p-3 sm:p-4 group rounded-xl transition-colors cursor-pointer',
+          'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+          'disabled:cursor-default disabled:hover:bg-transparent',
+          active && 'bg-muted/60 ring-1 ring-inset ring-primary/40',
+        )}
+      >
         <div className={cn('icon-3d h-12 w-12 sm:h-14 sm:w-14 shrink-0 transition-transform duration-300 group-hover:-translate-y-1', a.icon3d)}>
           <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white drop-shadow relative z-10" />
         </div>
@@ -177,9 +193,9 @@ function PipelineStage({ icon: Icon, label, count, accent, isLast, loading }: Pi
           }
           <p className="text-xs text-muted-foreground font-medium truncate">{label}</p>
         </div>
-      </div>
+      </button>
       {!isLast && (
-        <div className="hidden sm:flex items-center px-1 shrink-0 pipeline-arrow">
+        <div className="hidden sm:flex items-center px-1 shrink-0 pipeline-arrow" aria-hidden="true">
           <ChevronRight className="h-5 w-5 animate-arrow-float" />
         </div>
       )}
@@ -221,6 +237,20 @@ export function DashboardPage() {
   const user    = useAuthStore((s) => s.user);
   const nombre  = displayName(user);
   const { puedeVerReservados } = useRole();
+  const { estadosPipeline } = useEstadosDocumento();
+
+  // Estado del panel lateral persistido en la URL — si el usuario navega y vuelve
+  // al dashboard, el panel se reabre en el mismo estado seleccionado.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const panelParam = searchParams.get('panelEstado');
+  const estadoPanel = panelParam ? Number(panelParam) : null;
+  const setEstadoPanel = (id: number | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id == null) next.delete('panelEstado'); else next.set('panelEstado', String(id));
+      return next;
+    }, { replace: true });
+  };
 
   const { data: dashboard, isLoading: loadingDash } = useQuery({
     queryKey: ['dashboard'],
@@ -258,16 +288,15 @@ export function DashboardPage() {
     ratio > 0.05 || urgentes > 8  ? 'atencion' :
     'normal';
 
-  // Pipeline — cuenta por estado
-  const getCount = (ids: number[]) =>
-    dashboard?.porEstado?.filter(e => ids.includes(e.id_estado_documento)).reduce((s, e) => s + e.cantidad, 0) ?? 0;
+  // Pipeline — cuenta por estado real (1 = Registrado, 2 = Despachado, 3 = Recepcionado,
+  // 4 = Terminado — confirmado contra las transiciones del backend, ver documento.repository.ts).
+  // Antes esta lista agrupaba estados de forma arbitraria y etiquetaba mal el id 4 como
+  // "En Proceso" (en realidad es "Terminado"), lo que producía cifras distintas a las del
+  // gráfico "Por estado" pese a venir de la misma fuente de datos (dashboard.porEstado).
+  const getCount = (id: number) =>
+    dashboard?.porEstado?.find((e) => e.id_estado_documento === id)?.cantidad ?? 0;
 
-  const pipelineStages = [
-    { ids: [1, 2], label: 'Despachados',   icon: Send,         accent: 'indigo' },
-    { ids: [3],    label: 'Recepcionados', icon: Inbox,        accent: 'sky' },
-    { ids: [4],    label: 'En Proceso',    icon: Activity,     accent: 'amber' },
-    { ids: [5],    label: 'Terminados',    icon: CheckCircle2, accent: 'emerald' },
-  ];
+  const pipelineStages = estadosPipeline.map((e) => ({ ...e, count: getCount(e.id) }));
 
   const creadosHoy  = dashboard?.totales.creadosHoy  ?? 0;
   const cerradosHoy = dashboard?.totales.cerradosHoy ?? 0;
@@ -394,13 +423,15 @@ export function DashboardPage() {
           <div className="flex items-stretch overflow-x-auto">
             {pipelineStages.map((stage, i) => (
               <PipelineStage
-                key={stage.label}
+                key={stage.id}
                 icon={stage.icon}
                 label={stage.label}
-                count={getCount(stage.ids)}
+                count={stage.count}
                 accent={stage.accent}
                 isLast={i === pipelineStages.length - 1}
                 loading={loadingDash}
+                active={estadoPanel === stage.id}
+                onClick={() => setEstadoPanel(stage.id)}
               />
             ))}
           </div>
@@ -505,8 +536,17 @@ export function DashboardPage() {
                         cornerRadius={6}
                         stroke="none"
                       >
-                        {(dashboard?.porEstado ?? []).map((_, i) => (
-                          <Cell key={i} fill={`url(#pieGrad${i})`} />
+                        {(dashboard?.porEstado ?? []).map((entry, i) => (
+                          <Cell
+                            key={i}
+                            fill={`url(#pieGrad${i})`}
+                            className="cursor-pointer focus-visible:outline-none"
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`Ver documentos en estado ${entry.desc_estado_documento ?? 'sin estado'}`}
+                            onClick={() => setEstadoPanel(entry.id_estado_documento)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEstadoPanel(entry.id_estado_documento); } }}
+                          />
                         ))}
                       </Pie>
                       <Tooltip content={<PieChartTooltip />} />
@@ -521,11 +561,23 @@ export function DashboardPage() {
                 </div>
                 <div className="space-y-2">
                   {(dashboard?.porEstado ?? []).map((estado) => {
-                    const color = ESTADO_COLORES[estado.id_estado_documento] ?? '#94a3b8';
-                    const total = dashboard?.totales.total ?? 1;
-                    const pct   = Math.round((estado.cantidad / total) * 100);
+                    const color  = ESTADO_COLORES[estado.id_estado_documento] ?? '#94a3b8';
+                    const total  = dashboard?.totales.total ?? 1;
+                    const pct    = Math.round((estado.cantidad / total) * 100);
+                    const active = estadoPanel === estado.id_estado_documento;
                     return (
-                      <div key={estado.id_estado_documento} className="space-y-1">
+                      <button
+                        type="button"
+                        key={estado.id_estado_documento}
+                        onClick={() => setEstadoPanel(estado.id_estado_documento)}
+                        aria-pressed={active}
+                        aria-label={`Ver documentos en estado ${estado.desc_estado_documento ?? 'sin estado'} — ${estado.cantidad} en total`}
+                        className={cn(
+                          'w-full text-left space-y-1 rounded-lg px-1.5 py-1 -mx-1.5 transition-colors',
+                          'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          active && 'bg-muted/60',
+                        )}
+                      >
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
                             <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
@@ -536,7 +588,7 @@ export function DashboardPage() {
                         <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -613,6 +665,8 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      <DocumentosPanel idEstado={estadoPanel} onClose={() => setEstadoPanel(null)} />
     </div>
   );
 }

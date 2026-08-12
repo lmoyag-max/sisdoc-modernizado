@@ -10,6 +10,7 @@ export interface ApiResponse<T = unknown> {
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   meta: PaginationMeta;
+  [extra: string]: unknown;
 }
 
 export interface PaginationMeta {

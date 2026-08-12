@@ -26,6 +26,19 @@ export interface DocumentoRow {
   total: number;
   // Correlativo de memorándum (poblado en findMany y findById; ausente en findByNumero)
   correlativo_memo?: string | null;
+  // Campos derivados del último trámite — poblados solo en findMany()
+  id_destino_actual?: number | null;
+  desc_destino_actual?: string | null;
+  id_tipo_compromiso_actual?: number | null;
+  dias_compromiso_actual?: number | null;
+  dias_transcurridos?: number | null;
+  urgente?: number;
+  atrasado?: number;
+  proximo_a_vencer?: number;
+  total_urgentes?: number;
+  total_atrasados?: number;
+  total_proximos?: number;
+  antiguedad_promedio?: number | null;
 }
 
 export interface TramiteRow {
@@ -60,12 +73,25 @@ interface FiltroServicioRepo {
   verExternos:   boolean;
 }
 
+// Umbral de "próximo a vencer": días restantes <= este valor y aún no atrasado.
+const DIAS_PROXIMO_A_VENCER = 2;
+
+// Sin alias de tabla: el ORDER BY corre sobre la consulta externa, que selecciona
+// desde la CTE `base` (ya sin el alias `d` del documento original).
+const ORDEN_SQL: Record<FiltrosDocumentoDto['orden'], string> = {
+  fecha_desc:       'fecha_sistema DESC',
+  fecha_asc:        'fecha_sistema ASC',
+  antiguedad_desc:  'dias_transcurridos DESC',
+  antiguedad_asc:   'dias_transcurridos ASC',
+};
+
 export async function findMany(filtros: FiltrosDocumentoDto, filtroServicio?: FiltroServicioRepo | null): Promise<DocumentoRow[]> {
   const pool = await getPool();
   const offset = (filtros.pagina - 1) * filtros.porPagina;
   const request = pool.request()
     .input('offset', sql.Int, offset)
-    .input('porPagina', sql.Int, filtros.porPagina);
+    .input('porPagina', sql.Int, filtros.porPagina)
+    .input('diasProximo', sql.Int, DIAS_PROXIMO_A_VENCER);
 
   let where = '1=1';
   if (filtros.q) {
@@ -76,6 +102,10 @@ export async function findMany(filtros: FiltrosDocumentoDto, filtroServicio?: Fi
   if (filtros.idEstado)  { request.input('idEstado',  sql.Int,  filtros.idEstado);                  where += ' AND d.id_estado_documento = @idEstado'; }
   if (filtros.fechaDesde){ request.input('fechaDesde',sql.Date, new Date(filtros.fechaDesde));       where += ' AND d.fecha_sistema >= @fechaDesde'; }
   if (filtros.fechaHasta){ request.input('fechaHasta',sql.Date, new Date(filtros.fechaHasta));       where += ' AND d.fecha_sistema <= @fechaHasta'; }
+  // Servicio actualmente responsable (destino del último trámite) — combinable con el filtro
+  // de visibilidad de abajo: si el usuario no tiene acceso total, la intersección de ambos
+  // simplemente no devuelve filas cuando pide un servicio que no es el suyo.
+  if (filtros.idDependencia) { request.input('idDepResp', sql.Int, filtros.idDependencia); where += ' AND ut.id_destino = @idDepResp'; }
 
   // Filtro por servicio
   if (filtroServicio !== null && filtroServicio !== undefined) {
@@ -97,25 +127,60 @@ export async function findMany(filtros: FiltrosDocumentoDto, filtroServicio?: Fi
     }
   }
 
+  // atrasado/proximo_a_vencer solo tienen sentido mientras el documento sigue pendiente (estado != 4)
+  // y existe un plazo asignado (dias_compromiso > 0) — mismo criterio de "plazo" que ya usa Alertas.
+  const havingClauses: string[] = [];
+  if (filtros.soloAtrasados)  havingClauses.push('atrasado = 1');
+  if (filtros.proximoAVencer) havingClauses.push('proximo_a_vencer = 1');
+  const havingWhere = havingClauses.length ? `WHERE ${havingClauses.join(' AND ')}` : '';
+
   const result = await request.query<DocumentoRow>(`
-    SELECT
-      d.id_documento, d.num_interno, d.num_oficial, d.materia,
-      d.id_tipo_documento, td.desc_tipo_documento,
-      d.id_estado_documento, ed.desc_estado_documento,
-      d.id_usuario, u.usuario,
-      f.nombres, f.apellidos,
-      d.fecha_documento, d.fecha_sistema,
-      d.medio, d.resuelto,
-      mg.correlativo AS correlativo_memo,
-      COUNT(*) OVER() AS total
-    FROM documento d
-    LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
-    LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
-    LEFT JOIN usuario u           ON d.id_usuario          = u.id_usuario
-    LEFT JOIN funcionario f       ON u.id_funcionario      = f.id_funcionario
-    LEFT JOIN memo_generado mg    ON mg.id_documento       = d.id_documento
-    WHERE ${where}
-    ORDER BY d.fecha_sistema DESC
+    WITH ultimo_tramite AS (
+      SELECT t.*, ROW_NUMBER() OVER (PARTITION BY t.id_documento ORDER BY t.fecha_sistema DESC, t.id_seguimiento DESC) AS rn
+      FROM tramite t
+    ),
+    base AS (
+      SELECT
+        d.id_documento, d.num_interno, d.num_oficial, d.materia,
+        d.id_tipo_documento, td.desc_tipo_documento,
+        d.id_estado_documento, ed.desc_estado_documento,
+        d.id_usuario, u.usuario,
+        f.nombres, f.apellidos,
+        d.fecha_documento, d.fecha_sistema,
+        d.medio, d.resuelto,
+        mg.correlativo AS correlativo_memo,
+        ut.id_destino AS id_destino_actual,
+        LTRIM(RTRIM(dep.desc_dependencia)) AS desc_destino_actual,
+        ut.id_tipo_compromiso AS id_tipo_compromiso_actual,
+        ut.dias_compromiso AS dias_compromiso_actual,
+        DATEDIFF(DAY, ut.fecha_sistema, GETDATE()) AS dias_transcurridos,
+        CASE WHEN ut.id_tipo_compromiso = 3 THEN 1 ELSE 0 END AS urgente,
+        CASE WHEN d.id_estado_documento <> 4 AND ut.dias_compromiso > 0
+                  AND DATEDIFF(DAY, ut.fecha_sistema, GETDATE()) > ut.dias_compromiso
+             THEN 1 ELSE 0 END AS atrasado,
+        CASE WHEN d.id_estado_documento <> 4 AND ut.dias_compromiso > 0
+                  AND DATEDIFF(DAY, ut.fecha_sistema, GETDATE()) <= ut.dias_compromiso
+                  AND (ut.dias_compromiso - DATEDIFF(DAY, ut.fecha_sistema, GETDATE())) <= @diasProximo
+             THEN 1 ELSE 0 END AS proximo_a_vencer
+      FROM documento d
+      LEFT JOIN tipo_documento td   ON d.id_tipo_documento  = td.id_tipo_documento
+      LEFT JOIN estado_documento ed ON d.id_estado_documento = ed.id_estado_documento
+      LEFT JOIN usuario u           ON d.id_usuario          = u.id_usuario
+      LEFT JOIN funcionario f       ON u.id_funcionario      = f.id_funcionario
+      LEFT JOIN memo_generado mg    ON mg.id_documento       = d.id_documento
+      LEFT JOIN ultimo_tramite ut   ON ut.id_documento       = d.id_documento AND ut.rn = 1
+      LEFT JOIN dependencia dep     ON dep.id_dependencia    = ut.id_destino
+      WHERE ${where}
+    )
+    SELECT *,
+      COUNT(*)                                     OVER() AS total,
+      SUM(urgente)                                 OVER() AS total_urgentes,
+      SUM(atrasado)                                OVER() AS total_atrasados,
+      SUM(proximo_a_vencer)                        OVER() AS total_proximos,
+      AVG(CAST(dias_transcurridos AS FLOAT))       OVER() AS antiguedad_promedio
+    FROM base
+    ${havingWhere}
+    ORDER BY ${ORDEN_SQL[filtros.orden]}
     OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
   `);
   return result.recordset;

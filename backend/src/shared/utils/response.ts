@@ -14,8 +14,9 @@ export function sendPaginated<T>(
   res: Response,
   data: T[],
   meta: PaginationMeta,
+  extra?: Record<string, unknown>,
 ): Response {
-  const body: PaginatedResponse<T> = { ok: true, data, meta };
+  const body: PaginatedResponse<T> = { ok: true, data, meta, ...extra };
   return res.status(200).json(body);
 }
 

@@ -16,8 +16,20 @@ interface FiltroServicio {
 
 export async function listarDocumentos(filtros: FiltrosDocumentoDto, filtroServicio?: FiltroServicio | null) {
   const rows = await repo.findMany(filtros, filtroServicio ?? null);
-  const total = rows[0]?.total ?? 0;
-  return { data: rows.map(mapDocumento), meta: buildPaginationMeta(total, filtros.pagina, filtros.porPagina) };
+  const first = rows[0];
+  const total = first?.total ?? 0;
+  const resumen = {
+    total,
+    urgentes:            first?.total_urgentes ?? 0,
+    atrasados:           first?.total_atrasados ?? 0,
+    proximosAVencer:     first?.total_proximos ?? 0,
+    antiguedadPromedio:  first?.antiguedad_promedio != null ? Math.round(first.antiguedad_promedio * 10) / 10 : null,
+  };
+  return {
+    data: rows.map(mapDocumento),
+    meta: buildPaginationMeta(total, filtros.pagina, filtros.porPagina),
+    resumen,
+  };
 }
 
 // ── Control de acceso a documento individual ──────────────────
@@ -475,6 +487,13 @@ function mapDocumento(row: repo.DocumentoRow) {
     reservado:   row.resuelto === 'S',
     // Correlativo de memorándum (solo aplica si el documento es un Memorándum confirmado)
     numeroMemo: row.correlativo_memo ?? null,
+    // Campos de gestión derivados del último trámite (solo presentes en listarDocumentos)
+    responsableActual:  row.desc_destino_actual ?? null,
+    diasEnEstadoActual: row.dias_transcurridos ?? null,
+    diasCompromiso:     row.dias_compromiso_actual ?? null,
+    urgente:            row.urgente === 1,
+    atrasado:           row.atrasado === 1,
+    proximoAVencer:     row.proximo_a_vencer === 1,
   };
 }
 

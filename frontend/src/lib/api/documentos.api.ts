@@ -19,7 +19,16 @@ export interface Documento {
   // Campos Oficina de Partes (null-safe: docs legados no tienen estos campos)
   tipoSoporte?: 'D' | 'F';
   reservado?: boolean;
+  // Campos de gestión derivados del último trámite — solo presentes en listar()
+  responsableActual?:  string | null;
+  diasEnEstadoActual?: number | null;
+  diasCompromiso?:     number | null;
+  urgente?:            boolean;
+  atrasado?:            boolean;
+  proximoAVencer?:      boolean;
 }
+
+export type OrdenDocumentos = 'fecha_desc' | 'fecha_asc' | 'antiguedad_desc' | 'antiguedad_asc';
 
 export interface FiltrosDocumento {
   q?: string;
@@ -29,13 +38,25 @@ export interface FiltrosDocumento {
   idPrioridad?: number;
   fechaDesde?: string;
   fechaHasta?: string;
+  soloAtrasados?: boolean;
+  proximoAVencer?: boolean;
+  orden?: OrdenDocumentos;
   pagina?: number;
   porPagina?: number;
+}
+
+export interface ResumenDocumentos {
+  total: number;
+  urgentes: number;
+  atrasados: number;
+  proximosAVencer: number;
+  antiguedadPromedio: number | null;
 }
 
 export interface PaginatedResult<T> {
   data: T[];
   meta: { total: number; pagina: number; porPagina: number; totalPaginas: number };
+  resumen?: ResumenDocumentos;
 }
 
 export const documentosApi = {

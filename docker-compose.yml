@@ -19,7 +19,7 @@ services:
     # Dev: 1433 expuesto solo a localhost para que el backend en el host pueda conectar
     # En prod (perfil prod) el backend corre en Docker y accede por la red interna
     ports:
-      - "127.0.0.1:11433:1433"
+      - "127.0.0.1:15433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql/data
       - ./database:/var/opt/mssql/backup

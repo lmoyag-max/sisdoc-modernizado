@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { formatFechaHora, formatRelativo, cn } from '@/lib/utils';
+import { formatFechaHora, formatRelativo, cn, descargarArchivoAutenticado } from '@/lib/utils';
 import { useRole } from '@/hooks/useRole';
 import { toast } from 'sonner';
 
@@ -582,11 +582,15 @@ export function DocumentoDetallePage() {
                             </Button>
                           )}
                           {(a.download_url ?? a.url) && (
-                            <a href={a.download_url ?? a.url ?? ''} download>
-                              <Button variant="ghost" size="icon" className="h-9 w-9" title="Descargar" aria-label="Descargar archivo">
-                                <Download className="h-3.5 w-3.5" />
-                              </Button>
-                            </a>
+                            <Button
+                              variant="ghost" size="icon" className="h-9 w-9" title="Descargar" aria-label="Descargar archivo"
+                              onClick={() => {
+                                descargarArchivoAutenticado(a.download_url ?? a.url ?? '', nombre)
+                                  .catch(() => toast.error('No se pudo descargar el archivo'));
+                              }}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
                           )}
                         </div>
                       </div>

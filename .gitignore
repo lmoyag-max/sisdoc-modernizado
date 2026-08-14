@@ -34,6 +34,7 @@ database/*.mdf
 database/*.ldf
 database/*.dump
 database/backups/
+database/demo-doc360-backups/
 
 # ── Respaldos temporales de sesión (generados por Claude Code / dev) ──
 _backups_*/

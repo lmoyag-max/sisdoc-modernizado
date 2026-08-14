@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useAuthStore } from '@/stores/auth.store';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -57,4 +58,28 @@ export function uploadUrl(path: string | null | undefined): string | null {
   const backendPort = 3001;
   const base = `${window.location.protocol}//${window.location.hostname}:${backendPort}`;
   return `${base}${path}`;
+}
+
+/**
+ * Descarga un archivo desde un endpoint autenticado (requireAuth en el backend).
+ *
+ * Un `<a href={url} download>` plano NO funciona contra estos endpoints: una
+ * navegación de anchor no puede llevar el header `Authorization: Bearer …`,
+ * así que el backend responde 401 antes de que el navegador reciba el archivo
+ * (la vista previa sí funciona porque usa fetch() con el header, no un anchor).
+ * Se descarga como blob autenticado y se dispara la descarga desde ahí.
+ */
+export async function descargarArchivoAutenticado(url: string, nombreArchivo: string): Promise<void> {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error(`No se pudo descargar el archivo (HTTP ${res.status})`);
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
 }

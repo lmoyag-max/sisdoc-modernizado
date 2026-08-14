@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { formatFechaHora } from '@/lib/utils';
+import { formatFechaHora, descargarArchivoAutenticado } from '@/lib/utils';
 import { useUploadRules } from '@/hooks/useUploadRules';
 import { toast } from 'sonner';
 
@@ -223,11 +223,15 @@ export function ArchivosPage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {archivo.url && (
-                      <a href={archivo.url} target="_blank" rel="noreferrer" download={archivo.nombre_archivo ?? undefined}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </a>
+                      <Button
+                        variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => {
+                          descargarArchivoAutenticado(archivo.url!, archivo.nombre_archivo ?? 'archivo')
+                            .catch(() => toast.error('No se pudo descargar el archivo'));
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     )}
                     <Button
                       variant="ghost"

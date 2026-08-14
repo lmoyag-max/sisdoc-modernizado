@@ -1,0 +1,1985 @@
+{
+  "usuariosCreados": [
+    {
+      "idUsuario": 5536,
+      "usuario": "csepulve",
+      "clave": "Demo2026",
+      "nombres": "Carolina",
+      "apellidos": "Sepúlveda",
+      "idDependencia": 32,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5537,
+      "usuario": "jaravena",
+      "clave": "Demo2026",
+      "nombres": "Javiera",
+      "apellidos": "Aravena",
+      "idDependencia": 32,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5538,
+      "usuario": "fcastill",
+      "clave": "Demo2026",
+      "nombres": "Felipe",
+      "apellidos": "Castillo",
+      "idDependencia": 32,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5539,
+      "usuario": "bmorales",
+      "clave": "Demo2026",
+      "nombres": "Benjamín",
+      "apellidos": "Morales",
+      "idDependencia": 76,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5540,
+      "usuario": "dfernand",
+      "clave": "Demo2026",
+      "nombres": "Daniela",
+      "apellidos": "Fernández",
+      "idDependencia": 76,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5541,
+      "usuario": "ftoro",
+      "clave": "Demo2026",
+      "nombres": "Felipe",
+      "apellidos": "Toro",
+      "idDependencia": 76,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5542,
+      "usuario": "faraya",
+      "clave": "Demo2026",
+      "nombres": "Felipe",
+      "apellidos": "Araya",
+      "idDependencia": 76,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5543,
+      "usuario": "avergara",
+      "clave": "Demo2026",
+      "nombres": "Andrés",
+      "apellidos": "Vergara",
+      "idDependencia": 75,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5544,
+      "usuario": "cgodoy",
+      "clave": "Demo2026",
+      "nombres": "Catalina",
+      "apellidos": "Godoy",
+      "idDependencia": 75,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5545,
+      "usuario": "fbravo",
+      "clave": "Demo2026",
+      "nombres": "Fernanda",
+      "apellidos": "Bravo",
+      "idDependencia": 75,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5546,
+      "usuario": "cmorales",
+      "clave": "Demo2026",
+      "nombres": "Carolina",
+      "apellidos": "Morales",
+      "idDependencia": 40,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5547,
+      "usuario": "mriquelm",
+      "clave": "Demo2026",
+      "nombres": "Matías",
+      "apellidos": "Riquelme",
+      "idDependencia": 40,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5548,
+      "usuario": "mcarrasc",
+      "clave": "Demo2026",
+      "nombres": "Macarena",
+      "apellidos": "Carrasco",
+      "idDependencia": 40,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5549,
+      "usuario": "afuentes",
+      "clave": "Demo2026",
+      "nombres": "Andrés",
+      "apellidos": "Fuentes",
+      "idDependencia": 2055,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5550,
+      "usuario": "jcarrasc",
+      "clave": "Demo2026",
+      "nombres": "Josefa",
+      "apellidos": "Carrasco",
+      "idDependencia": 2055,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5551,
+      "usuario": "jguzman",
+      "clave": "Demo2026",
+      "nombres": "Javiera",
+      "apellidos": "Guzmán",
+      "idDependencia": 2055,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5552,
+      "usuario": "jsilva",
+      "clave": "Demo2026",
+      "nombres": "Javiera",
+      "apellidos": "Silva",
+      "idDependencia": 54,
+      "roles": [
+        "of.partes"
+      ]
+    },
+    {
+      "idUsuario": 5553,
+      "usuario": "despinoz",
+      "clave": "Demo2026",
+      "nombres": "Diego",
+      "apellidos": "Espinoza",
+      "idDependencia": 54,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5554,
+      "usuario": "asilva",
+      "clave": "Demo2026",
+      "nombres": "Andrés",
+      "apellidos": "Silva",
+      "idDependencia": 54,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5555,
+      "usuario": "imorales",
+      "clave": "Demo2026",
+      "nombres": "Isidora",
+      "apellidos": "Morales",
+      "idDependencia": 69,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5556,
+      "usuario": "breyes",
+      "clave": "Demo2026",
+      "nombres": "Benjamín",
+      "apellidos": "Reyes",
+      "idDependencia": 69,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5557,
+      "usuario": "maravena",
+      "clave": "Demo2026",
+      "nombres": "Macarena",
+      "apellidos": "Aravena",
+      "idDependencia": 69,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5558,
+      "usuario": "csepulve1",
+      "clave": "Demo2026",
+      "nombres": "Camila",
+      "apellidos": "Sepúlveda",
+      "idDependencia": 69,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5559,
+      "usuario": "fespinoz",
+      "clave": "Demo2026",
+      "nombres": "Felipe",
+      "apellidos": "Espinoza",
+      "idDependencia": 72,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5560,
+      "usuario": "vlagos",
+      "clave": "Demo2026",
+      "nombres": "Valentina",
+      "apellidos": "Lagos",
+      "idDependencia": 72,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5561,
+      "usuario": "vmorales",
+      "clave": "Demo2026",
+      "nombres": "Valentina",
+      "apellidos": "Morales",
+      "idDependencia": 72,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5562,
+      "usuario": "abravo",
+      "clave": "Demo2026",
+      "nombres": "Andrés",
+      "apellidos": "Bravo",
+      "idDependencia": 2012,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5563,
+      "usuario": "mmunoz",
+      "clave": "Demo2026",
+      "nombres": "Matías",
+      "apellidos": "Muñoz",
+      "idDependencia": 2012,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5564,
+      "usuario": "psoto",
+      "clave": "Demo2026",
+      "nombres": "Paula",
+      "apellidos": "Soto",
+      "idDependencia": 2012,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5565,
+      "usuario": "spizarro",
+      "clave": "Demo2026",
+      "nombres": "Sebastián",
+      "apellidos": "Pizarro",
+      "idDependencia": 2012,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5566,
+      "usuario": "vsandova",
+      "clave": "Demo2026",
+      "nombres": "Valentina",
+      "apellidos": "Sandoval",
+      "idDependencia": 12,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5567,
+      "usuario": "pvidal",
+      "clave": "Demo2026",
+      "nombres": "Paula",
+      "apellidos": "Vidal",
+      "idDependencia": 12,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5568,
+      "usuario": "nsilva",
+      "clave": "Demo2026",
+      "nombres": "Nicolás",
+      "apellidos": "Silva",
+      "idDependencia": 12,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5569,
+      "usuario": "vvergara",
+      "clave": "Demo2026",
+      "nombres": "Vicente",
+      "apellidos": "Vergara",
+      "idDependencia": 12,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5570,
+      "usuario": "jgodoy",
+      "clave": "Demo2026",
+      "nombres": "Javiera",
+      "apellidos": "Godoy",
+      "idDependencia": 13,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5571,
+      "usuario": "gtapia",
+      "clave": "Demo2026",
+      "nombres": "Gonzalo",
+      "apellidos": "Tapia",
+      "idDependencia": 13,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5572,
+      "usuario": "tsepulve",
+      "clave": "Demo2026",
+      "nombres": "Tomás",
+      "apellidos": "Sepúlveda",
+      "idDependencia": 13,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5573,
+      "usuario": "csoto",
+      "clave": "Demo2026",
+      "nombres": "Catalina",
+      "apellidos": "Soto",
+      "idDependencia": 2009,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5574,
+      "usuario": "csoto1",
+      "clave": "Demo2026",
+      "nombres": "Cristóbal",
+      "apellidos": "Soto",
+      "idDependencia": 2009,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5575,
+      "usuario": "imorales1",
+      "clave": "Demo2026",
+      "nombres": "Isidora",
+      "apellidos": "Morales",
+      "idDependencia": 2009,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5576,
+      "usuario": "avidal",
+      "clave": "Demo2026",
+      "nombres": "Andrés",
+      "apellidos": "Vidal",
+      "idDependencia": 37,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5577,
+      "usuario": "ftoro1",
+      "clave": "Demo2026",
+      "nombres": "Fernanda",
+      "apellidos": "Toro",
+      "idDependencia": 37,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5578,
+      "usuario": "ccortes",
+      "clave": "Demo2026",
+      "nombres": "Catalina",
+      "apellidos": "Cortés",
+      "idDependencia": 37,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5579,
+      "usuario": "jsalinas",
+      "clave": "Demo2026",
+      "nombres": "Josefa",
+      "apellidos": "Salinas",
+      "idDependencia": 43,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5580,
+      "usuario": "msilva",
+      "clave": "Demo2026",
+      "nombres": "Macarena",
+      "apellidos": "Silva",
+      "idDependencia": 43,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5581,
+      "usuario": "creyes",
+      "clave": "Demo2026",
+      "nombres": "Camila",
+      "apellidos": "Reyes",
+      "idDependencia": 43,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5582,
+      "usuario": "mgodoy",
+      "clave": "Demo2026",
+      "nombres": "Macarena",
+      "apellidos": "Godoy",
+      "idDependencia": 43,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5583,
+      "usuario": "tgodoy",
+      "clave": "Demo2026",
+      "nombres": "Trinidad",
+      "apellidos": "Godoy",
+      "idDependencia": 33,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5584,
+      "usuario": "dsilva",
+      "clave": "Demo2026",
+      "nombres": "Diego",
+      "apellidos": "Silva",
+      "idDependencia": 33,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5585,
+      "usuario": "mmunoz1",
+      "clave": "Demo2026",
+      "nombres": "Macarena",
+      "apellidos": "Muñoz",
+      "idDependencia": 33,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5586,
+      "usuario": "fsilva",
+      "clave": "Demo2026",
+      "nombres": "Fernanda",
+      "apellidos": "Silva",
+      "idDependencia": 33,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5587,
+      "usuario": "sgodoy",
+      "clave": "Demo2026",
+      "nombres": "Sebastián",
+      "apellidos": "Godoy",
+      "idDependencia": 1,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5588,
+      "usuario": "mlagos",
+      "clave": "Demo2026",
+      "nombres": "Macarena",
+      "apellidos": "Lagos",
+      "idDependencia": 1,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5589,
+      "usuario": "psoto1",
+      "clave": "Demo2026",
+      "nombres": "Paula",
+      "apellidos": "Soto",
+      "idDependencia": 1,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5590,
+      "usuario": "vcarrasc",
+      "clave": "Demo2026",
+      "nombres": "Valentina",
+      "apellidos": "Carrasco",
+      "idDependencia": 1,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5591,
+      "usuario": "vcarrasc1",
+      "clave": "Demo2026",
+      "nombres": "Vicente",
+      "apellidos": "Carrasco",
+      "idDependencia": 35,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5592,
+      "usuario": "csalinas",
+      "clave": "Demo2026",
+      "nombres": "Constanza",
+      "apellidos": "Salinas",
+      "idDependencia": 35,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5593,
+      "usuario": "sriquelm",
+      "clave": "Demo2026",
+      "nombres": "Sebastián",
+      "apellidos": "Riquelme",
+      "idDependencia": 35,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5594,
+      "usuario": "freyes",
+      "clave": "Demo2026",
+      "nombres": "Fernanda",
+      "apellidos": "Reyes",
+      "idDependencia": 35,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5595,
+      "usuario": "asoto",
+      "clave": "Demo2026",
+      "nombres": "Andrés",
+      "apellidos": "Soto",
+      "idDependencia": 78,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5596,
+      "usuario": "fmunoz",
+      "clave": "Demo2026",
+      "nombres": "Francisca",
+      "apellidos": "Muñoz",
+      "idDependencia": 78,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5597,
+      "usuario": "priquelm",
+      "clave": "Demo2026",
+      "nombres": "Paula",
+      "apellidos": "Riquelme",
+      "idDependencia": 78,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5598,
+      "usuario": "itoro",
+      "clave": "Demo2026",
+      "nombres": "Ignacio",
+      "apellidos": "Toro",
+      "idDependencia": 46,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5599,
+      "usuario": "pcontrer",
+      "clave": "Demo2026",
+      "nombres": "Pablo",
+      "apellidos": "Contreras",
+      "idDependencia": 46,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5600,
+      "usuario": "ccastill",
+      "clave": "Demo2026",
+      "nombres": "Cristian",
+      "apellidos": "Castillo",
+      "idDependencia": 46,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5601,
+      "usuario": "naraya",
+      "clave": "Demo2026",
+      "nombres": "Nicolás",
+      "apellidos": "Araya",
+      "idDependencia": 18,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5602,
+      "usuario": "vsoto",
+      "clave": "Demo2026",
+      "nombres": "Valentina",
+      "apellidos": "Soto",
+      "idDependencia": 18,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5603,
+      "usuario": "jcarrasc1",
+      "clave": "Demo2026",
+      "nombres": "Josefa",
+      "apellidos": "Carrasco",
+      "idDependencia": 18,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5604,
+      "usuario": "asandova",
+      "clave": "Demo2026",
+      "nombres": "Andrés",
+      "apellidos": "Sandoval",
+      "idDependencia": 39,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5605,
+      "usuario": "fespinoz1",
+      "clave": "Demo2026",
+      "nombres": "Francisca",
+      "apellidos": "Espinoza",
+      "idDependencia": 39,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5606,
+      "usuario": "dsoto",
+      "clave": "Demo2026",
+      "nombres": "Diego",
+      "apellidos": "Soto",
+      "idDependencia": 39,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5607,
+      "usuario": "friquelm",
+      "clave": "Demo2026",
+      "nombres": "Francisca",
+      "apellidos": "Riquelme",
+      "idDependencia": 39,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5608,
+      "usuario": "freyes1",
+      "clave": "Demo2026",
+      "nombres": "Fernanda",
+      "apellidos": "Reyes",
+      "idDependencia": 2003,
+      "roles": [
+        "supervisores"
+      ]
+    },
+    {
+      "idUsuario": 5609,
+      "usuario": "pordenes",
+      "clave": "Demo2026",
+      "nombres": "Paula",
+      "apellidos": "Órdenes",
+      "idDependencia": 2003,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5610,
+      "usuario": "dsalinas",
+      "clave": "Demo2026",
+      "nombres": "Daniela",
+      "apellidos": "Salinas",
+      "idDependencia": 2003,
+      "roles": [
+        "funcionario"
+      ]
+    },
+    {
+      "idUsuario": 5611,
+      "usuario": "pvega",
+      "clave": "Demo2026",
+      "nombres": "Paula",
+      "apellidos": "Vega",
+      "idDependencia": 2003,
+      "roles": [
+        "funcionario"
+      ]
+    }
+  ],
+  "documentosCreados": [
+    {
+      "idDocumento": 403241,
+      "numInterno": 1,
+      "descripcion": "Terminado — Adquisición de equipamiento clínico"
+    },
+    {
+      "idDocumento": 403242,
+      "numInterno": 2,
+      "descripcion": "Terminado — Actualización de protocolo clínico"
+    },
+    {
+      "idDocumento": 403243,
+      "numInterno": 3,
+      "descripcion": "Terminado — Recepción de oficio externo"
+    },
+    {
+      "idDocumento": 403244,
+      "numInterno": 4,
+      "descripcion": "Terminado — Incidente tecnológico"
+    },
+    {
+      "idDocumento": 403245,
+      "numInterno": 5,
+      "descripcion": "Terminado — Compromiso de mejora (Auditoría)"
+    },
+    {
+      "idDocumento": 403246,
+      "numInterno": 6,
+      "descripcion": "Pendiente — Capacitación institucional"
+    },
+    {
+      "idDocumento": 403247,
+      "numInterno": 7,
+      "descripcion": "Terminado — Recursos Humanos"
+    },
+    {
+      "idDocumento": 403248,
+      "numInterno": 8,
+      "descripcion": "En trámite (derivado) en Servicio Clinico UTI — Gestión de camas"
+    },
+    {
+      "idDocumento": 403249,
+      "numInterno": 9,
+      "descripcion": "Terminado — Farmacia"
+    },
+    {
+      "idDocumento": 403250,
+      "numInterno": 10,
+      "descripcion": "Recepcionado en Apoyo Laboratorio clínico — Laboratorio"
+    },
+    {
+      "idDocumento": 403251,
+      "numInterno": 11,
+      "descripcion": "Terminado — Imagenología"
+    },
+    {
+      "idDocumento": 403252,
+      "numInterno": 12,
+      "descripcion": "Terminado — Seguridad de la información"
+    },
+    {
+      "idDocumento": 403253,
+      "numInterno": 13,
+      "descripcion": "Pendiente — Mantenimiento"
+    },
+    {
+      "idDocumento": 403254,
+      "numInterno": 14,
+      "descripcion": "Terminado — Infraestructura"
+    },
+    {
+      "idDocumento": 403255,
+      "numInterno": 15,
+      "descripcion": "Terminado — Calidad"
+    },
+    {
+      "idDocumento": 403256,
+      "numInterno": 16,
+      "descripcion": "Terminado — IAAS"
+    },
+    {
+      "idDocumento": 403257,
+      "numInterno": 17,
+      "descripcion": "Recepcionado en Dirección — Comité de Ética (vía Dirección)"
+    },
+    {
+      "idDocumento": 403258,
+      "numInterno": 18,
+      "descripcion": "Terminado — Comité de Innovación"
+    },
+    {
+      "idDocumento": 403259,
+      "numInterno": 19,
+      "descripcion": "Terminado — Estadística"
+    },
+    {
+      "idDocumento": 403260,
+      "numInterno": 20,
+      "descripcion": "Recepcionado en Participacion Ciudadana — OIRS (vía Participación Ciudadana)"
+    },
+    {
+      "idDocumento": 403261,
+      "numInterno": 21,
+      "descripcion": "Terminado — Contingencia asistencial"
+    },
+    {
+      "idDocumento": 403262,
+      "numInterno": 22,
+      "descripcion": "Terminado — Pronunciamiento jurídico"
+    },
+    {
+      "idDocumento": 403263,
+      "numInterno": 23,
+      "descripcion": "Pendiente — Informe mensual de tiempos de respuesta documental — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403264,
+      "numInterno": 24,
+      "descripcion": "Recepcionado en Oficina de Partes — Coordinación de campaña de vacunación institucional"
+    },
+    {
+      "idDocumento": 403265,
+      "numInterno": 25,
+      "descripcion": "En trámite (derivado) en I.A.A.S — Informe mensual de tiempos de respuesta documental — actualización"
+    },
+    {
+      "idDocumento": 403266,
+      "numInterno": 26,
+      "descripcion": "Terminado — Informe de cumplimiento del plan de mantenimiento preventivo — seguimiento"
+    },
+    {
+      "idDocumento": 403267,
+      "numInterno": 27,
+      "descripcion": "Pendiente (destino sin actor) — Citación a reunión de coordinación asistencial — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403268,
+      "numInterno": 28,
+      "descripcion": "Pendiente — Actualización de protocolo de limpieza de pabellones — actualización"
+    },
+    {
+      "idDocumento": 403269,
+      "numInterno": 29,
+      "descripcion": "Pendiente — Informe de indicadores de calidad del trimestre — seguimiento"
+    },
+    {
+      "idDocumento": 403270,
+      "numInterno": 30,
+      "descripcion": "Pendiente — Solicitud de habilitación de nueva unidad de camas — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403271,
+      "numInterno": 31,
+      "descripcion": "Pendiente — Solicitud de capacitación en normativa de bioseguridad — respuesta"
+    },
+    {
+      "idDocumento": 403272,
+      "numInterno": 32,
+      "descripcion": "Recepcionado en Gestión de Pacientes — Solicitud de evaluación de riesgo ergonómico — actualización"
+    },
+    {
+      "idDocumento": 403273,
+      "numInterno": 33,
+      "descripcion": "Terminado — Informe de disponibilidad de insumos críticos — respuesta"
+    },
+    {
+      "idDocumento": 403274,
+      "numInterno": 34,
+      "descripcion": "Pendiente — Solicitud de capacitación en normativa de bioseguridad — actualización"
+    },
+    {
+      "idDocumento": 403275,
+      "numInterno": 35,
+      "descripcion": "Pendiente (destino sin actor) — Coordinación de mantenimiento de red de gases clínicos — seguimiento"
+    },
+    {
+      "idDocumento": 403276,
+      "numInterno": 36,
+      "descripcion": "Recepcionado en Estadística (Información para la Gestion Clínica) — Citación a reunión de coordinación asistencial"
+    },
+    {
+      "idDocumento": 403277,
+      "numInterno": 37,
+      "descripcion": "Pendiente — Coordinación de turnos para fin de semana largo — respuesta"
+    },
+    {
+      "idDocumento": 403278,
+      "numInterno": 38,
+      "descripcion": "Terminado — Remisión de acta del Comité de Innovación — actualización"
+    },
+    {
+      "idDocumento": 403279,
+      "numInterno": 39,
+      "descripcion": "Pendiente — Actualización de flujograma de derivación de pacientes"
+    },
+    {
+      "idDocumento": 403280,
+      "numInterno": 40,
+      "descripcion": "Pendiente — Solicitud de pronunciamiento técnico — respuesta"
+    },
+    {
+      "idDocumento": 403281,
+      "numInterno": 41,
+      "descripcion": "En trámite (derivado) en I.A.A.S — Remisión de antecedentes para licitación de insumos"
+    },
+    {
+      "idDocumento": 403282,
+      "numInterno": 42,
+      "descripcion": "Recepcionado en Gestion y Desarrollo de Personas — Remisión de informe de satisfacción usuaria"
+    },
+    {
+      "idDocumento": 403283,
+      "numInterno": 43,
+      "descripcion": "Pendiente (destino sin actor) — Solicitud de pronunciamiento técnico"
+    },
+    {
+      "idDocumento": 403284,
+      "numInterno": 44,
+      "descripcion": "Terminado — Actualización del protocolo de aislamiento respiratorio — respuesta"
+    },
+    {
+      "idDocumento": 403285,
+      "numInterno": 45,
+      "descripcion": "Pendiente (destino sin actor) — Actualización de nómina de responsables por servicio — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403286,
+      "numInterno": 46,
+      "descripcion": "En trámite (derivado) en Participacion Ciudadana — Solicitud de habilitación de nueva unidad de camas"
+    },
+    {
+      "idDocumento": 403288,
+      "numInterno": 48,
+      "descripcion": "Pendiente — Solicitud de capacitación en normativa de bioseguridad — actualización"
+    },
+    {
+      "idDocumento": 403290,
+      "numInterno": 50,
+      "descripcion": "Pendiente — Solicitud de mantención correctiva de equipo biomédico"
+    },
+    {
+      "idDocumento": 403291,
+      "numInterno": 51,
+      "descripcion": "Terminado — Remisión de informe de satisfacción usuaria"
+    },
+    {
+      "idDocumento": 403292,
+      "numInterno": 52,
+      "descripcion": "Terminado — Coordinación de capacitación sobre seguridad de la información — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403293,
+      "numInterno": 53,
+      "descripcion": "Pendiente — Solicitud de reposición de monitores multiparámetro"
+    },
+    {
+      "idDocumento": 403294,
+      "numInterno": 54,
+      "descripcion": "Pendiente — Solicitud de evaluación de riesgo ergonómico"
+    },
+    {
+      "idDocumento": 403296,
+      "numInterno": 56,
+      "descripcion": "Pendiente (destino sin actor) — Actualización de protocolo de limpieza de pabellones — actualización"
+    },
+    {
+      "idDocumento": 403298,
+      "numInterno": 58,
+      "descripcion": "Pendiente (destino sin actor) — Coordinación de capacitación sobre seguridad de la información — seguimiento"
+    },
+    {
+      "idDocumento": 403299,
+      "numInterno": 59,
+      "descripcion": "Terminado — Solicitud de reposición de monitores multiparámetro"
+    },
+    {
+      "idDocumento": 403301,
+      "numInterno": 61,
+      "descripcion": "Recepcionado en Apoyo Imagenología — Actualización de nómina de responsables por servicio"
+    },
+    {
+      "idDocumento": 403302,
+      "numInterno": 62,
+      "descripcion": "Pendiente — Solicitud de adquisición de insumos críticos"
+    },
+    {
+      "idDocumento": 403303,
+      "numInterno": 63,
+      "descripcion": "Pendiente — Remisión de informe de satisfacción usuaria — actualización"
+    },
+    {
+      "idDocumento": 403304,
+      "numInterno": 64,
+      "descripcion": "Pendiente (destino sin actor) — Coordinación de turnos para fin de semana largo — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403305,
+      "numInterno": 65,
+      "descripcion": "Terminado — Informe de disponibilidad de insumos críticos"
+    },
+    {
+      "idDocumento": 403309,
+      "numInterno": 69,
+      "descripcion": "Pendiente — Actualización del protocolo de aislamiento respiratorio — actualización"
+    },
+    {
+      "idDocumento": 403310,
+      "numInterno": 70,
+      "descripcion": "Terminado — Actualización del protocolo de aislamiento respiratorio — respuesta"
+    },
+    {
+      "idDocumento": 403312,
+      "numInterno": 72,
+      "descripcion": "Terminado — Remisión de antecedentes para revisión jurídica — respuesta"
+    },
+    {
+      "idDocumento": 403313,
+      "numInterno": 73,
+      "descripcion": "Terminado — Informe mensual de tiempos de respuesta documental — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403314,
+      "numInterno": 74,
+      "descripcion": "Recepcionado en Dirección — Coordinación de capacitación sobre seguridad de la información — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403315,
+      "numInterno": 75,
+      "descripcion": "Pendiente — Revisión de procedimiento para traslado intrahospitalario — seguimiento"
+    },
+    {
+      "idDocumento": 403316,
+      "numInterno": 76,
+      "descripcion": "Terminado — Solicitud de habilitación de acceso al sistema institucional"
+    },
+    {
+      "idDocumento": 403317,
+      "numInterno": 77,
+      "descripcion": "Pendiente — Revisión de procedimiento para traslado intrahospitalario"
+    },
+    {
+      "idDocumento": 403318,
+      "numInterno": 78,
+      "descripcion": "Pendiente — Actualización del protocolo de aislamiento respiratorio — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403320,
+      "numInterno": 80,
+      "descripcion": "Pendiente — Coordinación de capacitación sobre seguridad de la información — seguimiento"
+    },
+    {
+      "idDocumento": 403321,
+      "numInterno": 81,
+      "descripcion": "Pendiente — Informe de auditoría interna de historia clínica"
+    },
+    {
+      "idDocumento": 403322,
+      "numInterno": 82,
+      "descripcion": "Terminado — Informe de indicadores de calidad del trimestre — seguimiento"
+    },
+    {
+      "idDocumento": 403323,
+      "numInterno": 83,
+      "descripcion": "Pendiente — Coordinación de turnos para fin de semana largo"
+    },
+    {
+      "idDocumento": 403324,
+      "numInterno": 84,
+      "descripcion": "En trámite (derivado) en Departamento Gestion de las Personas — Remisión de acta del Comité de Innovación"
+    },
+    {
+      "idDocumento": 403325,
+      "numInterno": 85,
+      "descripcion": "Recepcionado en Gestion y Desarrollo de Personas — Solicitud de pronunciamiento técnico — actualización"
+    },
+    {
+      "idDocumento": 403326,
+      "numInterno": 86,
+      "descripcion": "Pendiente (destino sin actor) — Informe de cumplimiento del plan de mantenimiento preventivo"
+    },
+    {
+      "idDocumento": 403328,
+      "numInterno": 88,
+      "descripcion": "Terminado — Remisión de informe de satisfacción usuaria"
+    },
+    {
+      "idDocumento": 403331,
+      "numInterno": 91,
+      "descripcion": "Pendiente (destino sin actor) — Actualización de protocolo de limpieza de pabellones"
+    },
+    {
+      "idDocumento": 403332,
+      "numInterno": 92,
+      "descripcion": "Pendiente — Actualización de protocolo de limpieza de pabellones — actualización"
+    },
+    {
+      "idDocumento": 403333,
+      "numInterno": 93,
+      "descripcion": "Terminado — Solicitud de pronunciamiento técnico — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403334,
+      "numInterno": 94,
+      "descripcion": "Terminado — Actualización de nómina de responsables por servicio — respuesta"
+    },
+    {
+      "idDocumento": 403335,
+      "numInterno": 95,
+      "descripcion": "Pendiente (destino sin actor) — Remisión de acta del Comité de Innovación"
+    },
+    {
+      "idDocumento": 403336,
+      "numInterno": 96,
+      "descripcion": "Terminado — Solicitud de mantención correctiva de equipo biomédico — seguimiento"
+    },
+    {
+      "idDocumento": 403338,
+      "numInterno": 98,
+      "descripcion": "Recepcionado en I.A.A.S — Actualización de protocolo de limpieza de pabellones"
+    },
+    {
+      "idDocumento": 403340,
+      "numInterno": 100,
+      "descripcion": "Pendiente — Actualización de protocolo de limpieza de pabellones — seguimiento"
+    },
+    {
+      "idDocumento": 403341,
+      "numInterno": 101,
+      "descripcion": "Terminado — Solicitud de habilitación de nueva unidad de camas — actualización"
+    },
+    {
+      "idDocumento": 403343,
+      "numInterno": 103,
+      "descripcion": "Terminado — Actualización de protocolo de limpieza de pabellones — respuesta"
+    },
+    {
+      "idDocumento": 403344,
+      "numInterno": 104,
+      "descripcion": "Recepcionado en Tecnologías De la Información — Citación a reunión de coordinación asistencial"
+    },
+    {
+      "idDocumento": 403345,
+      "numInterno": 105,
+      "descripcion": "En trámite (derivado) en Auditoria — Actualización de flujograma de derivación de pacientes"
+    },
+    {
+      "idDocumento": 403346,
+      "numInterno": 106,
+      "descripcion": "Terminado — Actualización de nómina de responsables por servicio"
+    },
+    {
+      "idDocumento": 403347,
+      "numInterno": 107,
+      "descripcion": "Pendiente — Solicitud de capacitación en normativa de bioseguridad — actualización"
+    },
+    {
+      "idDocumento": 403350,
+      "numInterno": 110,
+      "descripcion": "Pendiente — Informe de indicadores de calidad del trimestre — seguimiento"
+    },
+    {
+      "idDocumento": 403351,
+      "numInterno": 111,
+      "descripcion": "Pendiente — Actualización de flujograma de derivación de pacientes — respuesta"
+    },
+    {
+      "idDocumento": 403352,
+      "numInterno": 112,
+      "descripcion": "Pendiente — Solicitud de evaluación de riesgo ergonómico — seguimiento"
+    },
+    {
+      "idDocumento": 403353,
+      "numInterno": 113,
+      "descripcion": "Pendiente — Informe de cumplimiento del plan de mantenimiento preventivo — respuesta"
+    },
+    {
+      "idDocumento": 403354,
+      "numInterno": 114,
+      "descripcion": "Recepcionado en Departamento Gestion de las Personas — Remisión de acta del Comité de Innovación — respuesta"
+    },
+    {
+      "idDocumento": 403355,
+      "numInterno": 115,
+      "descripcion": "Terminado — Remisión de antecedentes para revisión jurídica — actualización"
+    },
+    {
+      "idDocumento": 403356,
+      "numInterno": 116,
+      "descripcion": "Terminado — Remisión de acta del Comité de Innovación"
+    },
+    {
+      "idDocumento": 403358,
+      "numInterno": 118,
+      "descripcion": "Pendiente — Coordinación de mantenimiento de red de gases clínicos — respuesta"
+    },
+    {
+      "idDocumento": 403359,
+      "numInterno": 119,
+      "descripcion": "Recepcionado en I.A.A.S — Informe mensual de tiempos de respuesta documental — actualización"
+    },
+    {
+      "idDocumento": 403360,
+      "numInterno": 120,
+      "descripcion": "Recepcionado en I.A.A.S — Actualización del protocolo de aislamiento respiratorio — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403361,
+      "numInterno": 121,
+      "descripcion": "Pendiente — Solicitud de adquisición de insumos críticos"
+    },
+    {
+      "idDocumento": 403362,
+      "numInterno": 122,
+      "descripcion": "Pendiente — Actualización de nómina de responsables por servicio — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403363,
+      "numInterno": 123,
+      "descripcion": "Pendiente — Coordinación de mantenimiento de red de gases clínicos"
+    },
+    {
+      "idDocumento": 403364,
+      "numInterno": 124,
+      "descripcion": "Pendiente — Coordinación de turnos para fin de semana largo — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403366,
+      "numInterno": 126,
+      "descripcion": "Pendiente (destino sin actor) — Coordinación de capacitación sobre seguridad de la información"
+    },
+    {
+      "idDocumento": 403367,
+      "numInterno": 127,
+      "descripcion": "Terminado — Solicitud de reposición de monitores multiparámetro"
+    },
+    {
+      "idDocumento": 403369,
+      "numInterno": 129,
+      "descripcion": "Recepcionado en Servicio Clínico de Urgencia — Remisión de informe de satisfacción usuaria"
+    },
+    {
+      "idDocumento": 403370,
+      "numInterno": 130,
+      "descripcion": "Pendiente — Citación a reunión de coordinación asistencial — seguimiento"
+    },
+    {
+      "idDocumento": 403372,
+      "numInterno": 132,
+      "descripcion": "Pendiente — Informe de disponibilidad de insumos críticos — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403373,
+      "numInterno": 133,
+      "descripcion": "En trámite (derivado) en I.A.A.S — Solicitud de habilitación de nueva unidad de camas — respuesta"
+    },
+    {
+      "idDocumento": 403375,
+      "numInterno": 135,
+      "descripcion": "Recepcionado en Abastecimiento — Actualización de protocolo de limpieza de pabellones — seguimiento"
+    },
+    {
+      "idDocumento": 403376,
+      "numInterno": 136,
+      "descripcion": "Pendiente (destino sin actor) — Coordinación de mantenimiento de red de gases clínicos — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403377,
+      "numInterno": 137,
+      "descripcion": "Pendiente (destino sin actor) — Remisión de acta del Comité de Innovación — respuesta"
+    },
+    {
+      "idDocumento": 403380,
+      "numInterno": 140,
+      "descripcion": "Pendiente — Revisión de procedimiento para traslado intrahospitalario — actualización"
+    },
+    {
+      "idDocumento": 403381,
+      "numInterno": 141,
+      "descripcion": "Recepcionado en Tecnologías De la Información — Solicitud de adquisición de insumos críticos — solicitud complementaria"
+    },
+    {
+      "idDocumento": 403383,
+      "numInterno": 143,
+      "descripcion": "Recepcionado en Dirección — Documento reservado"
+    },
+    {
+      "idDocumento": 403384,
+      "numInterno": 144,
+      "descripcion": "Recepcionado en Dirección — Documento reservado"
+    },
+    {
+      "idDocumento": 403385,
+      "numInterno": 145,
+      "descripcion": "Recepcionado en Dirección — Documento reservado"
+    },
+    {
+      "idDocumento": 403386,
+      "numInterno": 146,
+      "descripcion": "Memorándum MEMO-2026-DIR032-000001 (FIRMADO — Firma Simple DOC360)"
+    },
+    {
+      "idDocumento": 403387,
+      "numInterno": 147,
+      "descripcion": "Memorándum MEMO-2026-SUB076-000001 (FIRMADO — Firma Simple DOC360)"
+    },
+    {
+      "idDocumento": 403388,
+      "numInterno": 148,
+      "descripcion": "Memorándum MEMO-2026-SUB075-000001 (FIRMADO — Firma Simple DOC360)"
+    },
+    {
+      "idDocumento": 403389,
+      "numInterno": 149,
+      "descripcion": "Memorándum MEMO-2026-GES037-000001 (FIRMADO — Firma Simple DOC360)"
+    },
+    {
+      "idDocumento": 403390,
+      "numInterno": 150,
+      "descripcion": "Memorándum MEMO-2026-IAA043-000001 (FIRMADO — Firma Simple DOC360)"
+    },
+    {
+      "idDocumento": 403391,
+      "numInterno": 151,
+      "descripcion": "Memorándum MEMO-2026-FIN035-000001 (FIRMADO — Firma Simple DOC360)"
+    },
+    {
+      "idDocumento": 403392,
+      "numInterno": 152,
+      "descripcion": "Memorándum MEMO-2026-GES040-000001 (pendiente de firma)"
+    },
+    {
+      "idDocumento": 403393,
+      "numInterno": 153,
+      "descripcion": "Memorándum MEMO-2026-OFI054-000001 (pendiente de firma)"
+    },
+    {
+      "idDocumento": 403394,
+      "numInterno": 154,
+      "descripcion": "Memorándum MEMO-2026-TEC078-000001 (pendiente de firma)"
+    },
+    {
+      "idDocumento": 403395,
+      "numInterno": 155,
+      "descripcion": "Memorándum MEMO-2026-JUR046-000001 (pendiente de firma)"
+    },
+    {
+      "idDocumento": 403396,
+      "numInterno": 156,
+      "descripcion": "Memorándum MEMO-2026-AUD018-000001 (pendiente de firma)"
+    },
+    {
+      "idDocumento": 403397,
+      "numInterno": 157,
+      "descripcion": "Memorándum MEMO-2026-GES039-000001 (pendiente de firma)"
+    },
+    {
+      "idDocumento": 403398,
+      "numInterno": 158,
+      "descripcion": "Memorándum MEMO-2026-FAR009-000001 (pendiente de firma)"
+    }
+  ],
+  "memorandumsCreados": [
+    {
+      "idDocumento": 403386,
+      "correlativo": "MEMO-2026-DIR032-000001",
+      "firmado": true
+    },
+    {
+      "idDocumento": 403387,
+      "correlativo": "MEMO-2026-SUB076-000001",
+      "firmado": true
+    },
+    {
+      "idDocumento": 403388,
+      "correlativo": "MEMO-2026-SUB075-000001",
+      "firmado": true
+    },
+    {
+      "idDocumento": 403389,
+      "correlativo": "MEMO-2026-GES037-000001",
+      "firmado": true
+    },
+    {
+      "idDocumento": 403390,
+      "correlativo": "MEMO-2026-IAA043-000001",
+      "firmado": true
+    },
+    {
+      "idDocumento": 403391,
+      "correlativo": "MEMO-2026-FIN035-000001",
+      "firmado": true
+    },
+    {
+      "idDocumento": 403392,
+      "correlativo": "MEMO-2026-GES040-000001",
+      "firmado": false
+    },
+    {
+      "idDocumento": 403393,
+      "correlativo": "MEMO-2026-OFI054-000001",
+      "firmado": false
+    },
+    {
+      "idDocumento": 403394,
+      "correlativo": "MEMO-2026-TEC078-000001",
+      "firmado": false
+    },
+    {
+      "idDocumento": 403395,
+      "correlativo": "MEMO-2026-JUR046-000001",
+      "firmado": false
+    },
+    {
+      "idDocumento": 403396,
+      "correlativo": "MEMO-2026-AUD018-000001",
+      "firmado": false
+    },
+    {
+      "idDocumento": 403397,
+      "correlativo": "MEMO-2026-GES039-000001",
+      "firmado": false
+    },
+    {
+      "idDocumento": 403398,
+      "correlativo": "MEMO-2026-FAR009-000001",
+      "firmado": false
+    }
+  ],
+  "procesosCompletos": [
+    {
+      "idDocumento": 403241,
+      "numInterno": 1,
+      "tag": "Adquisición de equipamiento clínico"
+    },
+    {
+      "idDocumento": 403242,
+      "numInterno": 2,
+      "tag": "Actualización de protocolo clínico"
+    },
+    {
+      "idDocumento": 403243,
+      "numInterno": 3,
+      "tag": "Recepción de oficio externo"
+    },
+    {
+      "idDocumento": 403244,
+      "numInterno": 4,
+      "tag": "Incidente tecnológico"
+    },
+    {
+      "idDocumento": 403245,
+      "numInterno": 5,
+      "tag": "Compromiso de mejora (Auditoría)"
+    },
+    {
+      "idDocumento": 403246,
+      "numInterno": 6,
+      "tag": "Capacitación institucional"
+    },
+    {
+      "idDocumento": 403247,
+      "numInterno": 7,
+      "tag": "Recursos Humanos"
+    },
+    {
+      "idDocumento": 403248,
+      "numInterno": 8,
+      "tag": "Gestión de camas"
+    },
+    {
+      "idDocumento": 403249,
+      "numInterno": 9,
+      "tag": "Farmacia"
+    },
+    {
+      "idDocumento": 403250,
+      "numInterno": 10,
+      "tag": "Laboratorio"
+    },
+    {
+      "idDocumento": 403251,
+      "numInterno": 11,
+      "tag": "Imagenología"
+    },
+    {
+      "idDocumento": 403252,
+      "numInterno": 12,
+      "tag": "Seguridad de la información"
+    },
+    {
+      "idDocumento": 403253,
+      "numInterno": 13,
+      "tag": "Mantenimiento"
+    },
+    {
+      "idDocumento": 403254,
+      "numInterno": 14,
+      "tag": "Infraestructura"
+    },
+    {
+      "idDocumento": 403255,
+      "numInterno": 15,
+      "tag": "Calidad"
+    },
+    {
+      "idDocumento": 403256,
+      "numInterno": 16,
+      "tag": "IAAS"
+    },
+    {
+      "idDocumento": 403257,
+      "numInterno": 17,
+      "tag": "Comité de Ética (vía Dirección)"
+    },
+    {
+      "idDocumento": 403258,
+      "numInterno": 18,
+      "tag": "Comité de Innovación"
+    },
+    {
+      "idDocumento": 403259,
+      "numInterno": 19,
+      "tag": "Estadística"
+    },
+    {
+      "idDocumento": 403260,
+      "numInterno": 20,
+      "tag": "OIRS (vía Participación Ciudadana)"
+    },
+    {
+      "idDocumento": 403261,
+      "numInterno": 21,
+      "tag": "Contingencia asistencial"
+    },
+    {
+      "idDocumento": 403262,
+      "numInterno": 22,
+      "tag": "Pronunciamiento jurídico"
+    }
+  ],
+  "reservados": [
+    {
+      "idDocumento": 403383,
+      "numInterno": 143
+    },
+    {
+      "idDocumento": 403384,
+      "numInterno": 144
+    },
+    {
+      "idDocumento": 403385,
+      "numInterno": 145
+    }
+  ],
+  "errores": [
+    {
+      "contexto": "ambiente:22",
+      "error": "Login falló para freyes1: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:24",
+      "error": "Login falló para pvega: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:25",
+      "error": "Login falló para jgodoy: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:26",
+      "error": "Login falló para fbravo: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:27",
+      "error": "Login falló para vsoto: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:29",
+      "error": "Login falló para pvidal: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:30",
+      "error": "Login falló para gtapia: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:31",
+      "error": "Login falló para vsoto: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:33",
+      "error": "Login falló para freyes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:34",
+      "error": "Login falló para tgodoy: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:37",
+      "error": "Login falló para afuentes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:41",
+      "error": "Login falló para fespinoz1: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:42",
+      "error": "Login falló para pvega: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:44",
+      "error": "Login falló para vmorales: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:45",
+      "error": "Login falló para imorales: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:48",
+      "error": "Login falló para ftoro: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:52",
+      "error": "Login falló para vmorales: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:55",
+      "error": "Login falló para freyes1: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:56",
+      "error": "Login falló para fcastill: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:57",
+      "error": "Login falló para freyes1: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:60",
+      "error": "Login falló para fespinoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:61",
+      "error": "Login falló para faraya: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:62",
+      "error": "Login falló para ftoro: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:67",
+      "error": "Login falló para fespinoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:71",
+      "error": "Login falló para mriquelm: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:76",
+      "error": "Login falló para vsoto: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:79",
+      "error": "Login falló para pvega: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:80",
+      "error": "Login falló para tgodoy: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:82",
+      "error": "Login falló para pvidal: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:83",
+      "error": "Login falló para freyes1: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:84",
+      "error": "Login falló para vsoto: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:85",
+      "error": "Login falló para mmunoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:87",
+      "error": "Login falló para pvega: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:88",
+      "error": "Login falló para mriquelm: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:90",
+      "error": "Login falló para mriquelm: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:96",
+      "error": "Login falló para jgodoy: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:98",
+      "error": "Login falló para faraya: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:100",
+      "error": "Login falló para imorales: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:102",
+      "error": "Login falló para mmunoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:103",
+      "error": "Login falló para freyes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:104",
+      "error": "Login falló para pvega: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:105",
+      "error": "Login falló para vsoto: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:111",
+      "error": "Login falló para dsoto: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:112",
+      "error": "Login falló para freyes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:113",
+      "error": "Login falló para mmunoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:118",
+      "error": "Login falló para faraya: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:119",
+      "error": "Login falló para dsoto: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:123",
+      "error": "Login falló para jgodoy: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:124",
+      "error": "Login falló para ftoro: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:128",
+      "error": "Login falló para freyes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:129",
+      "error": "Login falló para fcastill: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:130",
+      "error": "Login falló para freyes1: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:132",
+      "error": "Login falló para afuentes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:134",
+      "error": "Login falló para freyes1: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:135",
+      "error": "Login falló para tgodoy: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:137",
+      "error": "Login falló para fbravo: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:139",
+      "error": "Login falló para afuentes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:142",
+      "error": "Login falló para gtapia: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:143",
+      "error": "Login falló para despinoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:146",
+      "error": "Login falló para fmunoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:149",
+      "error": "Login falló para fmunoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:150",
+      "error": "Login falló para gtapia: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:151",
+      "error": "Login falló para vmorales: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:154",
+      "error": "Login falló para fmunoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:156",
+      "error": "Login falló para freyes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "ambiente:157",
+      "error": "Login falló para pvega: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "reservado",
+      "error": "Login falló para fcastill: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "memo-firmado:69",
+      "error": "Login falló para imorales: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "memo-firmado:72",
+      "error": "Login falló para fespinoz: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "memo-pendiente:2055",
+      "error": "Login falló para afuentes: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "memo-pendiente:2003",
+      "error": "Login falló para freyes1: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    },
+    {
+      "contexto": "memo-pendiente:33",
+      "error": "Login falló para tgodoy: 429 {\"ok\":false,\"error\":\"Demasiados intentos. Intente en 15 minutos.\"}"
+    }
+  ]
+}

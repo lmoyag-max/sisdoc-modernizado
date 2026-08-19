@@ -24,6 +24,7 @@ import { FirmaGobPage } from '@/pages/admin/FirmaGobPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ReportesPage } from '@/pages/reportes/ReportesPage';
 import { AlertasPage } from '@/pages/alertas/AlertasPage';
+import { LibroReferenciasPage } from '@/pages/libro-referencias/LibroReferenciasPage';
 
 // Envoltura helper: muestra ModuleGuard con el módulo indicado
 function M({ m, children }: { m: string; children: React.ReactNode }) {
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
           { path: '/trazabilidad',        element: <M m="trazabilidad"><TrazabilidadPage /></M>,   errorElement: <RouteError /> },
           { path: '/busqueda',            element: <M m="busqueda"><BusquedaPage /></M>,            errorElement: <RouteError /> },
           { path: '/archivos',            element: <M m="archivos"><ArchivosPage /></M>,            errorElement: <RouteError /> },
+          { path: '/libro-referencias',   element: <M m="libro-referencias"><LibroReferenciasPage /></M>, errorElement: <RouteError /> },
 
           // ── Administración ──────────────────────────────────
           { path: '/admin/usuarios',      element: <M m="usuarios"><UsuariosPage /></M>,            errorElement: <RouteError /> },

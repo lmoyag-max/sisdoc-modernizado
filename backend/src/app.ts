@@ -27,6 +27,7 @@ import alertasRoutes     from './modules/alertas/alertas.routes';
 import memorandumRoutes  from './modules/memorandum/memorandum.routes';
 import jefaturasRoutes   from './modules/jefaturas/jefatura.routes';
 import firmaGobRoutes    from './modules/firma-gob/firma-gob.routes';
+import libroReferenciasRoutes from './modules/libro-referencias/libro-referencias.routes';
 
 const app = express();
 
@@ -130,6 +131,7 @@ app.use(`${API}/alertas`,     alertasRoutes);
 app.use(`${API}/memorandum`,  memorandumRoutes);
 app.use(`${API}/jefaturas`,   jefaturasRoutes);
 app.use(`${API}/firma-gob`,   firmaGobRoutes);
+app.use(`${API}/libro-referencias`, libroReferenciasRoutes);
 
 app.get(`${API}`, (_req, res) => {
   res.json({ ok: true, api: 'DOC360 v2', docs: '/api-docs' });

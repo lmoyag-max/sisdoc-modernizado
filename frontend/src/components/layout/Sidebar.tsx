@@ -5,7 +5,7 @@ import {
   LayoutDashboard, FileText, Inbox, Send, ClipboardList,
   Network, Search, Upload, Users, BarChart3,
   Settings, LogOut, ChevronLeft, ChevronRight, X,
-  Building2, Shield, Bell, UserCheck, PenLine,
+  Building2, Shield, Bell, UserCheck, PenLine, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore, displayName } from '@/stores/auth.store';
@@ -35,6 +35,7 @@ const ACCENT_MODULO: Record<string, string> = {
   trazabilidad:   'violet',
   busqueda:       'sky',
   archivos:       'emerald',
+  'libro-referencias': 'sky',
   usuarios:       'amber',
   reportes:       'emerald',
   roles:          'violet',
@@ -53,6 +54,7 @@ const NAV_PRINCIPAL: NavItem[] = [
   { label: 'Trazabilidad',    to: '/trazabilidad', icon: Network,         modulo: 'trazabilidad' },
   { label: 'Búsqueda',        to: '/busqueda',     icon: Search,          modulo: 'busqueda'     },
   { label: 'Archivos',        to: '/archivos',     icon: Upload,          modulo: 'archivos'     },
+  { label: 'Libro de Referencias', to: '/libro-referencias', icon: BookOpen, modulo: 'libro-referencias' },
 ];
 
 const NAV_ADMIN: NavItem[] = [

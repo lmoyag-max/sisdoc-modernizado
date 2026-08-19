@@ -11,7 +11,7 @@ const TODOS_MODULOS = [
   'dashboard','documentos','bandeja','enviados','tramites',
   'trazabilidad','busqueda','archivos',
   'usuarios','reportes','roles','configuracion','alertas',
-  'jefaturas','firma-gob',
+  'jefaturas','firma-gob','libro-referencias',
 ];
 
 // ── GET /roles — listar roles con sus módulos ─────────────────
@@ -173,6 +173,7 @@ router.get('/meta/modulos', (_req: Request, res: Response) => {
     alertas:       { label: 'Alertas',             grupo: 'admin' },
     jefaturas:     { label: 'Jefaturas',           grupo: 'admin' },
     'firma-gob':   { label: 'Firma.gob',           grupo: 'admin' },
+    'libro-referencias': { label: 'Libro de Referencias', grupo: 'operativo' },
   };
   sendSuccess(res, TODOS_MODULOS.map((m) => ({ codigo: m, ...LABELS[m] })));
 });
